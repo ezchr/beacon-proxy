@@ -34,9 +34,11 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"github.com/ezchr/beacon-proxy/internal/bridge"
 	"github.com/ezchr/beacon-proxy/internal/proxy"
 	"github.com/ezchr/beacon-proxy/internal/session"
 	"github.com/ezchr/beacon-proxy/internal/xbl"
@@ -145,6 +147,11 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	allowXUID func(string) bool, friendActivity *friendactivity.Store, debug bool, log *slog.Logger) error {
 	log = log.With("broadcast", name)
 	cfg.BroadcastName = name
+	// The relay counts the players who joined through this world; relayless players never pass
+	// through Beacon, so there the server's own count is shown.
+	if cfg.BackendTransport != bridge.TransportNetherNetNoRelay {
+		cfg.WorldPlayers = new(atomic.Int64)
+	}
 	if !proxy.Supported(cfg.Protocol) {
 		log.Warn("this broadcast advertises a protocol the relay does not serve: its players will be refused",
 			"protocol", cfg.Protocol, "version", cfg.Version, "served", proxy.SupportedProtocols())

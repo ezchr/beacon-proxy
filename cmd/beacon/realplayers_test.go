@@ -64,3 +64,24 @@ func TestRealPlayerCount(t *testing.T) {
 		t.Error("a fake count must win over the real one")
 	}
 }
+
+// TestWorldPlayerCount: in relay mode the Friends tab shows the players who joined through that
+// world, never below 1, and a fake count still wins.
+func TestWorldPlayerCount(t *testing.T) {
+	cfg := FileConfig{BackendTransport: "nethernet", WorldPlayers: new(atomic.Int64)}
+	if got := advertisedPlayers(cfg); got != 1 {
+		t.Fatalf("empty world shows %d, want 1", got)
+	}
+	cfg.WorldPlayers.Add(3)
+	if got := advertisedPlayers(cfg); got != 3 {
+		t.Fatalf("three players show %d", got)
+	}
+	cfg.WorldPlayers.Add(-1)
+	if got := advertisedPlayers(cfg); got != 2 {
+		t.Fatalf("after one left it shows %d", got)
+	}
+	cfg.FakePlayerCount = 21
+	if got := advertisedPlayers(cfg); got != 21 {
+		t.Fatalf("fake count shows %d", got)
+	}
+}

@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/url"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/df-mc/go-nethernet"
@@ -57,6 +58,10 @@ type Config struct {
 	// BackendTransport selects how the backend is reached: TransportRakNet (the default when
 	// empty) or TransportNetherNet.
 	BackendTransport string
+
+	// WorldPlayers, when set, counts the players on the relay who joined through this Friends-tab
+	// world (one counter per world): it is the player count the world shows.
+	WorldPlayers *atomic.Int64
 
 	// GeyserAddress is host:port of the backend's RakNet listener, e.g. "127.0.0.1:19132".
 	// Used only when BackendTransport is RakNet. That listener MUST have encryption disabled -

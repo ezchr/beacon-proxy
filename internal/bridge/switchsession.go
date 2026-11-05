@@ -193,6 +193,10 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	noteBedrock(1) // the network's player count, see onlinecount.go
 	defer noteBedrock(-1)
+	if cfg.WorldPlayers != nil {
+		cfg.WorldPlayers.Add(1)
+		defer cfg.WorldPlayers.Add(-1)
+	}
 	// The build's own player checks, if it has any (checks.go).
 	unchecked := true
 	if Checks != nil {

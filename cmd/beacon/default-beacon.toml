@@ -105,7 +105,8 @@ packets-per-second = 0
 # Most players online at once from one IP address. 0: no limit.
 sessions-per-ip = 0
 
-# The player count on the Friends tab. 0: the real count. Above 0: this number instead.
+# The player count on the Friends tab. 0: the real count, the players who joined through that world
+# (relayless: everyone on your server). Above 0: this number instead.
 fake-player-count = {{.FakePlayerCount}}
 
 # Or a count that wanders between min and max, moving by at most max-step each update, and never

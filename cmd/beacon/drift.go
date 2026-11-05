@@ -121,8 +121,12 @@ func advertisedPlayers(cfg FileConfig) int {
 	if cfg.FakePlayerCount > 0 {
 		return cfg.FakePlayerCount
 	}
-	// The real count, as last read by refreshRealPlayers. Unknown (never read yet) and 0 both
-	// show as 1, for the reason above.
+	// Relay mode: the players who joined through this world. 0 shows as 1, for the reason above.
+	if cfg.WorldPlayers != nil {
+		return max(int(cfg.WorldPlayers.Load()), 1)
+	}
+	// Relayless: the backend's count, as last read by refreshRealPlayers. Unknown (never read yet)
+	// and 0 both show as 1.
 	return max(int(realPlayers.Load()), 1)
 }
 

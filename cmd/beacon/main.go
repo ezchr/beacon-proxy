@@ -377,7 +377,7 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	// fake_player_drift's range when that is set, or else the backend's real count - never
 	// below 1 - see advertisedPlayers.
 	realCount := advertisesRealPlayers(cfg)
-	if realCount {
+	if realCount && cfg.WorldPlayers == nil {
 		// Read once now so the session is created with the real number rather than the floor.
 		if _, err := refreshRealPlayers(ctx, cfg); err != nil {
 			log.Warn("could not read the backend's player count; advertising 1 until it answers", "err", err)
@@ -575,11 +575,29 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 			countTick = countTicker.C
 		}
 		countFailing := false
+		var shown int64
+		if cfg.WorldPlayers != nil {
+			shown = cfg.WorldPlayers.Load()
+		}
 		for {
 			select {
 			case <-sessionCtx.Done():
 				return
 			case <-countTick:
+				if cfg.WorldPlayers != nil {
+					// Relay mode: the players who joined through this world, as the relay counts them.
+					n := cfg.WorldPlayers.Load()
+					if n == shown {
+						continue
+					}
+					shown = n
+					log.Info("players in this world changed, updating the Friends tab", "players", n, "advertised", advertisedPlayers(cfg))
+					xblSession.SetWorldInfo(worldInfo())
+					if err := xblSession.Update(sessionCtx); err != nil {
+						log.Error("failed to update session with the new player count", "err", err)
+					}
+					continue
+				}
 				changed, err := refreshRealPlayers(sessionCtx, cfg)
 				if err != nil {
 					// Log the first failure and the recovery, not every 15s in between.
@@ -659,6 +677,7 @@ func relayConfig(cfg FileConfig, authSession *session.Session, allowXUID func(st
 		DisableClientEncryption: cfg.DisableClientEncryption,
 		ForwardingSecret:        cfg.ForwardingSecret,
 		ForwardingServer:        cfg.DefaultServer,
+		WorldPlayers:            cfg.WorldPlayers,
 		AllowXUID:               allowXUID,
 		OnJoin: func(xuid, name string) {
 			friendActivity.RecordJoin(xuid, name)

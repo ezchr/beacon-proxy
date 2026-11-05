@@ -6,6 +6,7 @@ import (
 	"github.com/ezchr/beacon-proxy/internal/bridge"
 	"os"
 	"strings"
+	"sync/atomic"
 )
 
 type FileConfig struct {
@@ -69,10 +70,14 @@ type FileConfig struct {
 	MaxPlayers int    `json:"max_players"`
 
 	// FakePlayerCount, when above zero, is shown on the Friends tab instead of the real count.
-	// Zero (with no fake_player_drift) shows the backend's real player count - everyone on it,
-	// however they joined - read every 15s and pushed as soon as it changes, never below 1. See
-	// advertisedPlayers.
+	// Zero (with no fake_player_drift) shows the real count, never below 1: in relay mode the
+	// players who joined through that world (WorldPlayers), in relayless mode the backend's own
+	// count. Checked every 15s and pushed when it changes. See advertisedPlayers.
 	FakePlayerCount int `json:"fake_player_count"`
+
+	// WorldPlayers counts the players who joined through this broadcast's world (relay mode;
+	// runBroadcast sets it, and the relay keeps it). Nil elsewhere.
+	WorldPlayers *atomic.Int64 `json:"-"`
 
 	// FakePlayerDrift, when set with max above zero, makes the advertised count wander inside
 	// [min, max] instead of sitting on fake_player_count: every update_interval_seconds it moves
