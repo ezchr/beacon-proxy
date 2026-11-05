@@ -19,7 +19,8 @@ forwarding-secret-file = "forwarding.secret"
 # The world name on the Friends tab and server list.
 motd = {{q .MOTD}}
 
-# The max players shown. Display only.
+# The max players shown next to the player count, on the Friends tab and the server list.
+# Display only: it doesn't stop anyone joining.
 show-max-players = {{.ShowMaxPlayers}}
 
 # What the server list takes from the first server's own entry: "off", "motd", "players" or "all".
@@ -40,7 +41,9 @@ ping-passthrough = "off"
 try = {{list .Try}}
 
 [forced-hosts]
-# Players who join by one of these addresses get their own order, e.g. "pvp.example.com" = ["pvp"].
+# Players who join by one of these addresses go to these servers, in order, instead of try.
+# Friends-tab joins have no address and always use try. To use one, remove the # in front:
+# "pvp.example.com" = ["pvp"]
 
 [broadcast]
 # The host name shown on the Friends tab. Empty: the motd.
@@ -93,6 +96,13 @@ packets-per-second = 0
 
 # Most players online at once from one IP address. 0: off.
 sessions-per-ip = 0
+
+# The player count on the Friends tab. 0: the real count. Above 0: this number instead.
+fake-player-count = {{.FakePlayerCount}}
+
+# Or a count that wanders between min and max, moving by at most max-step each update, and never
+# reaching show-max-players (a full world can't be joined). max = 0: off.
+fake-player-drift = {{with .FakePlayerDrift}}{ min = {{.Min}}, max = {{.Max}}, max-step = {{.MaxStep}} }{{else}}{ min = 0, max = 0, max-step = 1 }{{end}}
 {{- if .DisableClientEncryption}}
 disable-client-encryption = true
 {{- end}}
@@ -102,10 +112,4 @@ network-dir = {{q .NetworkDir}}
 {{- if .RejoinAddress}}
 # Where players rejoin when a server's packs changed during their join.
 rejoin-address = {{q .RejoinAddress}}
-{{- end}}
-{{- if .FakePlayerCount}}
-fake-player-count = {{.FakePlayerCount}}
-{{- end}}
-{{- with .FakePlayerDrift}}
-fake-player-drift = { min = {{.Min}}, max = {{.Max}}, max-step = {{.MaxStep}} }
 {{- end}}
