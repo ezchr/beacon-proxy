@@ -30,8 +30,9 @@ Geyser and others. It can run on the same machine as your servers or on its own.
 
 4. Set up each server for Beacon (next section).
 5. Start Beacon again. It asks you to sign in with a Microsoft account: open the link it prints
-   and enter the code. **Use an Xbox account made for this**, not your own: the world is shown as
-   hosted by it, and everyone who wants to see it on the Friends tab has to be its friend.
+   and enter the code. **Don't use your main Xbox account:** make a separate one for Beacon. The
+   world is shown as hosted by it, and everyone who wants to see it on the Friends tab has to be its
+   friend.
 
 Players now find the world on the Friends tab once they friend the Beacon account, or join by your
 IP and port 19132.
