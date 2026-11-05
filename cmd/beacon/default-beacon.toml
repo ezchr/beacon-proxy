@@ -50,9 +50,9 @@ try = {{list .Try}}
 # "pvp.example.com" = ["pvp"]
 
 [broadcast]
-# A world on the Friends tab holds at most 30 players at once. That is Minecraft's own limit and
-# can't be raised. For more, add hosting accounts (beacon accounts add <name>): each lists your
-# servers as one more world, with 30 more places.
+# A world on the Friends tab holds at most 30 players at once, whatever show-max-players says.
+# That is Minecraft's own limit and can't be raised. For more, add hosting accounts
+# (beacon accounts add <name>): each lists your servers as one more world, with 30 more places.
 
 # The host name shown on the Friends tab. Empty: the motd.
 host-name = {{q .HostName}}

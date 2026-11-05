@@ -15,8 +15,10 @@ its own (`accept-friends = true` under `[broadcast]`), and once they are friends
 ## 30 players per world, and more accounts
 
 A world on the Friends tab holds at most **30 players** at once. That limit is built into Minecraft
-and Xbox Live: no server, proxy or setting can raise it. Player 31 sees the world as full and can't
-join it. Players who join by IP address don't count.
+and Xbox Live: no server, proxy or setting can raise it. Once 30 players have joined a world,
+nobody else can connect to it, even if its max shows more (`show-max-players` can be set higher,
+as in Minecraft itself, but it only changes the number shown). Players who join by IP address
+don't count.
 
 To let more players in from the Friends tab, list more worlds: each extra Xbox account broadcasts
 your servers as one more world with its own 30 places. Players still end up on the same servers
