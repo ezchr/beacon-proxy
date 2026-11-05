@@ -19,6 +19,7 @@ import (
 
 	"github.com/df-mc/go-nethernet"
 	"github.com/ezchr/beacon-proxy/internal/proxy"
+	"github.com/sandertv/go-raknet"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -661,21 +662,114 @@ func (n *Network) fetchPacks(server string) {
 	if c != nil && c.PacksInfo != nil && len(want) == 0 {
 		return
 	}
-	if err := n.downloadPacks(server); err != nil {
+	if _, err := n.downloadPacks(server); err != nil {
 		n.Log.Warn("network: could not download resource packs", "server", server, "err", err)
 	}
 }
 
-// FetchAllPacks downloads every server's missing packs (and learns their pack lists), and joins
-// each server the relay has nothing cached for once, to learn its content; run at start.
+// refresh reads a server's pack list at the pack screen, without joining its world, and downloads
+// any new pack. A changed list means the rest of its content may have changed too, so that is
+// learned again as well: the next player then gets the new packs at login, instead of finding
+// out on reaching the server and having to join again.
+func (n *Network) refresh(server string) error {
+	n.mu.Lock()
+	if n.fetching[server] {
+		n.mu.Unlock()
+		return nil
+	}
+	n.fetching[server] = true
+	n.mu.Unlock()
+	changed, err := n.downloadPacks(server)
+	n.mu.Lock()
+	delete(n.fetching, server)
+	n.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	if changed {
+		n.Log.Info("network: a server has new resource packs", "server", server)
+		// The server may still be closing the pack check's connection: give it a moment.
+		for range 3 {
+			time.Sleep(3 * time.Second)
+			if err = n.learn(server); err == nil {
+				return nil
+			}
+		}
+		n.Log.Warn("network: could not learn a server's content (retried at the next join)", "server", server, "err", err)
+	}
+	return nil
+}
+
+const (
+	// serverWatchInterval is how often the servers are checked for being up.
+	serverWatchInterval = 5 * time.Second
+	// serverRefreshInterval is how often pack lists are read anyway, for a restart too quick to
+	// be seen or packs changed without one.
+	serverRefreshInterval = 10 * time.Minute
+)
+
+// watchServers refreshes a server that comes back up, which is when its packs change, and every
+// server now and then. It runs for as long as the relay does.
+func (n *Network) watchServers() {
+	up := map[string]bool{}
+	lastRefresh := time.Now()
+	for range time.Tick(serverWatchInterval) {
+		periodic := time.Since(lastRefresh) >= serverRefreshInterval
+		if periodic {
+			lastRefresh = time.Now()
+		}
+		for _, s := range n.conf().servers {
+			now := serverUp(s)
+			was, seen := up[s.Name]
+			up[s.Name] = now
+			if now && (periodic || seen && !was) {
+				go n.refreshRetrying(s.Name)
+			}
+		}
+	}
+}
+
+// refreshRetrying refreshes a server, trying again for a server still starting.
+func (n *Network) refreshRetrying(server string) {
+	var err error
+	for range 4 {
+		if err = n.refresh(server); err == nil {
+			return
+		}
+		time.Sleep(serverWatchInterval)
+	}
+	n.Log.Warn("network: could not read a server's resource packs", "server", server, "err", err)
+}
+
+// serverUp reports whether a server answers: a ping for RakNet, its signaling port for NetherNet.
+func serverUp(s ServerConfig) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	if strings.EqualFold(s.Transport, TransportRakNet) {
+		_, err := raknet.PingContext(ctx, s.Address)
+		return err == nil
+	}
+	host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(s.Address, "http://"), "https://"), "/")
+	c, err := (&net.Dialer{}).DialContext(ctx, "tcp", host)
+	if err != nil {
+		return false
+	}
+	_ = c.Close()
+	return true
+}
+
+// FetchAllPacks reads every server's pack list and downloads its missing packs, joins each server
+// the relay has nothing cached for once, to learn its content, and starts watching the servers;
+// run at start.
 func (n *Network) FetchAllPacks() {
+	go n.watchServers()
 	for _, s := range n.conf().servers {
 		n.mu.Lock()
 		c := n.content[s.Name]
 		known := c != nil && c.StartGame != nil
 		n.mu.Unlock()
 		if known {
-			go n.fetchPacks(s.Name)
+			go n.refreshRetrying(s.Name)
 			continue
 		}
 		go func(name string) {
@@ -716,8 +810,10 @@ func (n *Network) learn(server string) error {
 			n.record(server, pk.ID(), payload)
 		}
 	}
-	// Some servers send their registries after the spawn.
-	_ = conn.SetReadDeadline(time.Now().Add(4 * time.Second))
+	// Some servers send their registries after the spawn. Closing ends the wait: a read deadline
+	// would not, as NetherNet connections ignore it, and the made-up player would stay in the world.
+	leave := time.AfterFunc(4*time.Second, func() { _ = conn.Close() })
+	defer leave.Stop()
 	for {
 		pks, err := c.ReadPackets()
 		if err != nil {
@@ -761,17 +857,19 @@ const (
 	learnerXUID     = "2535400000000003"
 )
 
-func (n *Network) downloadPacks(server string) error {
+// downloadPacks logs in as far as the pack screen, keeps the server's pack list and downloads the
+// packs the relay does not have. It reports whether the list changed.
+func (n *Network) downloadPacks(server string) (changed bool, err error) {
 	s := n.server(server)
 	if s == nil {
-		return fmt.Errorf("no server %q", server)
+		return false, fmt.Errorf("no server %q", server)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	id := login.IdentityData{XUID: packFetcherXUID, DisplayName: "beaconpacks", Identity: "6e327061-636b-3300-8000-000000000002"}
 	c, conn, err := n.dialServer(ctx, *s, s.probeProtocol(), id, ProbeClientData("beaconpacks"), "")
 	if err != nil {
-		return err
+		return false, err
 	}
 	defer conn.Close()
 	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
@@ -787,24 +885,24 @@ func (n *Network) downloadPacks(server string) error {
 	for {
 		pks, err := c.ReadPackets()
 		if err != nil {
-			return err
+			return changed, err
 		}
 		for _, raw := range pks {
 			pid, payload, err := splitPacket(raw)
 			if err != nil {
-				return err
+				return changed, err
 			}
 			switch pid {
 			case packet.IDDisconnect:
 				var pk packet.Disconnect
 				_ = decodeInto(&pk, payload)
-				return fmt.Errorf("disconnected: %s", pk.Message)
+				return changed, fmt.Errorf("disconnected: %s", pk.Message)
 			case packet.IDResourcePacksInfo:
 				info = &packet.ResourcePacksInfo{}
 				if err := decodeInto(info, payload); err != nil {
-					return err
+					return changed, err
 				}
-				n.record(server, pid, payload)
+				changed = n.record(server, pid, payload)
 				var ids []string
 				n.mu.Lock()
 				for _, t := range info.TexturePacks {
@@ -815,29 +913,29 @@ func (n *Network) downloadPacks(server string) error {
 				}
 				n.mu.Unlock()
 				if len(ids) == 0 {
-					return nil
+					return changed, nil
 				}
 				if err := c.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseSendPacks, PacksToDownload: ids}); err != nil {
-					return err
+					return changed, err
 				}
 				got = len(ids)
 			case packet.IDResourcePackStack:
-				return nil // the server had nothing to send
+				return changed, nil // the server had nothing to send
 			case packet.IDResourcePackDataInfo:
 				pk := &packet.ResourcePackDataInfo{}
 				if err := decodeInto(pk, payload); err != nil {
-					return err
+					return changed, err
 				}
 				downloads[pk.UUID] = &pending{info: pk, data: make([]byte, 0, pk.Size)}
 				for i := uint32(0); i < pk.ChunkCount; i++ {
 					if err := c.WritePacket(&packet.ResourcePackChunkRequest{UUID: pk.UUID, ChunkIndex: int32(i)}); err != nil {
-						return err
+						return changed, err
 					}
 				}
 			case packet.IDResourcePackChunkData:
 				var pk packet.ResourcePackChunkData
 				if err := decodeInto(&pk, payload); err != nil {
-					return err
+					return changed, err
 				}
 				d := downloads[pk.UUID]
 				if d == nil {
@@ -850,7 +948,7 @@ func (n *Network) downloadPacks(server string) error {
 				}
 				sum := sha256.Sum256(d.data)
 				if len(d.info.Hash) > 0 && !bytes.Equal(sum[:], d.info.Hash) {
-					return fmt.Errorf("pack %s: hash mismatch", pk.UUID)
+					return changed, fmt.Errorf("pack %s: hash mismatch", pk.UUID)
 				}
 				key := pk.UUID
 				if !strings.Contains(key, "_") {
@@ -862,7 +960,7 @@ func (n *Network) downloadPacks(server string) error {
 				}
 				_ = os.MkdirAll(filepath.Join(n.Dir, "packs"), 0o755)
 				if err := os.WriteFile(filepath.Join(n.Dir, "packs", key+".zip"), d.data, 0o644); err != nil {
-					return err
+					return changed, err
 				}
 				n.mu.Lock()
 				n.packs[key] = &cachedPack{data: d.data, hash: sum[:]}
@@ -870,7 +968,7 @@ func (n *Network) downloadPacks(server string) error {
 				n.Log.Info("network: downloaded resource pack", "server", server, "pack", key, "bytes", len(d.data))
 				got--
 				if got == 0 {
-					return nil
+					return changed, nil
 				}
 			}
 		}
