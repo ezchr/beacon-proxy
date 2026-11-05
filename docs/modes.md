@@ -26,9 +26,10 @@ Pick it when you have more than one server, or want players to join by IP throug
 
 ## Relayless
 
-Beacon keeps the world on the Friends tab, and when a player clicks it, Beacon hands the player's
-connection details to your server. The player then connects to your server directly, with their
+Beacon lists your server on the Friends tab as in relay mode, but when a player clicks it, Beacon
+hands the player's connection details to your server instead of carrying the connection. The player then connects to your server directly, with their
 own Xbox login, which your server checks itself. Beacon carries no game traffic.
 
-Pick it when you only want your one server on the Friends tab and nothing else changes: the server
-keeps working as it always has, and a Beacon restart does not kick anyone.
+Pick it when you don't need to move players between servers: you have one server and want it on
+the Friends tab without changing anything on it. The server keeps working as it always has, a
+Beacon restart does not kick anyone, and Beacon's machine carries no game traffic.

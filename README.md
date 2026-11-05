@@ -113,17 +113,18 @@ certificate can cover) still get in, after the wait.
 You can also leave HTTPS to a web server in front of Beacon (nginx, Caddy): bind Beacon to
 `127.0.0.1` and have the web server forward `/v1/join` to it.
 
-## Friends tab only (relayless mode)
+## Without server switching (relayless mode)
 
-If you only want your server on the Friends tab, and no `/server` switching, set (see
+If you don't need `/server` switching between servers, set (see
 [Relay and relayless mode](docs/modes.md)):
 
 ```toml
 mode = "relayless"
 ```
 
-Beacon then only lists the world and hands each player straight to your server, so it is not in
-the connection at all: players keep playing through a Beacon restart. Your server keeps its own
+Beacon then lists your server on the Friends tab as usual, but hands each player straight to it
+instead of carrying their connection, so it is not in the connection at all: players keep playing
+through a Beacon restart, and Beacon's machine carries no game traffic. Your server keeps its own
 Xbox check on (`online-mode=true`), needs nothing else, and must be reachable by players. It must
 offer NetherNet (BDS 1.26.60+ does by default).
 
@@ -147,7 +148,7 @@ All on by default unless noted; details in [Features](docs/features.md).
 
 | Setting | Meaning |
 |---|---|
-| `mode` | `"relay"` (default): players go through Beacon and can switch servers. `"relayless"`: Friends tab only. |
+| `mode` | `"relay"` (default): players go through Beacon and can switch servers. `"relayless"`: players connect straight to your one server, no switching. |
 | `bind` | where players join by IP, e.g. `"0.0.0.0:19132"`. Empty: Friends tab only. |
 | `domain`, or `tls-cert` and `tls-key` | HTTPS for joining by address; see [above](#joining-by-address-https) |
 | `motd` | the world name on the Friends tab and server list |

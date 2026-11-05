@@ -5,9 +5,9 @@ config-version = "1.0"
 #   "relay"     - players connect through Beacon, which can move them between the servers below
 #                 with /server (like Velocity). Each server needs online-mode=false in its own
 #                 config, so firewall it: only Beacon may reach it (see the README).
-#   "relayless" - Beacon only lists your server (Friends tab) and hands each player straight to
-#                 it. Beacon is not in the connection, so players stay on through a Beacon restart.
-#                 One server, no /server. The server keeps online-mode=true.
+#   "relayless" - for when you don't need /server: Beacon lists your one server on the Friends tab
+#                 and hands each player straight to it instead of carrying the connection, so
+#                 players stay on through a Beacon restart. The server keeps online-mode=true.
 mode = {{q .Mode}}
 
 # Where players join by IP / the server list (relay mode). Empty: Friends tab only.
