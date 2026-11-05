@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"slices"
 	"strings"
 	"sync"
 
@@ -27,22 +28,9 @@ func setupNetwork(cfg FileConfig, authSession *session.Session, log *slog.Logger
 	if strings.EqualFold(strings.TrimSpace(cfg.BackendTransport), bridge.TransportNetherNetNoRelay) {
 		return nil, errors.New(`"servers" needs backend_transport "nethernet" (relay mode): in no-relay mode the relay is not in the connection, so it can't move players`)
 	}
-	seen := map[string]bool{}
-	for i, s := range cfg.Servers {
-		if s.Name == "" || s.Address == "" {
-			return nil, fmt.Errorf("servers[%d] needs a name and an address", i)
-		}
-		if seen[strings.ToLower(s.Name)] {
-			return nil, fmt.Errorf("two servers are called %q", s.Name)
-		}
-		seen[strings.ToLower(s.Name)] = true
-		if !strings.EqualFold(s.Transport, bridge.TransportRakNet) {
-			addr, err := bridge.NormalizeNetherNetAddress(s.Address)
-			if err != nil {
-				return nil, fmt.Errorf("server %s: %w", s.Name, err)
-			}
-			cfg.Servers[i].Address = addr
-		}
+	servers, err := normalizeServers(cfg.Servers)
+	if err != nil {
+		return nil, err
 	}
 	def := cfg.DefaultServer
 	if def == "" {
@@ -52,16 +40,14 @@ func setupNetwork(cfg FileConfig, authSession *session.Session, log *slog.Logger
 	if dir == "" {
 		dir = "network"
 	}
-	admins := map[string]bool{}
-	for _, a := range cfg.Admins {
-		admins[strings.ToLower(strings.TrimSpace(a))] = true
-	}
 	n := &bridge.Network{
-		Servers:          cfg.Servers,
+		Servers:          servers,
 		Default:          def,
+		Try:              cfg.Try,
+		ForcedHosts:      cfg.ForcedHosts,
 		Dir:              dir,
 		Identity:         identityCacheFor(authSession, log).Identity,
-		Admins:           admins,
+		Admins:           adminSet(cfg.Admins),
 		Log:              log,
 		RejoinAddress:    cfg.RejoinAddress,
 		ForwardingSecret: cfg.ForwardingSecret,
@@ -74,6 +60,29 @@ func setupNetwork(cfg FileConfig, authSession *session.Session, log *slog.Logger
 	}
 	n.FetchAllPacks()
 	return n, nil
+}
+
+// normalizeServers checks the server list and puts NetherNet addresses in the form dialing needs.
+func normalizeServers(in []bridge.ServerConfig) ([]bridge.ServerConfig, error) {
+	out := slices.Clone(in)
+	seen := map[string]bool{}
+	for i, s := range out {
+		if s.Name == "" || s.Address == "" {
+			return nil, fmt.Errorf("servers[%d] needs a name and an address", i)
+		}
+		if seen[strings.ToLower(s.Name)] {
+			return nil, fmt.Errorf("two servers are called %q", s.Name)
+		}
+		seen[strings.ToLower(s.Name)] = true
+		if !strings.EqualFold(s.Transport, bridge.TransportRakNet) {
+			addr, err := bridge.NormalizeNetherNetAddress(s.Address)
+			if err != nil {
+				return nil, fmt.Errorf("server %s: %w", s.Name, err)
+			}
+			out[i].Address = addr
+		}
+	}
+	return out, nil
 }
 
 // listing switches the Friends-tab listing (every broadcast of this relay) on and off: config
@@ -188,7 +197,7 @@ func serveNetworkControl(w http.ResponseWriter, r *http.Request) bool {
 			http.Error(w, "this relay has no servers list", http.StatusNotFound)
 			return true
 		}
-		_ = json.NewEncoder(w).Encode(map[string]any{"servers": network.ServerNames(), "default": network.Default, "players": network.Sessions()})
+		_ = json.NewEncoder(w).Encode(map[string]any{"servers": network.ServerNames(), "default": network.DefaultServer(), "players": network.Sessions()})
 		return true
 	case path == "/switch":
 		if network == nil {

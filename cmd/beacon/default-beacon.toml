@@ -22,6 +22,9 @@ motd = {{q .MOTD}}
 # The max players shown. Display only.
 show-max-players = {{.ShowMaxPlayers}}
 
+# What the server list takes from the first server's own entry: "off", "motd", "players" or "all".
+ping-passthrough = "off"
+
 [servers]
 # Your servers, as name = "host:port".
 {{- range .Servers}}
@@ -32,8 +35,12 @@ show-max-players = {{.ShowMaxPlayers}}
 {{- end}}
 {{- end}}
 
-# The server players join first. If their server stops, they're moved to another one.
+# Where players join, in order: if one can't be joined, the next. If their server stops while they
+# play, they're moved to another one.
 try = {{list .Try}}
+
+[forced-hosts]
+# Players who join by one of these addresses get their own order, e.g. "pvp.example.com" = ["pvp"].
 
 [broadcast]
 # The host name shown on the Friends tab. Empty: the motd.
@@ -77,6 +84,12 @@ control-port = {{.ControlPort}}
 
 # Let your servers share chat through the control API.
 cross-server-chat = {{.CrossServerChat}}
+
+# Least milliseconds between two joins from one IP address. 0: off.
+login-ratelimit = 0
+
+# Most packets a player may send in a second. 0: off.
+packets-per-second = 0
 {{- if .DisableClientEncryption}}
 disable-client-encryption = true
 {{- end}}

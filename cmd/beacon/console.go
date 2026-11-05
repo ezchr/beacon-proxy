@@ -87,6 +87,8 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 			return []string{"The world is listed in the Friends tab."}
 		}
 		return []string{"The world is not listed in the Friends tab."}
+	case "reload":
+		return reloadConfig()
 	case "invites", "friendadd":
 		return controlCommand(fields)
 	case "help", "?":
@@ -95,6 +97,7 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 			"glist                     players on every server",
 			"send <player|all> <srv>   move players to a server",
 			"broadcast [on|off]        show or hide the world in the Friends tab",
+			"reload                    reread beacon.toml without a restart",
 			"invites start|stop|status Xbox invites to the players beacon scrape found",
 			"friendadd <from>|stop|status  friend requests to the players seen on <from>",
 		}

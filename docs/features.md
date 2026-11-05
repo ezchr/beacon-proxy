@@ -15,9 +15,31 @@ setup.
 - **Safe arrivals.** After a move Beacon holds back the client's movement until it stands at the
   new spawn, so the new server doesn't see a long fall, and it re-sends the chunks around the spawn
   a moment later, since a client still loading can drop them and leave an invisible hole.
-- **Failover:** when a player's server stops or drops them, Beacon moves them to another server
-  (the `try` one first) instead of disconnecting them.
+- **Join order and failover:** players join the first server in `try` that can be joined. When a
+  player's server stops or drops them, Beacon moves them to another server instead of
+  disconnecting them.
+- **Forced hosts:** players who join by a given address get their own order:
+
+  ```toml
+  [forced-hosts]
+  "pvp.example.com" = ["pvp"]
+  ```
+
+  Friends-tab joins carry no address and always use `try`.
 - **Commands:** `/server` lists the servers; admins also get `/glist`, `/send` and `/broadcast`.
+
+## Server list
+
+`ping-passthrough` decides what the server list shows: Beacon's own `motd` and player count
+(`"off"`, the default), or those of the first server in `try` that answers: its name (`"motd"`), its
+player counts (`"players"`) or both (`"all"`).
+
+## Reloading
+
+`reload` in the console, or `/beacon reload` in game for admins, rereads `beacon.toml` without a
+restart. The servers, `try`, forced hosts, admins, ping passthrough, rate limits and cross-server
+chat change at once; players stay where they are. It lists anything else you changed, which needs
+a restart (`mode`, `bind`, `motd`, accounts and so on).
 
 ## Game versions
 
@@ -42,6 +64,9 @@ of a broken join.
   through anyway (Microsoft's, for example, which Xbox relays use). Every join attempt is logged in
   `dcblock/joins.log`. With no lists, nobody is blocked. `BEACON_DCBLOCK_DIR` moves the folder.
 - **Allow list.** `allowed-xuids` under `[broadcast]` lets only those Xbox accounts join.
+- **Rate limits** (under `[advanced]`, off by default): `login-ratelimit` is the least time in
+  milliseconds between two joins from one IP address, `packets-per-second` the most packets a
+  player may send in a second; a player past either is sent away.
 
 ## Skins for Java players
 

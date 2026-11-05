@@ -111,3 +111,33 @@ func TestMigrateLegacyConfig(t *testing.T) {
 		})
 	}
 }
+
+func TestNewRelaySettings(t *testing.T) {
+	inDir(t)
+	_ = os.WriteFile(tomlConfigFile, []byte(`
+ping-passthrough = "players"
+[servers]
+lobby = "127.0.0.1:19133"
+pvp = "127.0.0.1:19134"
+try = ["lobby", "pvp"]
+[forced-hosts]
+"pvp.example.com" = ["pvp"]
+[advanced]
+login-ratelimit = 3000
+packets-per-second = 500
+`), 0o644)
+	cfg, err := loadBeaconConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !slices.Equal(cfg.Try, []string{"lobby", "pvp"}) || !slices.Equal(cfg.ForcedHosts["pvp.example.com"], []string{"pvp"}) {
+		t.Fatalf("try %v forced %v", cfg.Try, cfg.ForcedHosts)
+	}
+	if cfg.PingPassthrough != "players" || cfg.LoginRateLimit != 3000 || cfg.PacketsPerSecond != 500 {
+		t.Fatalf("passthrough %q limits %d %d", cfg.PingPassthrough, cfg.LoginRateLimit, cfg.PacketsPerSecond)
+	}
+	_ = os.WriteFile(tomlConfigFile, []byte("ping-passthrough = \"sometimes\"\n[servers]\nlobby = \"127.0.0.1:1\"\n"), 0o644)
+	if _, err := loadBeaconConfig(); err == nil {
+		t.Fatal("bad ping-passthrough accepted")
+	}
+}

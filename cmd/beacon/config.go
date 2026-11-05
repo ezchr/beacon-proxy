@@ -192,6 +192,14 @@ type FileConfig struct {
 	TLSDomain, TLSCert, TLSKey string `json:"-"`
 	// ACMEHTTPAddress is where Let's Encrypt's domain check is answered (default ":80").
 	ACMEHTTPAddress string `json:"-"`
+	// Try is the join order (Servers names), ForcedHosts an address's own order; beacon.toml only.
+	Try         []string            `json:"-"`
+	ForcedHosts map[string][]string `json:"-"`
+	// PingPassthrough is what the server list takes from the first server: off, motd, players, all.
+	PingPassthrough string `json:"-"`
+	// LoginRateLimit (ms between joins from one IP) and PacketsPerSecond (per player); 0 is off.
+	LoginRateLimit   int `json:"-"`
+	PacketsPerSecond int `json:"-"`
 	// CrossServerChat serves the /chat routes (chathub.go); beacon.toml only.
 	CrossServerChat bool `json:"-"`
 	// JavaAuth turns on premium/cracked Java logins (javaauth.go); beacon.toml only.

@@ -134,7 +134,10 @@ All on by default unless noted; details in [Features](docs/features.md).
 | `bind` | where players join by IP, e.g. `"0.0.0.0:19132"`. Empty: Friends tab only. |
 | `motd` | the world name on the Friends tab and server list |
 | `forwarding-secret-file` | the secret Beacon signs logins to your servers with; see [forwarding](docs/forwarding.md) |
-| `[servers]` | your servers, and `try`: the server players join first. If their server stops while they play, they're moved to another one. |
+| `[servers]` | your servers, and `try`: the order players join in. If one can't be joined, the next is tried; if a player's server stops, they're moved to another one. |
+| `[forced-hosts]` | players who join by a given address get their own order, e.g. `"pvp.example.com" = ["pvp"]` |
+| `ping-passthrough` | what the server list takes from your first server: `"off"`, `"motd"`, `"players"` or `"all"` |
+| `login-ratelimit`, `packets-per-second` | rate limits under `[advanced]`: least milliseconds between joins from one IP, most packets per player per second; `0` is off |
 | `[broadcast]` | the Friends-tab side: host name, admins, friend requests; see [Friends tab](docs/friends-tab.md) |
 | `control-port` | a local HTTP API on 127.0.0.1 for your servers and scripts (player ping, cross-server chat, Friends-tab listing, invites); see [control API](docs/control-api.md) |
 
@@ -153,7 +156,7 @@ The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead o
 
 In game, for everyone: `/server [name]`.
 In game, for the `admins` in `beacon.toml`: `/glist`, `/send <player|all|current> <server>`,
-`/broadcast [on|off]`.
+`/broadcast [on|off]`, `/beacon reload`.
 
 In Beacon's console:
 
@@ -165,6 +168,7 @@ In Beacon's console:
 | `broadcast [on\|off]` | show or hide the world on the Friends tab |
 | `invites start\|stop\|status` | Xbox invites to the players `beacon scrape` found |
 | `friendadd <server>\|stop\|status` | friend requests to the players seen on a server |
+| `reload` | reread `beacon.toml` without a restart, and say what still needs one |
 | `help` | list the commands |
 
 From a shell:

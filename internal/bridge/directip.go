@@ -260,6 +260,15 @@ func (p *serverListProvider) entry(ctx context.Context) serverListEntry {
 		if live.Version != "" {
 			entry.Version = live.Version
 		}
+		switch passthrough() {
+		case "motd":
+			entry.Name, entry.Level = live.Name, live.Level
+		case "players":
+			entry.Players, entry.MaxPlayers = live.Players, live.MaxPlayers
+		case "all":
+			entry.Name, entry.Level = live.Name, live.Level
+			entry.Players, entry.MaxPlayers = live.Players, live.MaxPlayers
+		}
 	}
 
 	p.cached, p.cachedAt = &entry, time.Now()
@@ -269,6 +278,25 @@ func (p *serverListProvider) entry(ctx context.Context) serverListEntry {
 // backendEntry reads the backend's own server-list JSON. Only meaningful when the backend is
 // itself a NetherNet server; a RakNet backend has no such endpoint and this simply fails.
 func (p *serverListProvider) backendEntry(ctx context.Context) (*serverListEntry, error) {
+	if n := p.cfg.Relay.Network; n != nil {
+		// The first server in the join order that answers, as Velocity does.
+		c := n.conf()
+		var last error = fmt.Errorf("no nethernet server in try")
+		for _, name := range c.try {
+			s := c.server(name)
+			if s == nil || s.Transport == TransportRakNet {
+				continue
+			}
+			sctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+			entry, err := fetchServerListEntry(sctx, s.Address)
+			cancel()
+			if err == nil {
+				return entry, nil
+			}
+			last = err
+		}
+		return nil, last
+	}
 	if !BackendSpeaksNetherNet(p.cfg.Relay) {
 		return nil, fmt.Errorf("backend is not nethernet")
 	}

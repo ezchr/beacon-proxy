@@ -182,7 +182,9 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 	go runConsole(ctx, os.Stdin, stop, log)
-	chatEnabled = cfg.CrossServerChat
+	running = cfg
+	applyLive(cfg)
+	bridge.ReloadHook = reloadConfig
 
 	if cfg.JavaProxy != "" {
 		dataDir := cfg.JavaDataDir
@@ -274,7 +276,7 @@ func main() {
 	// rather than letting it surface as an unexplained stall on the first player's join.
 	backendTransport := strings.ToLower(strings.TrimSpace(cfg.BackendTransport))
 	if network != nil {
-		log.Info("network mode: players can move between servers", "servers", network.ServerNames(), "default", network.Default)
+		log.Info("network mode: players can move between servers", "servers", network.ServerNames(), "default", network.DefaultServer())
 		backendTransport = "network"
 	}
 	switch backendTransport {

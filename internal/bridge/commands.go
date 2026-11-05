@@ -137,6 +137,16 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		})
 		added = true
 	}
+	if s.isAdmin() && !have["beacon"] && ReloadHook != nil {
+		actions := enum("BeaconAction", []string{"reload"})
+		pk.Commands = append(pk.Commands, protocol.Command{
+			Name: "beacon", Description: "Beacon Proxy: reload beacon.toml", AliasesOffset: math.MaxUint32,
+			Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+				{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | actions},
+			}}},
+		})
+		added = true
+	}
 	if !have["broadcast"] && s.n.Listing != nil && s.isAdmin() {
 		states := enum("BeaconBroadcast", []string{"on", "off", "status"})
 		pk.Commands = append(pk.Commands, protocol.Command{
@@ -153,8 +163,11 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 	return encodePacket(&pk)
 }
 
+// ReloadHook reloads beacon.toml and describes what changed (/beacon reload); set by the program.
+var ReloadHook func() []string
+
 func (s *switchSession) isAdmin() bool {
-	return s.n.Admins[s.id.XUID] || s.n.Admins[strings.ToLower(s.id.DisplayName)]
+	return s.n.IsAdmin(s.id.XUID, s.id.DisplayName)
 }
 
 // handleCommand runs a relay command and reports whether it was one (so it must not reach the server).
@@ -168,7 +181,7 @@ func (s *switchSession) handleCommand(line string) bool {
 		if len(fields) == 1 {
 			cur := s.serverName()
 			var names []string
-			for _, sc := range s.n.Servers {
+			for _, sc := range s.n.conf().servers {
 				n := sc.Name
 				if strings.EqualFold(n, cur) {
 					n = "<green>" + n + "</green>"
@@ -214,6 +227,18 @@ func (s *switchSession) handleCommand(line string) bool {
 			return true
 		}
 		s.message("<green>Moving %d player(s) to %s.</green>", moved, fields[2])
+		return true
+	case "beacon":
+		if !s.isAdmin() || ReloadHook == nil {
+			return false
+		}
+		if len(fields) != 2 || !strings.EqualFold(fields[1], "reload") {
+			s.message("<red>Usage: /beacon reload</red>")
+			return true
+		}
+		for _, line := range ReloadHook() {
+			s.message("<yellow>%s</yellow>", line)
+		}
 		return true
 	case "broadcast":
 		if s.n.Listing == nil {

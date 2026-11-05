@@ -39,15 +39,17 @@ var defaultTOMLTemplate string
 
 // tomlConfig mirrors beacon.toml.
 type tomlConfig struct {
-	ConfigVersion        string `toml:"config-version"`
-	Mode                 string `toml:"mode"`
-	Bind                 string `toml:"bind"`
-	Domain               string `toml:"domain"`
-	TLSCert              string `toml:"tls-cert"`
-	TLSKey               string `toml:"tls-key"`
-	MOTD                 string `toml:"motd"`
-	ShowMaxPlayers       int    `toml:"show-max-players"`
-	ForwardingSecretFile string `toml:"forwarding-secret-file"`
+	ConfigVersion        string              `toml:"config-version"`
+	Mode                 string              `toml:"mode"`
+	Bind                 string              `toml:"bind"`
+	PingPassthrough      string              `toml:"ping-passthrough"`
+	ForcedHosts          map[string][]string `toml:"forced-hosts"`
+	Domain               string              `toml:"domain"`
+	TLSCert              string              `toml:"tls-cert"`
+	TLSKey               string              `toml:"tls-key"`
+	MOTD                 string              `toml:"motd"`
+	ShowMaxPlayers       int                 `toml:"show-max-players"`
+	ForwardingSecretFile string              `toml:"forwarding-secret-file"`
 
 	// Servers holds "name = address" pairs, "name = { address = ..., transport = ... }" tables and
 	// the "try" list, like Velocity's [servers].
@@ -86,6 +88,8 @@ type tomlConfig struct {
 		JavaDataDir             string           `toml:"java-data-dir"`
 		JavaAuth                *javaAuthOptions `toml:"java-auth"`
 		CrossServerChat         bool             `toml:"cross-server-chat"`
+		LoginRateLimit          int              `toml:"login-ratelimit"`
+		PacketsPerSecond        int              `toml:"packets-per-second"`
 		ACMEHTTPAddress         string           `toml:"acme-http-address"`
 		FakePlayerCount         int              `toml:"fake-player-count"`
 		FakePlayerDrift         *struct {
@@ -173,6 +177,13 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.JavaProxy, cfg.JavaDataDir, cfg.JavaAuth = a.JavaProxy, a.JavaDataDir, a.JavaAuth
 	cfg.CrossServerChat = a.CrossServerChat
+	cfg.LoginRateLimit, cfg.PacketsPerSecond = a.LoginRateLimit, a.PacketsPerSecond
+	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
+	case "", "off", "motd", "players", "all":
+		cfg.PingPassthrough = p
+	default:
+		return FileConfig{}, fmt.Errorf("ping-passthrough %q: use \"off\", \"motd\", \"players\" or \"all\"", t.PingPassthrough)
+	}
 	cfg.ACMEHTTPAddress = a.ACMEHTTPAddress
 	cfg.FakePlayerCount = a.FakePlayerCount
 	if d := a.FakePlayerDrift; d != nil {
@@ -196,6 +207,10 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	case "", modeRelay:
 		cfg.BackendTransport = bridge.TransportNetherNet
 		cfg.Servers, cfg.DefaultServer = servers, def
+		cfg.Try, cfg.ForcedHosts = try, t.ForcedHosts
+		if len(cfg.Try) == 0 {
+			cfg.Try = []string{def}
+		}
 		if t.Bind != "" {
 			cfg.RelayDirectIP, cfg.RelayDirectIPListenAddress = true, t.Bind
 			// A bind on this machine only (something like nginx faces the players) is private, so the

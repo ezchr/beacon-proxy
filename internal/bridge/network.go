@@ -8,11 +8,13 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"path/filepath"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/df-mc/go-nethernet"
@@ -38,6 +40,10 @@ type Network struct {
 	// accepts the relay's re-signed logins).
 	Servers []ServerConfig
 	Default string
+	// Try is the order players join in, falling back to the next server when one can't be joined
+	// (default: Default only). ForcedHosts gives an address players type its own order.
+	Try         []string
+	ForcedHosts map[string][]string
 	// ForwardingSecret, when set, signs a Beacon forwarding claim into every backend login.
 	ForwardingSecret []byte
 	// Dir holds the per-server content cache and downloaded packs.
@@ -52,6 +58,9 @@ type Network struct {
 	// content changed during their join or move, so they play with the new content; "" asks them
 	// to join again instead.
 	RejoinAddress string
+
+	// live is what Reload can change while players are on: Servers, Try, ForcedHosts, Admins.
+	live atomic.Pointer[liveConfig]
 
 	mu       sync.Mutex
 	content  map[string]*serverContent
@@ -173,8 +182,12 @@ func (n *Network) Init() error {
 	n.content = map[string]*serverContent{}
 	n.packs = map[string]*cachedPack{}
 	n.fetching = map[string]bool{}
-	if n.server(n.Default) == nil {
-		return fmt.Errorf("default server %q is not one of the servers", n.Default)
+	try := n.Try
+	if len(try) == 0 {
+		try = []string{n.Default}
+	}
+	if err := n.setLive(n.Servers, try, n.ForcedHosts, n.Admins); err != nil {
+		return err
 	}
 	for _, s := range n.Servers {
 		c := &serverContent{}
@@ -204,9 +217,131 @@ func (n *Network) Init() error {
 }
 
 func (n *Network) server(name string) *ServerConfig {
-	for i := range n.Servers {
-		if strings.EqualFold(n.Servers[i].Name, name) {
-			return &n.Servers[i]
+	return n.conf().server(name)
+}
+
+// liveConfig is the part of the network Reload can change. It is replaced whole, never modified.
+type liveConfig struct {
+	servers []ServerConfig
+	try     []string
+	forced  map[string][]string // lower-case host -> join order
+	admins  map[string]bool
+}
+
+func (c *liveConfig) server(name string) *ServerConfig {
+	for i := range c.servers {
+		if strings.EqualFold(c.servers[i].Name, name) {
+			return &c.servers[i]
+		}
+	}
+	return nil
+}
+
+func (n *Network) conf() *liveConfig {
+	if c := n.live.Load(); c != nil {
+		return c
+	}
+	// Before Init (as in tests): the fields as they are.
+	try := n.Try
+	if len(try) == 0 && n.Default != "" {
+		try = []string{n.Default}
+	}
+	if len(try) == 0 && len(n.Servers) > 0 {
+		try = []string{n.Servers[0].Name}
+	}
+	n.live.CompareAndSwap(nil, &liveConfig{servers: n.Servers, try: try, forced: map[string][]string{}, admins: n.Admins})
+	return n.live.Load()
+}
+
+func (n *Network) setLive(servers []ServerConfig, try []string, forced map[string][]string, admins map[string]bool) error {
+	c := &liveConfig{servers: servers, try: try, forced: map[string][]string{}, admins: admins}
+	if len(try) == 0 {
+		return errors.New("try names no server")
+	}
+	for _, name := range try {
+		if c.server(name) == nil {
+			return fmt.Errorf("try names %q, which is not a server", name)
+		}
+	}
+	for host, order := range forced {
+		for _, name := range order {
+			if c.server(name) == nil {
+				return fmt.Errorf("forced host %q names %q, which is not a server", host, name)
+			}
+		}
+		c.forced[strings.ToLower(host)] = order
+	}
+	n.live.Store(c)
+	return nil
+}
+
+// DefaultServer is the first server players join.
+func (n *Network) DefaultServer() string { return n.conf().try[0] }
+
+// IsAdmin reports whether a gamertag (any case) or XUID is one of the admins.
+func (n *Network) IsAdmin(xuid, name string) bool {
+	a := n.conf().admins
+	return a[xuid] || a[strings.ToLower(name)]
+}
+
+// joinOrder is the servers a player of protocol id tries to join, in order: the forced host's
+// order when the address they typed (typed, as the client sends it) has one, else Try. Servers that
+// don't take their version are left out; if none is left, any server that does.
+func (n *Network) joinOrder(id int32, typed string) []ServerConfig {
+	c := n.conf()
+	order := c.try
+	if host := hostOf(typed); host != "" {
+		if o, ok := c.forced[host]; ok {
+			order = o
+		}
+	}
+	var out []ServerConfig
+	for _, name := range order {
+		if s := c.server(name); s != nil && s.Accepts(id) {
+			out = append(out, *s)
+		}
+	}
+	if len(out) == 0 {
+		if s, ok := n.serverFor(id); ok {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// hostOf is the lower-case host name in an address a client sends ("https://play.example.com:19132").
+func hostOf(addr string) string {
+	addr = strings.TrimSpace(addr)
+	if i := strings.Index(addr, "://"); i >= 0 {
+		addr = addr[i+3:]
+	}
+	addr, _, _ = strings.Cut(addr, "/")
+	if h, _, err := net.SplitHostPort(addr); err == nil {
+		addr = h
+	}
+	return strings.ToLower(strings.Trim(addr, "[]"))
+}
+
+// Reload replaces the servers, join order, forced hosts and admins while players are on. Players
+// stay where they are; joins and /server use the new lists. A new server's content is learned in
+// the background, as at start.
+func (n *Network) Reload(servers []ServerConfig, try []string, forced map[string][]string, admins map[string]bool) error {
+	if err := n.setLive(servers, try, forced, admins); err != nil {
+		return err
+	}
+	for _, s := range servers {
+		n.mu.Lock()
+		_, known := n.content[s.Name]
+		if !known {
+			n.content[s.Name] = &serverContent{}
+		}
+		n.mu.Unlock()
+		if !known {
+			go func(name string) {
+				if err := n.learn(name); err != nil {
+					n.Log.Warn("network: could not learn a reloaded server's content yet", "server", name, "err", err)
+				}
+			}(s.Name)
 		}
 	}
 	return nil
@@ -294,9 +429,10 @@ type union struct {
 }
 
 func (n *Network) orderedServers() []ServerConfig {
-	out := []ServerConfig{*n.server(n.Default)}
-	for _, s := range n.Servers {
-		if !strings.EqualFold(s.Name, n.Default) {
+	c := n.conf()
+	out := []ServerConfig{*c.server(c.try[0])}
+	for _, s := range c.servers {
+		if !strings.EqualFold(s.Name, c.try[0]) {
 			out = append(out, s)
 		}
 	}
@@ -427,7 +563,7 @@ func (n *Network) buildUnion() (*union, error) {
 			}
 		}
 	}
-	if len(u.missing) == len(n.Servers) {
+	if len(u.missing) == len(n.conf().servers) {
 		return nil, errors.New("no server has been joined yet: run backendprobe on each server once")
 	}
 	u.packStack.TexturePackRequired = u.packsInfo.TexturePackRequired
@@ -533,7 +669,7 @@ func (n *Network) fetchPacks(server string) {
 // FetchAllPacks downloads every server's missing packs (and learns their pack lists), and joins
 // each server the relay has nothing cached for once, to learn its content; run at start.
 func (n *Network) FetchAllPacks() {
-	for _, s := range n.Servers {
+	for _, s := range n.conf().servers {
 		n.mu.Lock()
 		c := n.content[s.Name]
 		known := c != nil && c.StartGame != nil
@@ -857,8 +993,9 @@ func (n *Network) Switch(xuid, server string) error {
 
 // ServerNames lists the servers.
 func (n *Network) ServerNames() []string {
-	out := make([]string, 0, len(n.Servers))
-	for _, s := range n.Servers {
+	servers := n.conf().servers
+	out := make([]string, 0, len(servers))
+	for _, s := range servers {
 		out = append(out, s.Name)
 	}
 	return out

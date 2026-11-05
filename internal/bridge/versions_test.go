@@ -37,7 +37,7 @@ func TestServerVersions(t *testing.T) {
 	if s, ok := n.serverFor(2225); !ok || s.Name != "skygen" {
 		t.Fatalf("1.26.60 player should join the default, got %q", s.Name)
 	}
-	n.Servers = []ServerConfig{skygen}
+	n = &Network{Servers: []ServerConfig{skygen}, Default: "skygen"}
 	if _, ok := n.serverFor(2300); ok {
 		t.Fatal("no server takes 1.27.0")
 	}

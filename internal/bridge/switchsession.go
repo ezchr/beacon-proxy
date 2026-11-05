@@ -76,7 +76,9 @@ type switchSession struct {
 	maxRadius   uint8
 	// unchecked: left out of the build's player checks (checks.go). radiusSeen: the client has asked
 	// for a view distance before.
-	unchecked  bool
+	unchecked bool
+	// packets counts the client's packets for the packet rate limit (limits.go); readClient only.
+	packets    packetMeter
 	radiusSeen bool
 	// scrub: not an admin of the relay, so command block and NPC commands are blanked on the way
 	// to the client (opfilter.go).
@@ -172,6 +174,12 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 			time.Sleep(time.Second)
 			return
 		}
+	}
+	if _, _, ip, _ := dcVerdict(conn.RemoteAddr()); ip != nil && loginTooSoon(ip.String()) {
+		log.Info("join refused: login rate limit", "ip", ip)
+		_ = client.WritePacket(&packet.Disconnect{Message: loginTooFastMessage})
+		time.Sleep(time.Second)
+		return
 	}
 	noteBedrock(1) // the network's player count, see onlinecount.go
 	defer noteBedrock(-1)
@@ -321,21 +329,38 @@ func (s *switchSession) join() error {
 	}
 	s.palette = u.palette
 
-	server, ok := s.n.serverFor(s.proto)
-	if !ok {
+	order := s.n.joinOrder(s.proto, s.cd.ServerAddress)
+	if len(order) == 0 {
 		return fmt.Errorf("no server here supports %s yet", proxy.VersionName(s.proto))
 	}
-	if !strings.EqualFold(server.Name, s.n.Default) {
-		s.log.Info("network: the default server does not take this version, joining another", "version", proxy.VersionName(s.proto), "server", server.Name)
-	}
+	// The player joins the first server in order that answers with a world; the others are tried in
+	// turn while the client loads the resource packs.
 	type dialed struct {
-		l   *link
-		err error
+		l      *link
+		server ServerConfig
+		err    error
 	}
 	dialCh := make(chan dialed, 1)
 	go func() {
-		l, err := s.openLink(server)
-		dialCh <- dialed{l, err}
+		var last error
+		for _, server := range order {
+			l, err := s.openLink(server)
+			if err == nil {
+				select {
+				case <-l.started:
+					dialCh <- dialed{l: l, server: server}
+					return
+				case <-l.closed:
+					err = l.err
+				case <-time.After(backendDialTimeout):
+					l.close()
+					err = errors.New("no StartGame")
+				}
+			}
+			last = fmt.Errorf("%s: %w", server.Name, err)
+			s.log.Info("network: could not join a server, trying the next", "server", server.Name, "err", err)
+		}
+		dialCh <- dialed{err: last}
 	}()
 
 	if err := s.packScreen(u); err != nil {
@@ -343,17 +368,9 @@ func (s *switchSession) join() error {
 	}
 	d := <-dialCh
 	if d.err != nil {
-		return fmt.Errorf("%s: %w", server.Name, d.err)
+		return d.err
 	}
-	l := d.l
-	select {
-	case <-l.started:
-	case <-l.closed:
-		return fmt.Errorf("%s: %w", server.Name, l.err)
-	case <-time.After(backendDialTimeout):
-		l.close()
-		return fmt.Errorf("%s: no StartGame", server.Name)
-	}
+	l, server := d.l, d.server
 
 	sg := *l.startGame
 	s.mu.Lock()
@@ -717,6 +734,11 @@ func (s *switchSession) readClient() {
 		pks, err := s.client.ReadPackets()
 		if err != nil {
 			s.cancel(fmt.Errorf("client: %w", err))
+			return
+		}
+		if s.packets.over(len(pks)) {
+			s.log.Warn("player disconnected: packet rate limit", "packets", len(pks))
+			s.disconnect(tooManyPacketsMessage)
 			return
 		}
 		s.mu.Lock()
