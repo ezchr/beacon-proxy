@@ -147,7 +147,9 @@ The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead o
 `token.json`. It needs it for two things:
 
 - **The Friends tab:** a world on the Friends tab is always hosted by an Xbox account; players see it
-  once they are friends with that account.
+  once they are friends with that account. Minecraft lets at most **30 players** join one such
+  world at once, and that can't be changed; for more, add hosting accounts (`beacon accounts add`),
+  each one more world with 30 more places. See [Friends tab](docs/friends-tab.md).
 - **Connecting to your servers:** Beacon connects to your servers for its players, and NetherNet
   servers (BDS 1.26.60+, Dragonfly, Geyser) refuse a connection that doesn't carry an identity from
   an Xbox account, even with `online-mode=false`. Your servers need no account themselves.
