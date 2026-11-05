@@ -45,7 +45,7 @@ accept Beacon's login: turn its own Xbox check off. Beacon has already checked t
 | Server | Setting |
 |---|---|
 | BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) ([below](#bds-in-relay-mode-needs-xuidforward)) |
-| Dragonfly | `AuthEnabled = false` under `[Server]`, and NetherNet on: `Transport = ["nethernet"]` under `[Network]` |
+| Dragonfly | `AuthEnabled = false` under `[Server]` |
 | Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working |
 
 With its Xbox check off, a server lets in anyone who reaches it, so only Beacon may reach it.
