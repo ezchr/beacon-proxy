@@ -38,38 +38,55 @@ IP and port 19132.
 
 ## Setting up your servers
 
-In the default **relay** mode players connect through Beacon, and Beacon logs into your server for
-them. Your server must accept that login, so turn its own Xbox check off; Beacon has already checked
-the player.
+In relay mode (the default) Beacon logs into your servers for the players, so each server must
+accept Beacon's login: turn its own Xbox check off. Beacon has already checked the player.
 
-| Server | Setting | Address in `[servers]` |
-|---|---|---|
-| BDS | `online-mode=false` in `server.properties`, and [xuidforward](https://github.com/ezchr/xuidforward) | its `server-port`, e.g. `"127.0.0.1:19133"` |
-| Dragonfly | `AuthEnabled = false` under `[Server]` | its NetherNet address, e.g. `"127.0.0.1:19133"` |
-| Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working | its NetherNet address, e.g. `"127.0.0.1:19132"` |
+| Server | Setting |
+|---|---|
+| BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) (below) |
+| Dragonfly | `AuthEnabled = false` under `[Server]` |
+| Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working |
 
-Beacon reaches your servers over NetherNet, at their TCP port.
+With its Xbox check off, a server lets in anyone who reaches it, so only Beacon may reach it.
 
-**Keep these servers private.** With their own Xbox check off, anyone who can reach them could
-join as anyone. Beacon can only check the players who come through it, so the server itself must
-not be reachable by anyone else:
+### Example: Beacon on the same machine
 
-- **Beacon on the same machine:** bind each server to `127.0.0.1`. Nothing else is needed.
-- **Beacon on another machine:** the server has to be reachable over the network, so either
-  - make the server check Beacon's signature, if you can add code to it: Beacon signs every login
-    it sends, and a server that checks the signature refuses everything else (see
-    [forwarding](docs/forwarding.md)); or
-  - if you can't change the server, firewall it so it only accepts connections from Beacon's IP,
-    for example `ufw allow from <beacon ip> to any port 19133` and no other rule for that port.
+```toml
+[servers]
+lobby = "127.0.0.1:19133"
+survival = "127.0.0.1:19134"
+try = ["lobby"]
+```
 
-Beacon warns at startup about servers that are on another machine.
+Keep the servers' ports closed to the internet (bind them to `127.0.0.1`, or firewall the ports).
+Players only ever connect to Beacon.
 
-**Relay mode with BDS needs an XUID forwarder.** BDS throws away the Xbox ID (XUID) of a login
-like Beacon's, so without one every player starts with fresh, empty data each time they join. Use
-[xuidforward](https://github.com/ezchr/xuidforward), an Endstone plugin by Beacon's author: install
-1.0.5 or newer on the BDS and give it the same `forwarding.secret` (its README shows how); BDS may
-then run on another machine too. Other servers keep the XUID without help, and relayless mode
-needs no forwarder at all.
+### Example: Beacon on another machine
+
+Beacon on `203.0.113.5`, a server on `198.51.100.7`:
+
+```toml
+[servers]
+lobby = "198.51.100.7:19133"
+try = ["lobby"]
+```
+
+On the server's machine, let only Beacon in:
+
+```
+ufw allow from 203.0.113.5 to any port 19133
+```
+
+If you can add code to the server, also have it check Beacon's signature on each login (see
+[forwarding](docs/forwarding.md)); then even a connection that gets past the firewall is refused.
+
+### BDS keeps player data with xuidforward
+
+BDS throws away the Xbox ID (XUID) of a login like Beacon's, so without help every player starts
+with fresh, empty data each time they join. Install
+[xuidforward](https://github.com/ezchr/xuidforward), an Endstone plugin by Beacon's author, version
+1.0.5 or newer, and give it the same `forwarding.secret` (its README shows how). Dragonfly and Geyser
+keep the XUID on their own, and relayless mode needs nothing.
 
 ## Without server switching (relayless mode)
 
