@@ -71,46 +71,6 @@ like Beacon's, so without one every player starts with fresh, empty data each ti
 then run on another machine too. Other servers keep the XUID without help, and relayless mode
 needs no forwarder at all.
 
-## Joining by address: HTTPS
-
-When a player adds your server by its address, their game asks for `https://` first and only
-tries plain `http://` after about 20 seconds. Without HTTPS, everyone who joins by your domain
-waits those 20 seconds, and the server list shows nothing until then. Give Beacon a certificate,
-in one of two ways:
-
-```toml
-bind = "0.0.0.0:19132"
-domain = "play.example.com"     # a free certificate from Let's Encrypt, renewed by Beacon
-```
-
-`domain` needs the domain to point at this machine and **port 80 free** on it: Let's Encrypt checks
-the domain there before issuing or renewing. Certificates are kept in the `certs` folder. If a web
-server already uses port 80, set `acme-http-address = "127.0.0.1:8402"` under `[advanced]` and have
-the web server forward `/.well-known/acme-challenge/` for your domain to that address. With nginx,
-keep the domain in the request:
-
-```nginx
-location /.well-known/acme-challenge/ {
-    proxy_set_header Host $host;
-    proxy_pass http://127.0.0.1:8402;
-}
-```
-
-```toml
-bind = "0.0.0.0:19132"
-tls-cert = "/etc/letsencrypt/live/play.example.com/fullchain.pem"
-tls-key = "/etc/letsencrypt/live/play.example.com/privkey.pem"
-```
-
-`tls-cert` and `tls-key` use a certificate you already have, for example from certbot. Beacon
-reads the files again when they are renewed.
-
-Plain HTTP keeps working on the same port, so players who type a bare IP address (which no
-certificate can cover) still get in, after the wait.
-
-You can also leave HTTPS to a web server in front of Beacon (nginx, Caddy): bind Beacon to
-`127.0.0.1` and have the web server forward `/v1/join` to it.
-
 ## Without server switching (relayless mode)
 
 If you don't need `/server` switching between servers, set (see
@@ -148,7 +108,7 @@ All on by default unless noted; details in [Features](docs/features.md).
 |---|---|
 | `mode` | `"relay"` (default): players go through Beacon and can switch servers. `"relayless"`: players connect straight to your one server, no switching. |
 | `bind` | where players join by IP, e.g. `"0.0.0.0:19132"`. Empty: Friends tab only. |
-| `domain`, or `tls-cert` and `tls-key` | HTTPS for joining by address; see [above](#joining-by-address-https) |
+| `domain`, or `tls-cert` and `tls-key` | HTTPS for joining by address, so players don't wait; see [HTTPS](docs/https.md) |
 | `motd` | the world name on the Friends tab and server list |
 | `forwarding-secret-file` | the secret Beacon signs logins to your servers with; see [forwarding](docs/forwarding.md) |
 | `[servers]` | your servers, and `try`: where players go first |
@@ -217,6 +177,7 @@ Sign in once by running `./beacon` by hand in that folder, then
 ## More
 
 - [Relay and relayless mode](docs/modes.md): what each does and when to pick it.
+- [HTTPS](docs/https.md): a certificate for joining by address.
 - [Features](docs/features.md): everything else Beacon does, and how to set it up.
 - [Player-info forwarding](docs/forwarding.md): how servers know a login came from Beacon, and
   the claim format for writing a check for another server.
