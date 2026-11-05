@@ -45,7 +45,7 @@ accept Beacon's login: turn its own Xbox check off. Beacon has already checked t
 | Server | Setting |
 |---|---|
 | BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) ([below](#bds-in-relay-mode-needs-xuidforward)) |
-| Dragonfly | `AuthEnabled = false` under `[Server]` |
+| Dragonfly | `AuthEnabled = false` under `[Server]`, and NetherNet on: `Transport = ["nethernet"]` under `[Network]` |
 | Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working |
 
 With its Xbox check off, a server lets in anyone who reaches it, so only Beacon may reach it.
@@ -72,10 +72,11 @@ lobby = "198.51.100.7:19133"
 try = ["lobby"]
 ```
 
-On the server's machine, let only Beacon in:
+On the server's machine, let only Beacon in. NetherNet carries the game over UDP on changing ports,
+so allow everything from Beacon's IP rather than one port, and nothing else to the server:
 
 ```
-ufw allow from 203.0.113.5 to any port 19133
+ufw allow from 203.0.113.5
 ```
 
 If you can add code to the server, also have it check Beacon's signature on each login (see
@@ -133,7 +134,7 @@ All on by default unless noted; details in [Features](docs/features.md).
 | `bind` | where players join by IP, e.g. `"0.0.0.0:19132"`. Empty: Friends tab only. |
 | `motd` | the world name on the Friends tab and server list |
 | `forwarding-secret-file` | the secret Beacon signs logins to your servers with; see [forwarding](docs/forwarding.md) |
-| `[servers]` | your servers, and `try`: where players go first |
+| `[servers]` | your servers, and `try`: the server players join first. If their server stops while they play, they're moved to another one. |
 | `[broadcast]` | the Friends-tab side: host name, admins, friend requests; see [Friends tab](docs/friends-tab.md) |
 | `control-port` | a local HTTP API on 127.0.0.1 for your servers and scripts (player ping, cross-server chat, Friends-tab listing, invites); see [control API](docs/control-api.md) |
 

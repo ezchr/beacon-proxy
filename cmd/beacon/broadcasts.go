@@ -336,12 +336,12 @@ func runLoginBroadcast(file string, debug, noFriendAccept bool, log *slog.Logger
 	cfg, err := loadBeaconConfig()
 	if err != nil {
 		log.Error("failed to load beacon.toml", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 	friendActivity, err := friendactivity.Open("friend_activity.txt", log)
 	if err != nil {
 		log.Error("failed to open friend activity file", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 	var allowXUID func(string) bool
 	if len(cfg.AllowedXUIDs) > 0 {
@@ -364,17 +364,17 @@ func runLoginBroadcast(file string, debug, noFriendAccept bool, log *slog.Logger
 	tokSrc, err := tokenSource(log, file, name)
 	if err != nil {
 		log.Error("failed to authenticate", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 	authSession, err := session.SessionFromTokenSource(tokSrc, deviceAuth, ctx)
 	if err != nil {
 		log.Error("failed to start minecraft auth session", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	log.Info("broadcasting - press Ctrl+C to stop", "tokenFile", file, "worldName", b.WorldName)
 	if err := runBroadcast(ctx, name, authSession, b, allowXUID, friendActivity, debug, log); err != nil && ctx.Err() == nil {
 		log.Error("broadcast failed to start", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 }

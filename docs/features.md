@@ -15,6 +15,8 @@ setup.
 - **Safe arrivals.** After a move Beacon holds back the client's movement until it stands at the
   new spawn, so the new server doesn't see a long fall, and it re-sends the chunks around the spawn
   a moment later, since a client still loading can drop them and leave an invisible hole.
+- **Failover:** when a player's server stops or drops them, Beacon moves them to another server
+  (the `try` one first) instead of disconnecting them.
 - **Commands:** `/server` lists the servers; admins also get `/glist`, `/send` and `/broadcast`.
 
 ## Game versions

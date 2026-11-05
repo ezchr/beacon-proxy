@@ -79,7 +79,7 @@ func main() {
 	if len(os.Args) > 1 {
 		switch os.Args[1] {
 		case "accounts":
-			os.Exit(runAccounts(os.Args[2:], log))
+			exit(runAccounts(os.Args[2:], log))
 		case "scrape":
 			scraper.Main(os.Args[2:])
 			return
@@ -135,7 +135,7 @@ func main() {
 			defer stop()
 			if err := runJavaProxy(ctx, file, "java", nil, log); err != nil && ctx.Err() == nil {
 				log.Error("java proxy stopped", "err", err)
-				os.Exit(1)
+				exit(1)
 			}
 			return
 		}
@@ -144,7 +144,7 @@ func main() {
 	cfg, err := loadBeaconConfig()
 	if err != nil {
 		log.Error("failed to load beacon.toml", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 	if configCreated {
 		fmt.Println("\nWelcome to Beacon. This folder now has:\n" +
@@ -153,6 +153,7 @@ func main() {
 			"Next: open beacon.toml, put your servers under [servers], set each server up as the\n" +
 			"README says, then start Beacon again. It will then ask you to sign in with the Xbox\n" +
 			"account that hosts your world.")
+		waitIfOwnConsole()
 		return
 	}
 	for _, note := range cfg.Notes {
@@ -175,7 +176,7 @@ func main() {
 	friendActivity, err := friendactivity.Open("friend_activity.txt", log)
 	if err != nil {
 		log.Error("failed to open friend activity file", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -203,17 +204,17 @@ func main() {
 	loginVerifier, err = session.VerifierSession(ctx)
 	if err != nil {
 		log.Error("failed to reach Minecraft's services", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 	var authSession *session.Session
 	tokSrc, err := tokenSource(log, tokenCacheFile, "primary")
 	if err != nil {
 		log.Error("failed to authenticate", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 	if authSession, err = session.SessionFromTokenSource(tokSrc, deviceAuth, ctx); err != nil {
 		log.Error("failed to start minecraft auth session", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	// --- The control port (control.go): the ping API for the BDS ping plugin, every broadcast's
@@ -240,7 +241,7 @@ func main() {
 	}
 	if network, err = setupNetwork(cfg, authSession, log); err != nil {
 		log.Error("invalid [servers] in beacon.toml", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 
 	var allowXUID func(string) bool
@@ -284,7 +285,7 @@ func main() {
 		normalized, err := bridge.NormalizeNetherNetAddress(cfg.NetherNetBackendAddress)
 		if err != nil {
 			log.Error("invalid server address in beacon.toml", "err", err)
-			os.Exit(1)
+			exit(1)
 		}
 		if strings.EqualFold(strings.TrimSpace(cfg.BackendTransport), bridge.TransportNetherNetNoRelay) {
 			// The direct-IP door relays through HandleConn, which has no backend leg to dial in
@@ -294,7 +295,7 @@ func main() {
 			if cfg.RelayDirectIP {
 				log.Error("relay_direct_ip cannot be used with backend_transport \"nethernet-norelay\": " +
 					"set relay_direct_ip to false and point direct-IP traffic at the backend")
-				os.Exit(1)
+				exit(1)
 			}
 			// Worth stating plainly in the log: in this mode the backend is exposed to players
 			// directly, so it is the backend - not this process - that has to authenticate them.
@@ -320,7 +321,7 @@ func main() {
 	default:
 		log.Error("unknown backend_transport in config.json - use \"raknet\", \"nethernet\" or \"nethernet-norelay\"",
 			"value", cfg.BackendTransport)
-		os.Exit(1)
+		exit(1)
 	}
 	// Second front door: direct-IP joins. Started once for the process (not per Xbox Live
 	// session) because it has no dependency on Xbox Live signaling - it only needs the backend.
@@ -330,7 +331,7 @@ func main() {
 		doorTLSConfig, err := doorTLS(ctx, cfg, log)
 		if err != nil {
 			log.Error("https for joining by address", "err", err)
-			os.Exit(1)
+			exit(1)
 		}
 		if err := bridge.StartDirectIP(ctx, bridge.DirectIPConfig{
 			KeyFile:       "direct-ip.key",
@@ -345,7 +346,7 @@ func main() {
 			Log:           log,
 		}); err != nil {
 			log.Error("failed to start direct-ip front door", "err", err)
-			os.Exit(1)
+			exit(1)
 		}
 	} else {
 		log.Info("direct-ip front door disabled (set relay_direct_ip to turn it on)")
@@ -370,7 +371,7 @@ func main() {
 	primaryCfg.ExtraBroadcasts = nil
 	if err := runBroadcast(ctx, "primary", authSession, primaryCfg, allowXUID, friendActivity, debug, log); err != nil && ctx.Err() == nil {
 		log.Error("primary broadcast failed to start", "err", err)
-		os.Exit(1)
+		exit(1)
 	}
 }
 
