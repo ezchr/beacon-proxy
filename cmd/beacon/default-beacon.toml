@@ -88,13 +88,13 @@ control-port = {{.ControlPort}}
 # Let your servers share chat through the control API.
 cross-server-chat = {{.CrossServerChat}}
 
-# Least milliseconds between two joins from one IP address. 0: off.
+# Least milliseconds between two joins from one IP address. 0: no limit.
 login-ratelimit = 0
 
-# Most packets a player may send in a second. 0: off.
+# Most packets a player may send in a second. 0: no limit.
 packets-per-second = 0
 
-# Most players online at once from one IP address. 0: off.
+# Most players online at once from one IP address. 0: no limit.
 sessions-per-ip = 0
 
 # The player count on the Friends tab. 0: the real count. Above 0: this number instead.

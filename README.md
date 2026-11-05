@@ -137,7 +137,7 @@ All on by default unless noted; details in [Features](docs/features.md).
 | `[servers]` | your servers, and `try`: the order players join in. If one can't be joined, the next is tried; if a player's server stops, they're moved to another one. |
 | `[forced-hosts]` | players who join by a given address get their own order, e.g. `"pvp.example.com" = ["pvp"]` |
 | `ping-passthrough` | what the server list takes from your first server: `"off"`, `"motd"`, `"players"` or `"all"` |
-| `login-ratelimit`, `packets-per-second`, `sessions-per-ip` | limits under `[advanced]`: least milliseconds between joins from one IP, most packets per player per second, most players online from one IP; `0` is off |
+| `login-ratelimit`, `packets-per-second`, `sessions-per-ip` | limits under `[advanced]`: least milliseconds between joins from one IP, most packets per player per second, most players online from one IP; `0` means no limit |
 | `[broadcast]` | the Friends-tab side: host name, admins, friend requests; see [Friends tab](docs/friends-tab.md) |
 | `control-port` | a local HTTP API on 127.0.0.1 for your servers and scripts (player ping, cross-server chat, Friends-tab listing, invites); see [control API](docs/control-api.md) |
 
