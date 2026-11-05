@@ -114,6 +114,8 @@ All on by default unless noted; details in [Features](docs/features.md).
 - **Datacenter block (opt-in):** turns away joins from hosting providers' IP ranges you list.
 - **Skins for Java players:** uploads Bedrock skins to GeyserMC's skin API, for servers with Java
   players.
+- **HTTPS certificates (opt-in)** for joining by address: a free one from Let's Encrypt (`domain`)
+  or your own (`tls-cert`, `tls-key`).
 - **Network-wide player count** in the server list.
 - **Cross-server chat (opt-in):** your servers can share chat through the [control API](docs/control-api.md).
 
