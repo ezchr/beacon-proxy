@@ -81,9 +81,6 @@ join it directly, so the skin is there by XUID for those servers to look up. Set
 
 For Java Edition players, run Velocity (or another Java proxy) next to Beacon as usual.
 
-A Java proxy built into Beacon (`java-proxy` under `[advanced]`, using
-[Gate](https://github.com/minekube/gate)) is **unfinished and not supported yet**; don't use it.
-
 ## Cross-server chat
 
 Off by default. With `cross-server-chat = true` under `[advanced]`, servers can share chat through

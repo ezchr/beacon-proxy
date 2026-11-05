@@ -182,11 +182,6 @@ type FileConfig struct {
 	DefaultServer string                `json:"default_server,omitempty"`
 	NetworkDir    string                `json:"network_dir,omitempty"`
 
-	// JavaProxy, when set, is the path of a Gate config file (Gate's counterpart of velocity.toml):
-	// this process then also runs the Java Edition proxy, see java.go. JavaDataDir holds the Java
-	// login files (premium-usernames.txt, premium_cache.json); "java" when empty.
-	JavaProxy   string `json:"java_proxy,omitempty"`
-	JavaDataDir string `json:"java_data_dir,omitempty"`
 	// TLSDomain (an automatic Let's Encrypt certificate) or TLSCert and TLSKey (files) make the
 	// direct-IP door answer HTTPS too (tlsconfig.go); beacon.toml only.
 	TLSDomain, TLSCert, TLSKey string `json:"-"`
@@ -204,8 +199,6 @@ type FileConfig struct {
 	SessionsPerIP    int `json:"-"`
 	// CrossServerChat serves the /chat routes (chathub.go); beacon.toml only.
 	CrossServerChat bool `json:"-"`
-	// JavaAuth turns on premium/cracked Java logins (javaauth.go); beacon.toml only.
-	JavaAuth *javaAuthOptions `json:"-"`
 	// Admins (gamertags or XUIDs) may use the in-game /broadcast.
 	Admins []string `json:"admins,omitempty"`
 	// ListingToggle lets /broadcast and the control port take the world off the Friends tab and

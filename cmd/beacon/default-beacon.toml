@@ -103,15 +103,6 @@ network-dir = {{q .NetworkDir}}
 # Where players rejoin when a server's packs changed during their join.
 rejoin-address = {{q .RejoinAddress}}
 {{- end}}
-{{- if .JavaProxy}}
-java-proxy = {{q .JavaProxy}}
-{{- end}}
-{{- if .JavaDataDir}}
-java-data-dir = {{q .JavaDataDir}}
-{{- end}}
-{{- with .JavaAuth}}
-java-auth = { login-server = {{q .LoginServer}}, protected-server = {{q .ProtectedServer}}, url = {{q .URL}} }
-{{- end}}
 {{- if .FakePlayerCount}}
 fake-player-count = {{.FakePlayerCount}}
 {{- end}}

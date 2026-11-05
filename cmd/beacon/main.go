@@ -123,24 +123,6 @@ func main() {
 		}
 	}
 
-	// `-java-only [FILE]`: run only the Java Edition proxy (Gate) with the config file FILE
-	// (gate.yml when omitted), for running or testing it apart from a relay. See java.go.
-	for i, a := range args {
-		if a == "-java-only" || a == "--java-only" {
-			file := "gate.yml"
-			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
-				file = args[i+1]
-			}
-			ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-			defer stop()
-			if err := runJavaProxy(ctx, file, "java", nil, log); err != nil && ctx.Err() == nil {
-				log.Error("java proxy stopped", "err", err)
-				exit(1)
-			}
-			return
-		}
-	}
-
 	cfg, err := loadBeaconConfig()
 	if err != nil {
 		log.Error("failed to load beacon.toml", "err", err)
@@ -185,18 +167,6 @@ func main() {
 	running = cfg
 	applyLive(cfg)
 	bridge.ReloadHook = reloadConfig
-
-	if cfg.JavaProxy != "" {
-		dataDir := cfg.JavaDataDir
-		if dataDir == "" {
-			dataDir = "java"
-		}
-		go func() {
-			if err := runJavaProxy(ctx, cfg.JavaProxy, dataDir, cfg.JavaAuth, log); err != nil && ctx.Err() == nil {
-				log.Error("java proxy stopped", "err", err)
-			}
-		}()
-	}
 
 	// The primary broadcast's account (token.json). Signed in here, before the per-broadcast
 	// code, because the direct-IP front door below also relays with this account's identity.

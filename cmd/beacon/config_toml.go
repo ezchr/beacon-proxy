@@ -76,23 +76,20 @@ type tomlConfig struct {
 	} `toml:"broadcast"`
 
 	Advanced struct {
-		ControlPort             int              `toml:"control-port"`
-		Compression             string           `toml:"compression"`
-		CompressionThreshold    int              `toml:"compression-threshold"`
-		DisableClientEncryption bool             `toml:"disable-client-encryption"`
-		Protocol                int32            `toml:"protocol"`
-		Version                 string           `toml:"version"`
-		NetworkDir              string           `toml:"network-dir"`
-		RejoinAddress           string           `toml:"rejoin-address"`
-		JavaProxy               string           `toml:"java-proxy"`
-		JavaDataDir             string           `toml:"java-data-dir"`
-		JavaAuth                *javaAuthOptions `toml:"java-auth"`
-		CrossServerChat         bool             `toml:"cross-server-chat"`
-		LoginRateLimit          int              `toml:"login-ratelimit"`
-		PacketsPerSecond        int              `toml:"packets-per-second"`
-		SessionsPerIP           int              `toml:"sessions-per-ip"`
-		ACMEHTTPAddress         string           `toml:"acme-http-address"`
-		FakePlayerCount         int              `toml:"fake-player-count"`
+		ControlPort             int    `toml:"control-port"`
+		Compression             string `toml:"compression"`
+		CompressionThreshold    int    `toml:"compression-threshold"`
+		DisableClientEncryption bool   `toml:"disable-client-encryption"`
+		Protocol                int32  `toml:"protocol"`
+		Version                 string `toml:"version"`
+		NetworkDir              string `toml:"network-dir"`
+		RejoinAddress           string `toml:"rejoin-address"`
+		CrossServerChat         bool   `toml:"cross-server-chat"`
+		LoginRateLimit          int    `toml:"login-ratelimit"`
+		PacketsPerSecond        int    `toml:"packets-per-second"`
+		SessionsPerIP           int    `toml:"sessions-per-ip"`
+		ACMEHTTPAddress         string `toml:"acme-http-address"`
+		FakePlayerCount         int    `toml:"fake-player-count"`
 		FakePlayerDrift         *struct {
 			Min     int `toml:"min"`
 			Max     int `toml:"max"`
@@ -176,7 +173,6 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	}
 	cfg.DisableClientEncryption = a.DisableClientEncryption
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
-	cfg.JavaProxy, cfg.JavaDataDir, cfg.JavaAuth = a.JavaProxy, a.JavaDataDir, a.JavaAuth
 	cfg.CrossServerChat = a.CrossServerChat
 	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
@@ -392,8 +388,6 @@ type templateValues struct {
 	ControlPort                int
 	DisableClientEncryption    bool
 	NetworkDir, RejoinAddress  string
-	JavaProxy, JavaDataDir     string
-	JavaAuth                   *javaAuthOptions
 	CrossServerChat            bool
 	FakePlayerCount            int
 	FakePlayerDrift            *PlayerDriftConfig
@@ -457,15 +451,10 @@ func migrateLegacyConfig() error {
 		Extra: old.ExtraBroadcasts, ControlPort: old.ControlPort,
 		DisableClientEncryption: old.DisableClientEncryption,
 		NetworkDir:              old.NetworkDir, RejoinAddress: old.RejoinAddress,
-		JavaProxy: old.JavaProxy, JavaDataDir: old.JavaDataDir,
 		FakePlayerCount: old.FakePlayerCount, FakePlayerDrift: old.FakePlayerDrift,
 	}
 	// nether2rak always served the chat routes; a converted config keeps them.
 	v.CrossServerChat = true
-	if old.JavaProxy != "" {
-		// nether2rak always ran the premium/cracked Java logins, with these servers.
-		v.JavaAuth = &javaAuthOptions{LoginServer: "pvp", ProtectedServer: "skygen", URL: "http://127.0.0.1:7797/auth/"}
-	}
 	if old.HostName == old.WorldName {
 		v.HostName = ""
 	}
