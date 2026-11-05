@@ -317,6 +317,8 @@ func recordPlayerList(ctx context.Context, conn *minecraft.Conn, source string, 
 	// Everyone currently in the target's player list (by UUID), so the log shows how many
 	// players are really online, not just how many were new to us.
 	online := map[string]bool{}
+	// The scraper account is in the list too; it is not a player to invite.
+	self := conn.IdentityData().XUID
 	for {
 		pk, err := conn.ReadPacket()
 		if err != nil {
@@ -343,7 +345,7 @@ func recordPlayerList(ctx context.Context, conn *minecraft.Conn, source string, 
 			if entry.ActionType != protocol.PlayerListActionAdd {
 				continue
 			}
-			if entry.XUID == "" || seen[entry.XUID] {
+			if entry.XUID == "" || entry.XUID == self || seen[entry.XUID] {
 				continue
 			}
 			seen[entry.XUID] = true
