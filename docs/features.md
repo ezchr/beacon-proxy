@@ -66,7 +66,8 @@ of a broken join.
 - **Allow list.** `allowed-xuids` under `[broadcast]` lets only those Xbox accounts join.
 - **Rate limits** (under `[advanced]`, off by default): `login-ratelimit` is the least time in
   milliseconds between two joins from one IP address, `packets-per-second` the most packets a
-  player may send in a second; a player past either is sent away.
+  player may send in a second; a player past either is sent away. `sessions-per-ip` is the most
+  players online at once from one IP address; a player joining again from it still gets in.
 
 ## Skins for Java players
 

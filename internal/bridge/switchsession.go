@@ -181,6 +181,16 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		time.Sleep(time.Second)
 		return
 	}
+	if _, _, ip, _ := dcVerdict(conn.RemoteAddr()); ip != nil {
+		release, ok := holdSession(ip.String(), id.XUID)
+		if !ok {
+			log.Info("join refused: sessions per IP", "ip", ip)
+			_ = client.WritePacket(&packet.Disconnect{Message: tooManySessionsMessage})
+			time.Sleep(time.Second)
+			return
+		}
+		defer release()
+	}
 	noteBedrock(1) // the network's player count, see onlinecount.go
 	defer noteBedrock(-1)
 	// The build's own player checks, if it has any (checks.go).

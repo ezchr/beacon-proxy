@@ -21,6 +21,7 @@ func applyLive(cfg FileConfig) {
 	bridge.SetLimits(bridge.Limits{
 		LoginInterval:    time.Duration(cfg.LoginRateLimit) * time.Millisecond,
 		PacketsPerSecond: cfg.PacketsPerSecond,
+		SessionsPerIP:    cfg.SessionsPerIP,
 	})
 	bridge.SetPingPassthrough(cfg.PingPassthrough)
 	chatEnabled = cfg.CrossServerChat
@@ -74,6 +75,7 @@ func reloadConfig() []string {
 	// What is reloaded is now what runs; the rest keeps its old value until a restart.
 	cur.Servers, cur.Try, cur.ForcedHosts, cur.Admins = next.Servers, next.Try, next.ForcedHosts, next.Admins
 	cur.PingPassthrough, cur.LoginRateLimit, cur.PacketsPerSecond = next.PingPassthrough, next.LoginRateLimit, next.PacketsPerSecond
+	cur.SessionsPerIP = next.SessionsPerIP
 	cur.CrossServerChat = next.CrossServerChat
 	running = cur
 	return out

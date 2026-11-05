@@ -197,9 +197,11 @@ type FileConfig struct {
 	ForcedHosts map[string][]string `json:"-"`
 	// PingPassthrough is what the server list takes from the first server: off, motd, players, all.
 	PingPassthrough string `json:"-"`
-	// LoginRateLimit (ms between joins from one IP) and PacketsPerSecond (per player); 0 is off.
+	// LoginRateLimit (ms between joins from one IP), PacketsPerSecond (per player) and SessionsPerIP
+	// (players online from one IP); 0 is off.
 	LoginRateLimit   int `json:"-"`
 	PacketsPerSecond int `json:"-"`
+	SessionsPerIP    int `json:"-"`
 	// CrossServerChat serves the /chat routes (chathub.go); beacon.toml only.
 	CrossServerChat bool `json:"-"`
 	// JavaAuth turns on premium/cracked Java logins (javaauth.go); beacon.toml only.

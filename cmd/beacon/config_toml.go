@@ -90,6 +90,7 @@ type tomlConfig struct {
 		CrossServerChat         bool             `toml:"cross-server-chat"`
 		LoginRateLimit          int              `toml:"login-ratelimit"`
 		PacketsPerSecond        int              `toml:"packets-per-second"`
+		SessionsPerIP           int              `toml:"sessions-per-ip"`
 		ACMEHTTPAddress         string           `toml:"acme-http-address"`
 		FakePlayerCount         int              `toml:"fake-player-count"`
 		FakePlayerDrift         *struct {
@@ -177,7 +178,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.JavaProxy, cfg.JavaDataDir, cfg.JavaAuth = a.JavaProxy, a.JavaDataDir, a.JavaAuth
 	cfg.CrossServerChat = a.CrossServerChat
-	cfg.LoginRateLimit, cfg.PacketsPerSecond = a.LoginRateLimit, a.PacketsPerSecond
+	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
 	case "", "off", "motd", "players", "all":
 		cfg.PingPassthrough = p

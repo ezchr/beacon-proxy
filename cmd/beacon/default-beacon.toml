@@ -90,6 +90,9 @@ login-ratelimit = 0
 
 # Most packets a player may send in a second. 0: off.
 packets-per-second = 0
+
+# Most players online at once from one IP address. 0: off.
+sessions-per-ip = 0
 {{- if .DisableClientEncryption}}
 disable-client-encryption = true
 {{- end}}

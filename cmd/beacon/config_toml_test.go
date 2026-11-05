@@ -125,6 +125,7 @@ try = ["lobby", "pvp"]
 [advanced]
 login-ratelimit = 3000
 packets-per-second = 500
+sessions-per-ip = 3
 `), 0o644)
 	cfg, err := loadBeaconConfig()
 	if err != nil {
@@ -133,8 +134,8 @@ packets-per-second = 500
 	if !slices.Equal(cfg.Try, []string{"lobby", "pvp"}) || !slices.Equal(cfg.ForcedHosts["pvp.example.com"], []string{"pvp"}) {
 		t.Fatalf("try %v forced %v", cfg.Try, cfg.ForcedHosts)
 	}
-	if cfg.PingPassthrough != "players" || cfg.LoginRateLimit != 3000 || cfg.PacketsPerSecond != 500 {
-		t.Fatalf("passthrough %q limits %d %d", cfg.PingPassthrough, cfg.LoginRateLimit, cfg.PacketsPerSecond)
+	if cfg.PingPassthrough != "players" || cfg.LoginRateLimit != 3000 || cfg.PacketsPerSecond != 500 || cfg.SessionsPerIP != 3 {
+		t.Fatalf("passthrough %q limits %d %d %d", cfg.PingPassthrough, cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP)
 	}
 	_ = os.WriteFile(tomlConfigFile, []byte("ping-passthrough = \"sometimes\"\n[servers]\nlobby = \"127.0.0.1:1\"\n"), 0o644)
 	if _, err := loadBeaconConfig(); err == nil {
