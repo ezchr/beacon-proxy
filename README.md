@@ -10,8 +10,8 @@ Beacon is a proxy for Minecraft: Bedrock Edition. Put it in front of your server
   consoles included;
 - **lets players join by IP** from the server list.
 
-It works with any Bedrock server: Bedrock Dedicated Server (BDS), Dragonfly, Geyser,
-PocketMine-MP, Nukkit and others. It can run on the same machine as your servers or on its own.
+It works with Bedrock servers that speak NetherNet: Bedrock Dedicated Server (BDS), Dragonfly,
+Geyser and others. It can run on the same machine as your servers or on its own.
 
 ## Quick start
 
@@ -45,12 +45,10 @@ the player.
 | Server | Setting | Address in `[servers]` |
 |---|---|---|
 | BDS | `online-mode=false` in `server.properties`, and [xuidforward](https://github.com/ezchr/xuidforward) | its `server-port`, e.g. `"127.0.0.1:19133"` |
-| Dragonfly | `AuthEnabled = false` under `[Server]` | add `transport = "raknet"` unless it runs NetherNet |
-| Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working | `{ address = "127.0.0.1:19132", transport = "raknet" }` |
-| PocketMine-MP | `xbox-auth=off` in `server.properties` | `{ address = "127.0.0.1:19132", transport = "raknet" }` |
+| Dragonfly | `AuthEnabled = false` under `[Server]` | its NetherNet address, e.g. `"127.0.0.1:19133"` |
+| Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working | its NetherNet address, e.g. `"127.0.0.1:19132"` |
 
-Servers are reached over NetherNet by default (BDS 1.26.60+, and other servers that offer it).
-A server that only speaks RakNet is written as a table with `transport = "raknet"`.
+Beacon reaches your servers over NetherNet, at their TCP port.
 
 **Keep these servers private.** With their own Xbox check off, anyone who can reach them could
 join as anyone. Beacon can only check the players who come through it, so the server itself must

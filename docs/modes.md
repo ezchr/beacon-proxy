@@ -11,7 +11,6 @@ Beacon runs in one of two modes, set with `mode` in `beacon.toml`.
 | Your server's Xbox check | off (`online-mode=false`): Beacon checks players | on (`online-mode=true`) |
 | Who your server must accept | only Beacon: firewall it, use [forwarding](forwarding.md) | players, directly |
 | When Beacon restarts | players are disconnected | players keep playing |
-| Server must support | NetherNet or RakNet | NetherNet (BDS 1.26.60+, or a server that offers it) |
 
 ## Relay
 

@@ -15,7 +15,6 @@ What changed:
 | `config.json` | `beacon.toml` |
 | `backend_transport: "nethernet"` + `servers` | `mode = "relay"` + `[servers]` |
 | `backend_transport: "nethernet-norelay"` | `mode = "relayless"` |
-| `backend_transport: "raknet"` | `mode = "relay"`, server with `transport = "raknet"` |
 | `relay_direct_ip_listen_address` | `bind` |
 | `world_name` / `host_name` | `motd` / `[broadcast] host-name` |
 | `extra_broadcasts` | `[[broadcast.extra]]`, or `beacon accounts add` |
