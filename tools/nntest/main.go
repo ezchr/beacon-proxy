@@ -25,8 +25,8 @@ import (
 	"time"
 
 	"github.com/df-mc/go-nethernet"
-	"github.com/ezchr/beacon-proxy/bridge"
-	"github.com/ezchr/beacon-proxy/session"
+	"github.com/ezchr/beacon-proxy/internal/bridge"
+	"github.com/ezchr/beacon-proxy/internal/session"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"golang.org/x/oauth2"
 )

@@ -13,8 +13,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/ezchr/beacon-proxy/session"
-	"github.com/ezchr/beacon-proxy/xbl"
+	"github.com/ezchr/beacon-proxy/internal/session"
+	"github.com/ezchr/beacon-proxy/internal/xbl"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"golang.org/x/oauth2"
 )

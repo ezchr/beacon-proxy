@@ -21,8 +21,8 @@ import (
 	"sort"
 	"time"
 
-	"github.com/ezchr/beacon-proxy/session"
-	"github.com/ezchr/beacon-proxy/xbl/friendactivity"
+	"github.com/ezchr/beacon-proxy/internal/session"
+	"github.com/ezchr/beacon-proxy/internal/xbl/friendactivity"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"golang.org/x/oauth2"
 )

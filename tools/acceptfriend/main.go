@@ -12,7 +12,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/ezchr/beacon-proxy/session"
+	"github.com/ezchr/beacon-proxy/internal/session"
 	"github.com/sandertv/gophertunnel/minecraft/auth"
 	"golang.org/x/oauth2"
 )
