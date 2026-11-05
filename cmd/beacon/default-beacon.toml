@@ -8,8 +8,12 @@ mode = {{q .Mode}}
 # Where players join by IP. Empty: Friends tab only.
 bind = {{q .Bind}}
 
-# HTTPS for joining by address: a Let's Encrypt certificate for this domain, or your own files.
+# HTTPS for joining by address. Put your domain here and Beacon gets a free Let's Encrypt
+# certificate for it and renews it by itself (Let's Encrypt checks the domain on port 80).
 domain = ""
+
+# Or use your own certificate instead: leave domain empty and give its files here.
+# All three empty: no HTTPS.
 tls-cert = ""
 tls-key = ""
 
