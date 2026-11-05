@@ -79,7 +79,7 @@ func main() {
 	}
 	c := proxy.NewProxyConn(conn, false)
 	cd := bridge.ProbeClientData("netbot")
-	cd.ServerAddress = "127.0.0.1:19190"
+	cd.ServerAddress = *typedAddress
 	cd.GameVersion = proxy.VersionName(int32(*proto))
 	if err := c.Login(cd, sess, int32(*proto)); err != nil {
 		fail("login: %v", err)
@@ -188,6 +188,8 @@ func (b *bot) terrainArrived(x, z int32) {
 		_ = b.c.WritePacket(&packet.PlayerAction{EntityRuntimeID: rid, ActionType: protocol.PlayerActionDimensionChangeDone})
 	}()
 }
+
+var typedAddress = flag.String("address", "127.0.0.1:19190", "the address the client says the player typed (its ServerAddress), for forced hosts")
 
 var runCmds = flag.String("cmds", "", "comma-separated commands to run (without /) on the last server, logging the replies")
 
