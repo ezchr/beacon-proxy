@@ -1,0 +1,4 @@
+
+# ZID's own player checks: local to that build, not part of Beacon.
+bridge/toolcheck.go
+bridge/toolcheck_test.go

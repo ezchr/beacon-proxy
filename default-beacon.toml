@@ -1,0 +1,125 @@
+# Beacon Proxy configuration. Do not change config-version.
+config-version = "1.0"
+
+# How players reach your servers:
+#   "relay"     - players connect through Beacon, which can move them between the servers below
+#                 with /server (like Velocity). Each server needs online-mode=false in its own
+#                 config, so firewall it: only Beacon may reach it (see the README).
+#   "relayless" - Beacon only lists your server (Friends tab) and hands each player straight to
+#                 it. Beacon is not in the connection, so players stay on through a Beacon restart.
+#                 One server, no /server. The server keeps online-mode=true.
+mode = {{q .Mode}}
+
+# Where players join by IP / the server list (relay mode). Empty: Friends tab only.
+bind = {{q .Bind}}
+
+# HTTPS for joining by address. Players' clients try https first and wait about 20 seconds before
+# plain http, so set one of these if players join by a domain name:
+#   domain = "play.example.com"   a free Let's Encrypt certificate, renewed by Beacon. Needs port 80
+#                                 free on this machine (Let's Encrypt checks the domain there).
+#   tls-cert / tls-key            a certificate you already have (PEM files, read again when renewed).
+# Plain http keeps working on the same port, for players who type a bare IP.
+domain = ""
+tls-cert = ""
+tls-key = ""
+
+# Relay mode: Beacon signs every login it sends your servers with this secret, so a server that
+# checks it (see docs/forwarding.md) knows the login came from Beacon. Made on first start; keep it
+# private. BEACON_FORWARDING_SECRET, when set, is used instead.
+forwarding-secret-file = "forwarding.secret"
+
+# The world name players see on the Friends tab.
+motd = {{q .MOTD}}
+
+# The max players shown. Display only.
+show-max-players = {{.ShowMaxPlayers}}
+
+[servers]
+# Your servers, as name = "host:port": the server's NetherNet address (its TCP server-port, e.g.
+# BDS with transport=nethernet, Dragonfly, Geyser). Any Bedrock server works.
+# A server that only speaks RakNet (UDP): name = { address = "host:port", transport = "raknet" }
+{{- range .Servers}}
+{{- if .Transport}}
+{{.Name}} = { address = {{q .Address}}, transport = {{q .Transport}} }
+{{- else}}
+{{.Name}} = {{q .Address}}
+{{- end}}
+{{- end}}
+
+# Where players go when they join, in order: if the first is down, the next.
+try = {{list .Try}}
+
+[broadcast]
+# The account name shown as the world's host on the Friends tab. Empty: the motd.
+host-name = {{q .HostName}}
+
+# Gamertags or XUIDs that may use /broadcast and other Beacon admin commands.
+admins = {{list .Admins}}
+
+# Accept Xbox friend requests automatically. Friends of the account are who see the world.
+accept-friends = {{.AcceptFriends}}
+
+# Let admins take the world off the Friends tab and back with /broadcast off|on.
+listing-toggle = {{.ListingToggle}}
+{{- range .Extra}}
+
+# Another Friends-tab world for the same servers, hosted by another Xbox account (each account has
+# 30 slots). Sign it in with: beacon login {{.TokenFile}}
+[[broadcast.extra]]
+name = {{q .Name}}
+token-file = {{q .TokenFile}}
+{{- if .HostName}}
+host-name = {{q .HostName}}
+{{- end}}
+{{- if .WorldName}}
+world-name = {{q .WorldName}}
+{{- end}}
+{{- if .Invites}}
+invites = true
+{{- end}}
+{{- if .NoFriendAccept}}
+accept-friends = false
+{{- end}}
+{{- if .Protocol}}
+protocol = {{.Protocol}}
+version = {{q .Version}}
+{{- end}}
+{{- end}}
+
+[advanced]
+# A local HTTP API for your own servers and scripts: player ping, cross-server chat, the Friends-tab
+# listing, invites (docs/control-api.md). Always on 127.0.0.1; when bind is itself on 127.0.0.1, the
+# API shares bind's address instead.
+control-port = {{.ControlPort}}
+
+# Cross-server chat: your servers share their chat through the control API (/chat/send and
+# /chat/poll). Beacon only carries the lines; each server needs a plugin that sends and shows them.
+cross-server-chat = {{.CrossServerChat}}
+{{- if .DisableClientEncryption}}
+disable-client-encryption = true
+{{- end}}
+{{- if .NetworkDir}}
+network-dir = {{q .NetworkDir}}
+{{- end}}
+{{- if .RejoinAddress}}
+# Where players rejoin when a server's resource packs changed while they joined.
+rejoin-address = {{q .RejoinAddress}}
+{{- end}}
+{{- if .JavaProxy}}
+# Also run the Java Edition proxy (Gate) with this config file.
+java-proxy = {{q .JavaProxy}}
+{{- end}}
+{{- if .JavaDataDir}}
+java-data-dir = {{q .JavaDataDir}}
+{{- end}}
+{{- with .JavaAuth}}
+# Premium/cracked Java logins: cracked players log in on login-server (which answers at url) before
+# they may join protected-server.
+java-auth = { login-server = {{q .LoginServer}}, protected-server = {{q .ProtectedServer}}, url = {{q .URL}} }
+{{- end}}
+{{- if .FakePlayerCount}}
+fake-player-count = {{.FakePlayerCount}}
+{{- end}}
+{{- with .FakePlayerDrift}}
+fake-player-drift = { min = {{.Min}}, max = {{.Max}}, max-step = {{.MaxStep}} }
+{{- end}}
