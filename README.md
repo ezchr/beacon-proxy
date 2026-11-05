@@ -109,7 +109,6 @@ All on by default unless noted; details in [Features](docs/features.md).
 
 - **Different content per server:** servers may have their own resource packs, blocks and items;
   Beacon merges and renumbers them, so players move between a vanilla server and a modded one.
-- **Game versions:** a server one version behind still takes players on the new version.
 - **Private command blocks:** players can't read the commands in command blocks and NPCs.
 - **Datacenter block (opt-in):** turns away joins from hosting providers' IP ranges you list.
 - **Skins for Java players:** uploads Bedrock skins to GeyserMC's skin API, for servers with Java

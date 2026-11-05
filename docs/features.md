@@ -19,18 +19,9 @@ setup.
 
 ## Game versions
 
-Beacon serves the current Bedrock version. Per server you can say which client versions it takes,
-and which newer versions it speaks itself; for the rest Beacon translates, so a server that is one
-version behind still takes players on the new one:
-
-```toml
-[servers]
-old = { address = "127.0.0.1:19140", protocols = [2193, 2225] }
-```
-
-`protocols` lists the protocol numbers the server takes (default: all Beacon serves); `native` the
-newer ones it speaks itself. A player on a version a server doesn't take gets a clear message
-instead of a broken join.
+Each Beacon release serves one Bedrock version (1.0.0: 1.26.60), and your servers run that same
+version. Players on another version get a message saying which version the server takes, instead
+of a broken join.
 
 ## Protection
 
