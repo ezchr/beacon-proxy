@@ -108,7 +108,6 @@ All on by default unless noted; details in [Features](docs/features.md).
 |---|---|
 | `mode` | `"relay"` (default): players go through Beacon and can switch servers. `"relayless"`: players connect straight to your one server, no switching. |
 | `bind` | where players join by IP, e.g. `"0.0.0.0:19132"`. Empty: Friends tab only. |
-| `domain`, or `tls-cert` and `tls-key` | HTTPS for joining by address, so players don't wait; see [HTTPS](docs/https.md) |
 | `motd` | the world name on the Friends tab and server list |
 | `forwarding-secret-file` | the secret Beacon signs logins to your servers with; see [forwarding](docs/forwarding.md) |
 | `[servers]` | your servers, and `try`: where players go first |
@@ -177,7 +176,6 @@ Sign in once by running `./beacon` by hand in that folder, then
 ## More
 
 - [Relay and relayless mode](docs/modes.md): what each does and when to pick it.
-- [HTTPS](docs/https.md): a certificate for joining by address.
 - [Features](docs/features.md): everything else Beacon does, and how to set it up.
 - [Player-info forwarding](docs/forwarding.md): how servers know a login came from Beacon, and
   the claim format for writing a check for another server.
