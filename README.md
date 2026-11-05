@@ -43,7 +43,7 @@ accept Beacon's login: turn its own Xbox check off. Beacon has already checked t
 
 | Server | Setting |
 |---|---|
-| BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) (below) |
+| BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) ([below](#bds-in-relay-mode-needs-xuidforward)) |
 | Dragonfly | `AuthEnabled = false` under `[Server]` |
 | Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working |
 
@@ -80,13 +80,17 @@ ufw allow from 203.0.113.5 to any port 19133
 If you can add code to the server, also have it check Beacon's signature on each login (see
 [forwarding](docs/forwarding.md)); then even a connection that gets past the firewall is refused.
 
-### BDS keeps player data with xuidforward
+### BDS in relay mode needs xuidforward
 
-BDS throws away the Xbox ID (XUID) of a login like Beacon's, so without help every player starts
-with fresh, empty data each time they join. Install
+This is only for **relay mode**. If you just want your BDS on the Friends tab, use
+[relayless mode](#without-server-switching-relayless-mode): players log in to BDS themselves and
+keep their data, with nothing to install.
+
+In relay mode, BDS throws away the Xbox ID (XUID) of Beacon's login, so without help every player
+starts with fresh, empty data each time they join. Install
 [xuidforward](https://github.com/ezchr/xuidforward), an Endstone plugin by Beacon's author, version
 1.0.5 or newer, and give it the same `forwarding.secret` (its README shows how). Dragonfly and Geyser
-keep the XUID on their own, and relayless mode needs nothing.
+keep the XUID on their own.
 
 ## Without server switching (relayless mode)
 
