@@ -50,11 +50,11 @@ type FileConfig struct {
 	// Empty means the mode's default (127.0.0.1:19132 for raknet, 127.0.0.1:19134 otherwise).
 	ServerAddress string `json:"server_address"`
 
-	// RakNetServerAddress and NetherNetBackendAddress are what ServerAddress used to be split into, one
+	// LegacyRakNetAddress and NetherNetBackendAddress are what ServerAddress used to be split into, one
 	// per kind of backend. They are still read so older config files keep working (see
 	// resolveServerAddress), and after loading they hold ServerAddress in the form each transport
 	// needs, so the rest of the code reads them as before. New configs should not set them.
-	RakNetServerAddress     string `json:"geyser_address,omitempty"`
+	LegacyRakNetAddress     string `json:"geyser_address,omitempty"`
 	NetherNetBackendAddress string `json:"nethernet_backend_address,omitempty"`
 
 	// Notes are things worth telling the operator about the file that was loaded - old setting
@@ -280,7 +280,7 @@ func loadConfig(path string) (FileConfig, error) {
 		cfg := defaultConfig()
 		resolveServerAddress(&cfg, nil)
 		resolveControlPort(&cfg, nil)
-		cfg.RakNetServerAddress, cfg.NetherNetBackendAddress = "", "" // new files carry server_address only
+		cfg.LegacyRakNetAddress, cfg.NetherNetBackendAddress = "", "" // new files carry server_address only
 		out, _ := json.MarshalIndent(cfg, "", "  ")
 		_ = os.WriteFile(path, out, 0644)
 		resolveServerAddress(&cfg, nil)
@@ -318,7 +318,7 @@ func usesNetherNet(cfg FileConfig) bool {
 
 // resolveServerAddress settles the one backend address: server_address if the file sets it,
 // otherwise the older per-transport key that applies to the chosen transport, otherwise the
-// transport's default. It then fills RakNetServerAddress / NetherNetBackendAddress from it in the form
+// transport's default. It then puts it in ServerAddress / NetherNetBackendAddress in the form
 // the transport uses, which is what the rest of the code reads. present is the set of keys in
 // the file (nil for a freshly written default) and only decides which notes are added.
 func resolveServerAddress(cfg *FileConfig, present map[string]json.RawMessage) {
@@ -331,7 +331,7 @@ func resolveServerAddress(cfg *FileConfig, present map[string]json.RawMessage) {
 	_, hasUnused := present[unusedKey]
 
 	if cfg.ServerAddress == "" {
-		legacy := cfg.RakNetServerAddress
+		legacy := cfg.LegacyRakNetAddress
 		if nether {
 			legacy = cfg.NetherNetBackendAddress
 		}
@@ -362,7 +362,7 @@ func resolveServerAddress(cfg *FileConfig, present map[string]json.RawMessage) {
 	} else {
 		// RakNet has no URL form; tolerate one pasted from a NetherNet config.
 		address = strings.TrimPrefix(strings.TrimPrefix(address, "http://"), "https://")
-		cfg.RakNetServerAddress = strings.TrimSuffix(address, "/")
+		cfg.ServerAddress = strings.TrimSuffix(address, "/")
 	}
 }
 

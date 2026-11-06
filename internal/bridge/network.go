@@ -615,7 +615,7 @@ func (n *Network) dialServer(ctx context.Context, s ServerConfig, protocolID int
 	cfg := Config{BackendTransport: s.Transport, NetherNetIdentity: n.Identity, Log: n.Log}
 	switch strings.ToLower(s.Transport) {
 	case TransportRakNet:
-		cfg.RakNetServerAddress = s.Address
+		cfg.ServerAddress = s.Address
 	default:
 		cfg.BackendTransport = TransportNetherNet
 		cfg.NetherNetBackendAddress = s.Address

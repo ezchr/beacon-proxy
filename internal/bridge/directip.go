@@ -325,9 +325,9 @@ func BackendPlayers(ctx context.Context, cfg Config) (int, error) {
 		}
 		return entry.Players, nil
 	}
-	pong, err := raknet.PingContext(ctx, cfg.RakNetServerAddress)
+	pong, err := raknet.PingContext(ctx, cfg.ServerAddress)
 	if err != nil {
-		return 0, fmt.Errorf("ping raknet backend %s: %w", cfg.RakNetServerAddress, err)
+		return 0, fmt.Errorf("ping raknet backend %s: %w", cfg.ServerAddress, err)
 	}
 	return parsePongPlayers(pong)
 }

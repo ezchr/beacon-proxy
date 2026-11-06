@@ -63,10 +63,10 @@ type Config struct {
 	// world (one counter per world): it is the player count the world shows.
 	WorldPlayers *atomic.Int64
 
-	// RakNetServerAddress is host:port of the backend's RakNet listener, e.g. "127.0.0.1:19132".
+	// ServerAddress is host:port of the backend's RakNet listener, e.g. "127.0.0.1:19132".
 	// Used only when BackendTransport is RakNet. That listener MUST have encryption disabled -
 	// see the ForwardLogin doc comment in proxy/dial.go for why.
-	RakNetServerAddress string
+	ServerAddress string
 
 	// NetherNetBackendAddress is the base URL of the backend's NetherNet HTTP signaling
 	// endpoint, e.g. "http://127.0.0.1:19134". Used only when BackendTransport is NetherNet.
@@ -271,9 +271,9 @@ func BackendBypassesRelay(cfg Config) bool {
 func dialBackend(ctx context.Context, cfg Config, log *slog.Logger) (backendConn, *ecdsa.PrivateKey, error) {
 	switch name := backendTransportName(cfg); name {
 	case TransportRakNet:
-		conn, err := raknet.Dial(cfg.RakNetServerAddress)
+		conn, err := raknet.Dial(cfg.ServerAddress)
 		if err != nil {
-			return nil, nil, fmt.Errorf("dial raknet backend %s: %w", cfg.RakNetServerAddress, err)
+			return nil, nil, fmt.Errorf("dial raknet backend %s: %w", cfg.ServerAddress, err)
 		}
 		return conn, nil, nil
 	case TransportNetherNet:

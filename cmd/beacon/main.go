@@ -252,7 +252,7 @@ func main() {
 	switch backendTransport {
 	case "network":
 	case "", bridge.TransportRakNet:
-		log.Info("relaying into backend over raknet", "address", cfg.RakNetServerAddress)
+		log.Info("relaying into backend over raknet", "address", cfg.ServerAddress)
 	case bridge.TransportNetherNet, bridge.TransportNetherNetNoRelay:
 		normalized, err := bridge.NormalizeNetherNetAddress(cfg.NetherNetBackendAddress)
 		if err != nil {
@@ -672,7 +672,7 @@ func relayConfig(cfg FileConfig, authSession *session.Session, allowXUID func(st
 	return bridge.Config{
 		NetherNetIdentity:       identityCacheFor(authSession, log).Identity,
 		BackendTransport:        cfg.BackendTransport,
-		RakNetServerAddress:     cfg.RakNetServerAddress,
+		ServerAddress:           cfg.ServerAddress,
 		NetherNetBackendAddress: cfg.NetherNetBackendAddress,
 		DisableClientEncryption: cfg.DisableClientEncryption,
 		ForwardingSecret:        cfg.ForwardingSecret,
