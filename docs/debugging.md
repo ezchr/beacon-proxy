@@ -26,6 +26,13 @@ what is in it:
 
 `client` is the player sending to the server, `server` the other way.
 
+The first time a player shows up in a file, a line says who they are, which helps when something only
+happens on one device or version:
+
+```
+# player Steve xuid=2535400000000000 ip=203.0.113.7 device=Android model="SM-G991B" version=1.26.60
+```
+
 ## Commands
 
 | Command | Logs |
@@ -100,8 +107,8 @@ new run stops the one before it. While nothing is running it costs nothing.
 
 ## Before you share a log
 
-It holds what the packets hold, which can be private chat, names and positions. Only you can read the
-file on the server, but read it through before posting it anywhere. Logins are never logged, so it has
-no account tokens.
+It holds players' IP addresses, devices and XUIDs, and what the packets hold, which can be private chat
+and positions. Only you can read the file on the server, but remove all that before posting it anywhere.
+Logins are never logged, so it has no account tokens.
 
 It only sees players relayed through Beacon, so it needs relay mode and doesn't show Java players.

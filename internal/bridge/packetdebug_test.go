@@ -46,6 +46,9 @@ func TestDebugCommand(t *testing.T) {
 	}
 	data, _ := os.ReadFile(path)
 	text := string(data)
+	if !strings.Contains(text, "# player Some Player") {
+		t.Fatalf("no player line:\n%s", text)
+	}
 	if !strings.Contains(text, "hello there") || strings.Contains(text, "MovePlayer") || strings.Contains(text, "Other") {
 		t.Fatalf("log:\n%s", text)
 	}

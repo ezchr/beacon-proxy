@@ -89,6 +89,7 @@ type debugRun struct {
 	w        *bufio.Writer
 	written  int64
 	lines    int64
+	seen     sync.Map // players with their line written
 	stopOnce sync.Once
 	timer    *time.Timer
 }
@@ -110,12 +111,26 @@ func (s *switchSession) debugPacket(dir string, id uint32, payload []byte) {
 	case !d.full && debugNoisy[name]:
 		return
 	}
+	if _, seen := d.seen.LoadOrStore(s.id.XUID+s.id.DisplayName, true); !seen {
+		d.write(s.debugWho(), false)
+	}
 	line := fmt.Sprintf("%s  %-16s %-8s %-6s %-28s %6d B", time.Now().Format("15:04:05.000"), s.id.DisplayName, s.serverName(), dir, name, len(payload))
 	// Contents for one player or chosen packets: everything from everyone would be too much.
 	if d.player != "" || len(d.types) > 0 {
 		line += "  " + debugContents(id, payload)
 	}
-	d.write(line)
+	d.write(line, true)
+}
+
+// debugWho is the line that says who a player is, the first time they show up in a log.
+func (s *switchSession) debugWho() string {
+	ip := "unknown"
+	if s.conn != nil {
+		if a := s.remoteIP(); a != "" {
+			ip = a
+		}
+	}
+	return fmt.Sprintf("# player %s xuid=%s ip=%s device=%v model=%q version=%s", s.id.DisplayName, s.id.XUID, ip, s.cd.DeviceOS, s.cd.DeviceModel, s.cd.GameVersion)
 }
 
 // debugContents is a packet's fields as text.
@@ -135,7 +150,8 @@ func debugContents(id uint32, payload []byte) string {
 	return text
 }
 
-func (d *debugRun) write(line string) {
+// write adds a line; count says whether it is a packet.
+func (d *debugRun) write(line string, count bool) {
 	d.mu.Lock()
 	if d.w == nil {
 		d.mu.Unlock()
@@ -143,7 +159,9 @@ func (d *debugRun) write(line string) {
 	}
 	n, _ := d.w.WriteString(line + "\n")
 	d.written += int64(n)
-	d.lines++
+	if count {
+		d.lines++
+	}
 	over := d.written >= debugMaxBytes
 	d.mu.Unlock()
 	if over {
