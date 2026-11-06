@@ -37,6 +37,10 @@ import (
 // union comes from what each server sent the last time anyone joined it, kept on disk (Dir), and the
 // resource packs are downloaded from each server once and served by the relay itself.
 type Network struct {
+	// packGen counts the changes to the servers' resource packs: a client logged in before the
+	// last one has old packs.
+	packGen atomic.Uint64
+
 	// Servers in order; Default is where players join. Each needs a relay-mode door (a backend that
 	// accepts the relay's re-signed logins).
 	Servers []ServerConfig
@@ -411,6 +415,9 @@ func (n *Network) record(server string, id uint32, payload []byte) bool {
 	} else {
 		n.Log.Debug("network: server content changed, cached for the next joins", "server", server, "file", file)
 	}
+	if id == packet.IDResourcePacksInfo || id == packet.IDResourcePackStack {
+		n.packGen.Add(1)
+	}
 	if id == packet.IDResourcePacksInfo {
 		go n.fetchPacks(server)
 	}
@@ -702,7 +709,9 @@ func (n *Network) refresh(server string) error {
 
 const (
 	// serverWatchInterval is how often the servers are checked for being up.
-	serverWatchInterval = 5 * time.Second
+	serverWatchInterval = time.Second
+	// serverRetryInterval is the pause between tries at a server still starting.
+	serverRetryInterval = 5 * time.Second
 	// serverRefreshInterval is how often pack lists are read anyway, for a restart too quick to
 	// be seen or packs changed without one.
 	serverRefreshInterval = 10 * time.Minute
@@ -732,11 +741,11 @@ func (n *Network) watchServers() {
 // refreshRetrying refreshes a server, trying again for a server still starting.
 func (n *Network) refreshRetrying(server string) {
 	var err error
-	for range 4 {
+	for range 6 {
 		if err = n.refresh(server); err == nil {
 			return
 		}
-		time.Sleep(serverWatchInterval)
+		time.Sleep(serverRetryInterval)
 	}
 	n.Log.Warn("network: could not read a server's resource packs", "server", server, "err", err)
 }

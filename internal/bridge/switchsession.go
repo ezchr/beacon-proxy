@@ -38,6 +38,8 @@ type switchSession struct {
 
 	ctx    context.Context
 	cancel context.CancelCauseFunc
+	// packGen is Network.packGen when this client logged in.
+	packGen uint64
 	// rejoining is set once the player is being sent to join again (record).
 	rejoining atomic.Bool
 
@@ -225,7 +227,8 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		cd.PlayFabID = strings.ToLower(id.PlayFabID)
 	}
 	s := &switchSession{
-		n: n, cfg: cfg, log: log, client: client, conn: conn, id: id, cd: cd, proto: client.Protocol(),
+		packGen: n.packGen.Load(),
+		n:       n, cfg: cfg, log: log, client: client, conn: conn, id: id, cd: cd, proto: client.Protocol(),
 		pool: client.Pool(), ctx: sctx, cancel: cancel,
 		chunkRadius: 16, maxRadius: 16, unchecked: unchecked,
 		entities: map[int64]bool{}, players: map[uuid.UUID]bool{}, bossBars: map[int64]bool{}, waypoints: map[uuid.UUID]bool{},
@@ -285,13 +288,16 @@ func (s *switchSession) sendClient(pks ...packet.Packet) {
 	}
 }
 
-// record keeps what a server sent at a join or move (Network.record). New resource packs mean
-// this client has the old ones (packs only download at a join): it is sent to join again, once,
-// to download them. Other changes keep it relayed (items are renumbered per server, and new
-// entities come with new packs).
+// record keeps what a server sent at a join or move (Network.record). Resource packs newer than
+// the ones this client logged in with mean it has the old ones (packs only download at a join),
+// however the relay learned of them: it is sent to join again, once, to download them. Other
+// changes keep it relayed (items are renumbered per server, and new entities come with new packs).
 func (s *switchSession) record(server string, id uint32, payload []byte) {
-	changed := s.n.record(server, id, payload)
-	if !changed || (id != packet.IDResourcePacksInfo && id != packet.IDResourcePackStack) || !s.rejoining.CompareAndSwap(false, true) {
+	s.n.record(server, id, payload)
+	if id != packet.IDResourcePacksInfo && id != packet.IDResourcePackStack {
+		return
+	}
+	if s.n.packGen.Load() == s.packGen || !s.rejoining.CompareAndSwap(false, true) {
 		return
 	}
 	s.log.Info("network: server has new resource packs, the player joins again to download them", "server", server)
