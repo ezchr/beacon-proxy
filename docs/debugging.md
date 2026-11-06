@@ -44,6 +44,35 @@ space goes in quotes: `debug "Some Player"`. Packet names don't care about capit
 Start with the player and no packet names. Once you can see which packet matters, name it, and the
 file gets much shorter.
 
+## Finding the problem
+
+Note the time it went wrong, then look at the lines just before it. The last packets before a kick
+are usually the cause.
+
+| What you see | Try | Look for |
+|---|---|---|
+| A player is kicked or disconnected | `debug Steve` | the last lines, and a `Disconnect` packet: its message says why |
+| Chat is missing or wrong | `debug Steve Text` | `client` lines are what they typed, `server` lines what came back |
+| A command does nothing | `debug Steve CommandRequest CommandOutput` | whether it reached the server, and the answer |
+| A menu or form closes | `debug Steve ContainerOpen ContainerClose ModalFormRequest` | what closed it, and which side sent that |
+| An item or armour looks wrong | `debug Steve MobEquipment MobArmourEquipment InventorySlot` | the item the server really sent |
+| A player can't move between servers | `debug Steve Transfer Disconnect ResourcePacksInfo` | where it stops |
+| Something is lagging | `debug all` | which packets show up the most |
+
+A packet that a `client` line sends but no `server` line answers usually means the server ignored it.
+If Beacon logged the right thing and the player still sees it wrong, the problem is in the client or
+its resource packs, not in the relay.
+
+To search a big file:
+
+```
+grep Disconnect debug/packets-2026-11-06_21-04-11.log
+grep -c MobEquipment debug/packets-2026-11-06_21-04-11.log
+```
+
+The contents are the packet's fields as Beacon read them. A long packet is cut at 2000 characters and
+ends with `...cut`.
+
 ## Where to type it
 
 In Beacon's console. If Beacon runs as a service with no console, use the [control API](control-api.md):
@@ -51,6 +80,14 @@ In Beacon's console. If Beacon runs as a service with no console, use the [contr
 ```
 curl '127.0.0.1:7777/packetdebug?cmd=Steve'
 curl '127.0.0.1:7777/packetdebug?cmd=off'
+```
+
+Use your own `control-port` in place of 7777. For more than one word, use `+` for spaces, and `%22`
+for the quotes around a name with a space:
+
+```
+curl '127.0.0.1:7777/packetdebug?cmd=Steve+Text'
+curl '127.0.0.1:7777/packetdebug?cmd=%22Some+Player%22+Text'
 ```
 
 ## Where the logs are
