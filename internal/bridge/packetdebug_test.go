@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
@@ -126,5 +127,34 @@ func TestDebugHasAndDirection(t *testing.T) {
 	data, _ := os.ReadFile(path)
 	if !strings.Contains(string(data), "a Diamond sword") || strings.Contains(string(data), "nothing here") {
 		t.Fatalf("log:\n%s", data)
+	}
+}
+
+func TestDebugKeepsSecretsOut(t *testing.T) {
+	login, payload := debugTestPayload(t, &packet.Login{ClientProtocol: 1, ConnectionRequest: []byte("the-token")})
+	if got := debugContents(login, payload); strings.Contains(got, "the-token") || !strings.Contains(got, "hidden") {
+		t.Fatalf("login: %s", got)
+	}
+	id, payload := debugTestPayload(t, &packet.ServerToClientHandshake{JWT: []byte("the-jwt")})
+	if got := debugContents(id, payload); strings.Contains(got, "the-jwt") {
+		t.Fatalf("handshake: %s", got)
+	}
+	id, payload = debugTestPayload(t, &packet.PurchaseReceipt{Receipts: []string{"the-receipt"}})
+	if got := debugContents(id, payload); strings.Contains(got, "the-receipt") {
+		t.Fatalf("receipt: %s", got)
+	}
+	id, payload = debugTestPayload(t, &packet.ResourcePacksInfo{TexturePacks: []protocol.TexturePackInfo{{ContentKey: "the-pack-key"}}})
+	if got := debugContents(id, payload); strings.Contains(got, "the-pack-key") {
+		t.Fatalf("pack key: %s", got)
+	}
+	id, payload = debugTestPayload(t, &packet.CommandRequest{CommandLine: "/login hunter2"})
+	if got := debugContents(id, payload); strings.Contains(got, "hunter2") {
+		t.Fatalf("password: %s", got)
+	}
+	if got := debugCommandLine("/tp Steve"); got != "/tp Steve" {
+		t.Fatalf("other command: %s", got)
+	}
+	if got := string(debugFormResponse([]byte(`["my secret", 2, true]`))); strings.Contains(got, "secret") || !strings.Contains(got, "2") {
+		t.Fatalf("form: %s", got)
 	}
 }

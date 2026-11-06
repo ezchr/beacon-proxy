@@ -124,6 +124,16 @@ new run stops the one before it. While nothing is running it costs nothing.
 
 It holds players' IP addresses, devices, XUIDs and login details, and what the packets hold, which can
 be private chat and positions. Only you can read the file on the server, but remove all that before
-posting it anywhere. The login packet itself is not logged, as it holds Xbox tokens: what it said is.
+posting it anywhere.
+
+Beacon keeps secrets out, so a log is safe to keep on your server:
+
+- Logins and the encryption handshake show only that they happened, so no Xbox tokens. What a login said is logged, read out of it.
+- Purchase receipts are hidden.
+- Resource pack decryption keys are hidden.
+- `/login`, `/register` and similar commands show the command, not the password.
+- Text typed into forms is hidden; the buttons and options chosen are kept.
+
+Chat is logged as it was sent, so a player who types a password into chat will have it in the log.
 
 It only sees players relayed through Beacon, so it needs relay mode and doesn't show Java players.

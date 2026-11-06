@@ -16,6 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -237,6 +238,70 @@ func (s *switchSession) debugSkin(d *debugRun) string {
 	return fmt.Sprintf("# skin %q %dx%d persona=%v saved as %s", s.cd.SkinID, w, h, s.cd.PersonaSkin, path)
 }
 
+// debugSecret are the packets whose contents are never logged: login tokens, the handshake that
+// sets up encryption, and purchase receipts. A log is kept and passed around, so nothing in it may
+// be of use to anyone who gets hold of it.
+var debugSecret = map[string]bool{
+	"Login": true, "SubClientLogin": true, "ServerToClientHandshake": true, "ClientToServerHandshake": true,
+	"PurchaseReceipt": true,
+}
+
+// debugSecretCommands take a password, as login plugins do.
+var debugSecretCommands = map[string]bool{
+	"login": true, "l": true, "log": true, "register": true, "reg": true, "changepassword": true,
+	"changepass": true, "cp": true, "password": true, "pass": true, "passwd": true, "auth": true,
+}
+
+// debugRedact takes what is secret out of a packet that is otherwise fine to log.
+func debugRedact(pk packet.Packet) {
+	switch p := pk.(type) {
+	case *packet.ResourcePacksInfo:
+		for i := range p.TexturePacks {
+			if p.TexturePacks[i].ContentKey != "" {
+				p.TexturePacks[i].ContentKey = "(hidden)" // what decrypts the pack
+			}
+		}
+	case *packet.CommandRequest:
+		p.CommandLine = debugCommandLine(p.CommandLine)
+	case *packet.ModalFormResponse:
+		if data, ok := p.ResponseData.Value(); ok {
+			p.ResponseData = protocol.Option(debugFormResponse(data))
+		}
+	}
+}
+
+// debugCommandLine hides what follows a command that takes a password.
+func debugCommandLine(line string) string {
+	f := strings.Fields(strings.TrimPrefix(strings.TrimSpace(line), "/"))
+	if len(f) > 1 && debugSecretCommands[strings.ToLower(f[0])] {
+		return "/" + f[0] + " (hidden)"
+	}
+	return line
+}
+
+// debugFormResponse hides what a player typed into a form, which can be anything, and keeps which
+// buttons and options they chose.
+func debugFormResponse(data []byte) []byte {
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return []byte(`"(hidden)"`)
+	}
+	var hide func(v any) any
+	hide = func(v any) any {
+		switch t := v.(type) {
+		case string:
+			return "(typed text)"
+		case []any:
+			for i := range t {
+				t[i] = hide(t[i])
+			}
+		}
+		return v
+	}
+	out, _ := json.Marshal(hide(v))
+	return out
+}
+
 // debugContents is a packet's fields as text.
 func debugContents(id uint32, payload []byte) string {
 	f, ok := debugPackets()[id]
@@ -244,9 +309,13 @@ func debugContents(id uint32, payload []byte) string {
 		return "(unknown packet)"
 	}
 	pk := f()
-	if err := decodeInto(pk, payload); err != nil {
-		return "(could not read it: " + err.Error() + ")"
+	if debugSecret[debugName(id)] {
+		return "(hidden: it holds secrets)"
 	}
+	if err := decodeInto(pk, payload); err != nil {
+		return "(could not read it)"
+	}
+	debugRedact(pk)
 	text := strings.ReplaceAll(fmt.Sprintf("%+v", pk), "\n", " ")
 	if len(text) > debugMaxText {
 		text = strings.ToValidUTF8(text[:debugMaxText], "") + " ...cut"
