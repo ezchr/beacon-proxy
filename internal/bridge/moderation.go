@@ -26,9 +26,9 @@ import (
 //
 // time is such as 30m, 12h, 7d or 4w; left out, or perm, it has no end. The relay is the one place
 // that sees a player's real XUID and address before any server does. A ban turns them away at
-// login, and a mute stops their chat on its way to the server. They cover players relayed here, so
-// not Java players on a proxy of their own. A player who is not an admin gets their server's command
-// of the same name, if it has one.
+// login, and a mute stops their chat on its way to the server. They cover players relayed here. A
+// name Beacon doesn't know goes on to the player's server, which may know them, as it does a Java
+// player. A player who is not an admin gets their server's command of the same name, if it has one.
 
 // GamertagLookup finds the XUID of a gamertag on Xbox Live, for someone never seen here.
 var GamertagLookup func(ctx context.Context, gamertag string) (string, error)
@@ -259,8 +259,22 @@ type modTarget struct {
 	online         *switchSession
 }
 
-// findTarget finds a player by name: online, seen here before, or on Xbox Live.
+// findTarget finds a player by name: online or seen here before. A name it doesn't know may be a
+// Java player, who never comes through here and could share a name with a stranger's Xbox account,
+// so Xbox Live is only asked with xbox:<gamertag>.
 func (n *Network) findTarget(name string) (modTarget, bool) {
+	if gamertag, ok := strings.CutPrefix(name, "xbox:"); ok {
+		if GamertagLookup == nil {
+			return modTarget{}, false
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		xuid, err := GamertagLookup(ctx, gamertag)
+		if err != nil || xuid == "" {
+			return modTarget{}, false
+		}
+		return modTarget{xuid: xuid, name: gamertag}, true
+	}
 	if p, ok := n.FindPlayer(name); ok {
 		t := modTarget{xuid: p.XUID, name: p.Name}
 		if v, ok := n.sessions.Load(p.XUID); ok {
@@ -275,13 +289,6 @@ func (n *Network) findTarget(name string) (modTarget, bool) {
 	m.mu.Unlock()
 	if seen {
 		return modTarget{xuid: p.XUID, name: p.Name, ip: p.IP}, true
-	}
-	if GamertagLookup != nil {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if xuid, err := GamertagLookup(ctx, name); err == nil && xuid != "" {
-			return modTarget{xuid: xuid, name: name}, true
-		}
 	}
 	return modTarget{}, false
 }
@@ -373,11 +380,11 @@ func (s *switchSession) handleModeration(line string) bool {
 	}
 	switch name {
 	case "ban", "mute":
-		s.punish(name, args[0], args[1:])
+		return s.punish(name, args[0], args[1:])
 	case "banip":
 		s.banIP(args[0], args[1:])
 	case "unban", "unmute":
-		s.pardon(name, args[0])
+		return s.pardon(name, args[0])
 	case "unbanip":
 		s.unbanIP(args[0])
 	}
@@ -395,15 +402,17 @@ func (s *switchSession) entry(t modTarget, ip string, args []string) modEntry {
 	return e
 }
 
-func (s *switchSession) punish(kind, who string, args []string) {
+// punish bans or mutes a player. It reports false for a name Beacon doesn't know, which goes on to
+// the player's server: it may be a Java player, whom only the server can reach.
+func (s *switchSession) punish(kind, who string, args []string) bool {
 	t, ok := s.n.findTarget(who)
 	if !ok {
-		s.message("<red>No player named %s was found.</red>", who)
-		return
+		s.message("<yellow>Beacon doesn't know %s, so this only goes to your server. For an Xbox player who never joined, use xbox:%s.</yellow>", who, who)
+		return false
 	}
 	if s.n.IsAdmin(t.xuid, t.name) {
 		s.message("<red>%s is an admin.</red>", t.name)
-		return
+		return true
 	}
 	m := s.n.moderation()
 	e := s.entry(t, "", args)
@@ -420,15 +429,18 @@ func (s *switchSession) punish(kind, who string, args []string) {
 			t.online.disconnect(banMessage(e, now))
 		}
 		s.message("<green>Banned %s (%s).</green>", t.name, e.left(now))
-		return
+		return true
 	}
 	if t.online != nil {
 		t.online.message("<red>You were muted (%s).</red>", e.left(now))
 	}
 	s.message("<green>Muted %s (%s).</green>", t.name, e.left(now))
+	return true
 }
 
-func (s *switchSession) pardon(kind, who string) {
+// pardon lifts a ban or mute. Like punish, it reports false when Beacon has none on that player, as
+// the server may.
+func (s *switchSession) pardon(kind, who string) bool {
 	m := s.n.moderation()
 	list, verb := m.Bans, "banned"
 	if kind == "unmute" {
@@ -436,8 +448,7 @@ func (s *switchSession) pardon(kind, who string) {
 	}
 	t, ok := s.n.listedTarget(list, who)
 	if !ok {
-		s.message("<red>%s is not %s.</red>", who, verb)
-		return
+		return false
 	}
 	if _, err := m.remove(list, t); err != nil {
 		s.message("<red>Done, but it could not be saved: %s</red>", err)
@@ -446,6 +457,7 @@ func (s *switchSession) pardon(kind, who string) {
 		v.(*switchSession).message("<green>You can talk again.</green>")
 	}
 	s.message("<green>%s is no longer %s.</green>", who, verb)
+	return true
 }
 
 // listedTarget finds the key of an entry by the name on it, or the player of that name.

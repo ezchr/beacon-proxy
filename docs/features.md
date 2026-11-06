@@ -93,7 +93,8 @@ Admins have these across the whole network, in relay mode:
 | `/unban`, `/unbanip`, `/unmute` | lifts one |
 | `/banlist`, `/mutelist` | lists them |
 
-Time is such as `30m`, `12h`, `7d` or `4w`, or `perm`; left out, it has no end. They replace a server's commands of the same name for admins, and work for people who are offline. They are saved in `moderation.json`. They cover players relayed through Beacon, so not Java players joining through a Java proxy.
+Time is such as `30m`, `12h`, `7d` or `4w`, or `perm`; left out, it has no end. They replace a server's commands of the same name for admins, and work for people who are offline. They are saved in `moderation.json`. 
+They cover players relayed through Beacon. Beacon can't reach a Java player who joins through a Java proxy, so a name it doesn't know is passed on to the server you are on, whose own command can act on it. That only covers that server. To ban an Xbox player who has never joined, use `/ban xbox:Gamertag`.
 
 ## Chat to Discord
 
