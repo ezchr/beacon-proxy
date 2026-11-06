@@ -45,9 +45,23 @@ a picture beside the log (`packets-...-Steve.png`):
 | `debug all Text` | everyone, those packets, with contents |
 | `debug off` | stops, and names the file |
 
-Every packet is logged unless you say otherwise. Add `quiet` to leave out what goes by many times a
-second, such as movement and chunks, which makes a file much easier to read: `debug Steve quiet`. A
-gamertag with a space goes in quotes: `debug "Some Player"`. Packet names don't care about capitals.
+Every packet is logged unless you filter it. A gamertag with a space goes in quotes:
+`debug "Some Player"`. Packet names don't care about capitals.
+
+## Filters
+
+Add any of these after the player, in any mix:
+
+| Filter | Logs |
+|---|---|
+| `Text MobEquipment` | only these packets |
+| `-MovePlayer` | everything but this packet |
+| `quiet` | everything but movement, chunks and what else goes by many times a second |
+| `client` or `server` | only what that side sends |
+| `on:survival` | only on this server |
+| `has:diamond` | only packets with this word in them |
+
+For example, `debug Steve quiet on:survival` or `debug all Text has:hacks`.
 
 Start with `debug Steve quiet`. Once you can see which packet matters, name it, and the file gets much
 shorter.

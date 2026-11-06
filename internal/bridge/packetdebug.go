@@ -80,11 +80,48 @@ func debugTypes(typed []string) (map[string]bool, string) {
 	return out, ""
 }
 
+// debugFilter says which packets a run logs.
+type debugFilter struct {
+	player string          // lower case; "" for everyone
+	types  map[string]bool // only these
+	skip   map[string]bool // not these
+	quiet  bool            // not the ones in debugNoisy
+	from   string          // "client" or "server": only what they send
+	server string          // only on this server
+	has    string          // lower case: only packets with this in them
+}
+
+// debugParse reads the words after the player. It returns what it can't read.
+func debugParse(words []string, f *debugFilter) string {
+	var types, skip []string
+	for _, w := range words {
+		l := strings.ToLower(w)
+		switch {
+		case l == "quiet":
+			f.quiet = true
+		case l == "client" || l == "server":
+			f.from = l
+		case strings.HasPrefix(l, "on:") && len(l) > 3:
+			f.server = w[3:]
+		case strings.HasPrefix(l, "has:") && len(l) > 4:
+			f.has = l[4:]
+		case strings.HasPrefix(w, "-") && len(w) > 1:
+			skip = append(skip, w[1:])
+		default:
+			types = append(types, w)
+		}
+	}
+	var bad string
+	if f.types, bad = debugTypes(types); bad != "" {
+		return bad
+	}
+	f.skip, bad = debugTypes(skip)
+	return bad
+}
+
 // debugRun is packet logging under way.
 type debugRun struct {
-	player   string // lower case; "" for everyone
-	types    map[string]bool
-	quiet    bool
+	debugFilter
 	path     string
 	started  time.Time
 	mu       sync.Mutex
@@ -107,11 +144,22 @@ func (s *switchSession) debugPacket(dir string, id uint32, payload []byte) {
 	}
 	name := debugName(id)
 	switch {
-	case len(d.types) > 0:
-		if !d.types[name] {
-			return
-		}
-	case d.quiet && debugNoisy[name]:
+	case len(d.types) > 0 && !d.types[name],
+		d.skip[name],
+		d.quiet && len(d.types) == 0 && debugNoisy[name],
+		d.from != "" && d.from != dir:
+		return
+	}
+	server := s.serverName()
+	if d.server != "" && !strings.EqualFold(d.server, server) {
+		return
+	}
+	// Contents for one player or chosen packets: everything from everyone would be too much.
+	contents := ""
+	if d.player != "" || len(d.types) > 0 || d.has != "" {
+		contents = debugContents(id, payload)
+	}
+	if d.has != "" && !strings.Contains(strings.ToLower(contents), d.has) {
 		return
 	}
 	if _, seen := d.seen.LoadOrStore(s.id.XUID+s.id.DisplayName, true); !seen {
@@ -119,10 +167,9 @@ func (s *switchSession) debugPacket(dir string, id uint32, payload []byte) {
 		d.write(s.debugLogin(), false)
 		d.write(s.debugSkin(d), false)
 	}
-	line := fmt.Sprintf("%s  %-16s %-8s %-6s %-28s %6d B", time.Now().Format("15:04:05.000"), s.id.DisplayName, s.serverName(), dir, name, len(payload))
-	// Contents for one player or chosen packets: everything from everyone would be too much.
-	if d.player != "" || len(d.types) > 0 {
-		line += "  " + debugContents(id, payload)
+	line := fmt.Sprintf("%s  %-16s %-8s %-6s %-28s %6d B", time.Now().Format("15:04:05.000"), s.id.DisplayName, server, dir, name, len(payload))
+	if contents != "" {
+		line += "  " + contents
 	}
 	d.write(line, true)
 }
@@ -241,7 +288,7 @@ func (d *debugRun) stop(why string) {
 }
 
 // debugStart begins a run.
-func debugStart(player string, types map[string]bool, quiet bool) (*debugRun, error) {
+func debugStart(filter debugFilter) (*debugRun, error) {
 	if err := os.MkdirAll(debugDir, 0o755); err != nil {
 		return nil, err
 	}
@@ -252,7 +299,7 @@ func debugStart(player string, types map[string]bool, quiet bool) (*debugRun, er
 	if err != nil {
 		return nil, err
 	}
-	d := &debugRun{player: strings.ToLower(player), types: types, quiet: quiet, path: path, started: now, file: f, w: bufio.NewWriter(f)}
+	d := &debugRun{debugFilter: filter, path: path, started: now, file: f, w: bufio.NewWriter(f)}
 	_, _ = fmt.Fprintf(d.w, "# time  player  server  from  packet  size  contents\n")
 	d.timer = time.AfterFunc(debugFor, func() { d.stop("the time limit passed") })
 	if old := debugActive.Swap(d); old != nil {
@@ -282,7 +329,13 @@ func debugHelp() []string {
 		"debug <player> Text       only those packets (any number of names)",
 		"debug all                 every packet of everyone: names and sizes",
 		"debug all Text            everyone, those packets, with contents",
-		"add quiet to leave out movement, chunks and other packets that go by all the time",
+		"Filters, in any mix after the player:",
+		"  Text MobEquipment       only these packets",
+		"  -MovePlayer             not this packet",
+		"  quiet                   not movement, chunks and what else goes by all the time",
+		"  client / server         only what that side sends",
+		"  on:survival             only on this server",
+		"  has:diamond             only packets with this word in them",
 		"debug off                 stop and show the file",
 		"It stops by itself after 5 minutes or 50 MB. Files are in " + debugDir + "/, the newest 10 are kept.",
 	}
@@ -310,23 +363,15 @@ func DebugCommand(line string) []string {
 		d.stop("debug off")
 		return []string{fmt.Sprintf("Stopped. %d packets are in %s.", d.lines, d.path)}
 	}
-	player, rest := args[0], args[1:]
+	player := args[0]
 	if strings.EqualFold(player, "all") {
 		player = ""
 	}
-	quiet := false
-	rest = slices.DeleteFunc(slices.Clone(rest), func(s string) bool {
-		if strings.EqualFold(s, "quiet") {
-			quiet = true
-			return true
-		}
-		return false
-	})
-	types, bad := debugTypes(rest)
-	if bad != "" {
+	filter := debugFilter{player: strings.ToLower(player)}
+	if bad := debugParse(args[1:], &filter); bad != "" {
 		return []string{fmt.Sprintf("There is no packet called %s. Names are as in Text, MobEquipment or InventoryTransaction.", bad)}
 	}
-	d, err := debugStart(player, types, quiet)
+	d, err := debugStart(filter)
 	if err != nil {
 		return []string{"Could not start: " + err.Error()}
 	}

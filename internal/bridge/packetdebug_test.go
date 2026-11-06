@@ -95,3 +95,36 @@ func TestDebugAllLogsEverything(t *testing.T) {
 		t.Fatalf("log:\n%s", data)
 	}
 }
+
+func TestDebugFilters(t *testing.T) {
+	var f debugFilter
+	if bad := debugParse([]string{"text", "-MovePlayer", "quiet", "client", "on:pvp", "has:Diamond"}, &f); bad != "" {
+		t.Fatal(bad)
+	}
+	if !f.types["Text"] || !f.skip["MovePlayer"] || !f.quiet || f.from != "client" || f.server != "pvp" || f.has != "diamond" {
+		t.Fatalf("%+v", f)
+	}
+	if bad := debugParse([]string{"-nonsense"}, &f); bad != "nonsense" {
+		t.Fatalf("got %q", bad)
+	}
+}
+
+func TestDebugHasAndDirection(t *testing.T) {
+	t.Chdir(t.TempDir())
+	DebugCommand("all client has:diamond")
+	d := debugActive.Load()
+	id, yes := debugTestPayload(t, &packet.Text{Message: "a Diamond sword"})
+	_, no := debugTestPayload(t, &packet.Text{Message: "nothing here"})
+	s := debugTestSession("A")
+	s.debugPacket("client", id, yes)
+	s.debugPacket("client", id, no)
+	s.debugPacket("server", id, yes)
+	path := d.path
+	if got := DebugCommand("off"); !strings.Contains(got[0], "1 packets") {
+		t.Fatalf("%v", got)
+	}
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "a Diamond sword") || strings.Contains(string(data), "nothing here") {
+		t.Fatalf("log:\n%s", data)
+	}
+}
