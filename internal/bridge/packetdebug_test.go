@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"encoding/base64"
 	"os"
 	"strings"
 	"testing"
@@ -36,6 +37,9 @@ func TestDebugCommand(t *testing.T) {
 	id, payload := debugTestPayload(t, &packet.Text{TextType: packet.TextTypeChat, Message: "hello there"})
 	mid, mpayload := debugTestPayload(t, &packet.MovePlayer{})
 	s := debugTestSession("Some Player")
+	s.cd.SkinImageWidth, s.cd.SkinImageHeight = 2, 1
+	s.cd.SkinData = base64.StdEncoding.EncodeToString(make([]byte, 8))
+	s.cd.DeviceModel = "TestPhone"
 	s.debugPacket("client", id, payload)
 	s.debugPacket("client", mid, mpayload)                       // not chosen
 	debugTestSession("Other").debugPacket("client", id, payload) // not this player
@@ -46,6 +50,12 @@ func TestDebugCommand(t *testing.T) {
 	}
 	data, _ := os.ReadFile(path)
 	text := string(data)
+	if _, err := os.Stat(strings.TrimSuffix(path, ".log") + "-Some_Player.png"); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(text, "# login") || !strings.Contains(text, "TestPhone") {
+		t.Fatalf("no login:\n%s", text)
+	}
 	if !strings.Contains(text, "# player Some Player") {
 		t.Fatalf("no player line:\n%s", text)
 	}
@@ -54,9 +64,9 @@ func TestDebugCommand(t *testing.T) {
 	}
 }
 
-func TestDebugAllLeavesOutNoiseAndContents(t *testing.T) {
+func TestDebugAllQuiet(t *testing.T) {
 	t.Chdir(t.TempDir())
-	DebugCommand("all")
+	DebugCommand("all quiet")
 	d := debugActive.Load()
 	id, payload := debugTestPayload(t, &packet.Text{Message: "secret words"})
 	mid, mpayload := debugTestPayload(t, &packet.MovePlayer{})
@@ -69,5 +79,19 @@ func TestDebugAllLeavesOutNoiseAndContents(t *testing.T) {
 	text := string(data)
 	if !strings.Contains(text, "Text") || strings.Contains(text, "MovePlayer") || strings.Contains(text, "secret words") {
 		t.Fatalf("log:\n%s", text)
+	}
+}
+
+func TestDebugAllLogsEverything(t *testing.T) {
+	t.Chdir(t.TempDir())
+	DebugCommand("all")
+	d := debugActive.Load()
+	mid, mpayload := debugTestPayload(t, &packet.MovePlayer{})
+	debugTestSession("A").debugPacket("client", mid, mpayload)
+	path := d.path
+	DebugCommand("off")
+	data, _ := os.ReadFile(path)
+	if !strings.Contains(string(data), "MovePlayer") {
+		t.Fatalf("log:\n%s", data)
 	}
 }

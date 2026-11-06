@@ -2,7 +2,11 @@ package bridge
 
 import (
 	"bufio"
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
+	"image"
+	"image/png"
 	"os"
 	"path/filepath"
 	"slices"
@@ -17,8 +21,8 @@ import (
 
 // Packet logging, to find out what really goes between players and servers: the debug command of
 // the console and of the control API (docs/debugging.md). It writes to a file of its own in
-// debug/, stops by itself, and costs nothing while off. Logins never pass through here: the
-// session starts after them, so tokens cannot end up in a log.
+// debug/, stops by itself, and costs nothing while off. A player's login is logged as what it
+// said, not as the packet, which holds their Xbox tokens.
 
 const (
 	debugFor      = 5 * time.Minute
@@ -29,8 +33,7 @@ const (
 	debugMaxText = 2000
 )
 
-// debugNoisy are the packets that go by many times a second. They are left out unless named or
-// asked for with full.
+// debugNoisy are the packets that go by many times a second, which quiet leaves out.
 var debugNoisy = map[string]bool{
 	"PlayerAuthInput": true, "MovePlayer": true, "MoveActorAbsolute": true, "MoveActorDelta": true,
 	"SetActorMotion": true, "SetActorData": true, "LevelChunk": true, "SubChunk": true, "SubChunkRequest": true,
@@ -81,7 +84,7 @@ func debugTypes(typed []string) (map[string]bool, string) {
 type debugRun struct {
 	player   string // lower case; "" for everyone
 	types    map[string]bool
-	full     bool
+	quiet    bool
 	path     string
 	started  time.Time
 	mu       sync.Mutex
@@ -108,11 +111,13 @@ func (s *switchSession) debugPacket(dir string, id uint32, payload []byte) {
 		if !d.types[name] {
 			return
 		}
-	case !d.full && debugNoisy[name]:
+	case d.quiet && debugNoisy[name]:
 		return
 	}
 	if _, seen := d.seen.LoadOrStore(s.id.XUID+s.id.DisplayName, true); !seen {
 		d.write(s.debugWho(), false)
+		d.write(s.debugLogin(), false)
+		d.write(s.debugSkin(d), false)
 	}
 	line := fmt.Sprintf("%s  %-16s %-8s %-6s %-28s %6d B", time.Now().Format("15:04:05.000"), s.id.DisplayName, s.serverName(), dir, name, len(payload))
 	// Contents for one player or chosen packets: everything from everyone would be too much.
@@ -131,6 +136,58 @@ func (s *switchSession) debugWho() string {
 		}
 	}
 	return fmt.Sprintf("# player %s xuid=%s ip=%s device=%v model=%q version=%s", s.id.DisplayName, s.id.XUID, ip, s.cd.DeviceOS, s.cd.DeviceModel, s.cd.GameVersion)
+}
+
+// debugLogin is what the player's login said, read from it: the login packet itself holds their
+// Xbox tokens, which stay out of logs. Long values, the skin's images and models, are only measured.
+func (s *switchSession) debugLogin() string {
+	data, err := json.Marshal(s.cd)
+	if err != nil {
+		return "# login: " + err.Error()
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(data, &fields); err != nil {
+		return "# login: " + err.Error()
+	}
+	for k, v := range fields {
+		switch t := v.(type) {
+		case string:
+			if len(t) > 200 {
+				fields[k] = fmt.Sprintf("(%d characters)", len(t))
+			}
+		case []any:
+			fields[k] = fmt.Sprintf("(%d entries)", len(t))
+		}
+	}
+	id, _ := json.Marshal(s.id)
+	out, _ := json.Marshal(fields)
+	return "# identity " + string(id) + "\n# login " + string(out)
+}
+
+// debugSkin saves the player's skin as a picture beside the log and says where.
+func (s *switchSession) debugSkin(d *debugRun) string {
+	w, h := s.cd.SkinImageWidth, s.cd.SkinImageHeight
+	pix, err := base64.StdEncoding.DecodeString(s.cd.SkinData)
+	if err != nil || w <= 0 || h <= 0 || len(pix) != w*h*4 {
+		return fmt.Sprintf("# skin %q: no picture (%dx%d, %d bytes)", s.cd.SkinID, w, h, len(pix))
+	}
+	name := strings.Map(func(r rune) rune {
+		if r == ' ' || r == '/' || r == '\\' || r == '.' {
+			return '_'
+		}
+		return r
+	}, s.id.DisplayName)
+	path := strings.TrimSuffix(d.path, ".log") + "-" + name + ".png"
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o600)
+	if err != nil {
+		return "# skin: " + err.Error()
+	}
+	defer f.Close()
+	img := &image.NRGBA{Pix: pix, Stride: w * 4, Rect: image.Rect(0, 0, w, h)}
+	if err := png.Encode(f, img); err != nil {
+		return "# skin: " + err.Error()
+	}
+	return fmt.Sprintf("# skin %q %dx%d persona=%v saved as %s", s.cd.SkinID, w, h, s.cd.PersonaSkin, path)
 }
 
 // debugContents is a packet's fields as text.
@@ -184,7 +241,7 @@ func (d *debugRun) stop(why string) {
 }
 
 // debugStart begins a run.
-func debugStart(player string, types map[string]bool, full bool) (*debugRun, error) {
+func debugStart(player string, types map[string]bool, quiet bool) (*debugRun, error) {
 	if err := os.MkdirAll(debugDir, 0o755); err != nil {
 		return nil, err
 	}
@@ -195,7 +252,7 @@ func debugStart(player string, types map[string]bool, full bool) (*debugRun, err
 	if err != nil {
 		return nil, err
 	}
-	d := &debugRun{player: strings.ToLower(player), types: types, full: full, path: path, started: now, file: f, w: bufio.NewWriter(f)}
+	d := &debugRun{player: strings.ToLower(player), types: types, quiet: quiet, path: path, started: now, file: f, w: bufio.NewWriter(f)}
 	_, _ = fmt.Fprintf(d.w, "# time  player  server  from  packet  size  contents\n")
 	d.timer = time.AfterFunc(debugFor, func() { d.stop("the time limit passed") })
 	if old := debugActive.Swap(d); old != nil {
@@ -210,6 +267,10 @@ func debugPrune() {
 	slices.Sort(files) // names sort by time
 	for len(files) >= debugKeep {
 		_ = os.Remove(files[0])
+		skins, _ := filepath.Glob(strings.TrimSuffix(files[0], ".log") + "-*.png")
+		for _, skin := range skins {
+			_ = os.Remove(skin)
+		}
 		files = files[1:]
 	}
 }
@@ -219,9 +280,9 @@ func debugHelp() []string {
 	return []string{
 		"debug <player>            log what one player sends and gets, with contents",
 		"debug <player> Text       only those packets (any number of names)",
-		"debug all                 everyone: packet names and sizes",
+		"debug all                 every packet of everyone: names and sizes",
 		"debug all Text            everyone, those packets, with contents",
-		"add full to include movement, chunks and other packets that go by all the time",
+		"add quiet to leave out movement, chunks and other packets that go by all the time",
 		"debug off                 stop and show the file",
 		"It stops by itself after 5 minutes or 50 MB. Files are in " + debugDir + "/, the newest 10 are kept.",
 	}
@@ -253,10 +314,10 @@ func DebugCommand(line string) []string {
 	if strings.EqualFold(player, "all") {
 		player = ""
 	}
-	full := false
+	quiet := false
 	rest = slices.DeleteFunc(slices.Clone(rest), func(s string) bool {
-		if strings.EqualFold(s, "full") {
-			full = true
+		if strings.EqualFold(s, "quiet") {
+			quiet = true
 			return true
 		}
 		return false
@@ -265,7 +326,7 @@ func DebugCommand(line string) []string {
 	if bad != "" {
 		return []string{fmt.Sprintf("There is no packet called %s. Names are as in Text, MobEquipment or InventoryTransaction.", bad)}
 	}
-	d, err := debugStart(player, types, full)
+	d, err := debugStart(player, types, quiet)
 	if err != nil {
 		return []string{"Could not start: " + err.Error()}
 	}

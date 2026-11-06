@@ -26,8 +26,9 @@ what is in it:
 
 `client` is the player sending to the server, `server` the other way.
 
-The first time a player shows up in a file, a line says who they are, which helps when something only
-happens on one device or version:
+The first time a player shows up in a file, it says who they are, which helps when something only
+happens on one device or version. It also gives everything from their login, and saves their skin as
+a picture beside the log (`packets-...-Steve.png`):
 
 ```
 # player Steve xuid=2535400000000000 ip=203.0.113.7 device=Android model="SM-G991B" version=1.26.60
@@ -40,16 +41,16 @@ happens on one device or version:
 | `debug` | nothing: says what is running, and how to use it |
 | `debug <player>` | what one player sends and gets, with contents |
 | `debug <player> Text MobEquipment` | only those packets |
-| `debug all` | everyone, names and sizes only |
+| `debug all` | every packet of everyone, names and sizes only |
 | `debug all Text` | everyone, those packets, with contents |
 | `debug off` | stops, and names the file |
 
-Add `full` to include what goes by many times a second, such as movement and chunks. Those are left
-out otherwise, as they would bury everything else. Naming a packet always logs it. A gamertag with a
-space goes in quotes: `debug "Some Player"`. Packet names don't care about capitals.
+Every packet is logged unless you say otherwise. Add `quiet` to leave out what goes by many times a
+second, such as movement and chunks, which makes a file much easier to read: `debug Steve quiet`. A
+gamertag with a space goes in quotes: `debug "Some Player"`. Packet names don't care about capitals.
 
-Start with the player and no packet names. Once you can see which packet matters, name it, and the
-file gets much shorter.
+Start with `debug Steve quiet`. Once you can see which packet matters, name it, and the file gets much
+shorter.
 
 ## Finding the problem
 
@@ -58,7 +59,7 @@ are usually the cause.
 
 | What you see | Try | Look for |
 |---|---|---|
-| A player is kicked or disconnected | `debug Steve` | the last lines, and a `Disconnect` packet: its message says why |
+| A player is kicked or disconnected | `debug Steve quiet` | the last lines, and a `Disconnect` packet: its message says why |
 | Chat is missing or wrong | `debug Steve Text` | `client` lines are what they typed, `server` lines what came back |
 | A command does nothing | `debug Steve CommandRequest CommandOutput` | whether it reached the server, and the answer |
 | A menu or form closes | `debug Steve ContainerOpen ContainerClose ModalFormRequest` | what closed it, and which side sent that |
@@ -107,8 +108,8 @@ new run stops the one before it. While nothing is running it costs nothing.
 
 ## Before you share a log
 
-It holds players' IP addresses, devices and XUIDs, and what the packets hold, which can be private chat
-and positions. Only you can read the file on the server, but remove all that before posting it anywhere.
-Logins are never logged, so it has no account tokens.
+It holds players' IP addresses, devices, XUIDs and login details, and what the packets hold, which can
+be private chat and positions. Only you can read the file on the server, but remove all that before
+posting it anywhere. The login packet itself is not logged, as it holds Xbox tokens: what it said is.
 
 It only sees players relayed through Beacon, so it needs relay mode and doesn't show Java players.
