@@ -116,7 +116,7 @@ func StartDirectIP(ctx context.Context, cfg DirectIPConfig) error {
 		// so all local candidates must be gathered before the answer is written.
 		DisableTrickleICE: true,
 		// Clients whose clocks are a little off still join (clockLeeway).
-		VerifyClientToken: verifyClientToken,
+		VerifyClientIdentity: verifyClientIdentity,
 		// AllowAnonymous is left false: a real Bedrock client always presents an identity
 		// assertion, and accepting peers without one would remove the binding between an
 		// account and its connection.

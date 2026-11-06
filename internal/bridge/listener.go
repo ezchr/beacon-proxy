@@ -99,7 +99,7 @@ func Listen(ctx context.Context, authSession *session.Session, netherNetID uint6
 			l.brokers = append(l.brokers, broker)
 			return nil
 		}
-		ln, err := nethernet.ListenConfig{Log: log, ConnContext: connCtx, API: api, VerifyClientToken: verifyClientToken}.Listen(sig)
+		ln, err := nethernet.ListenConfig{Log: log, ConnContext: connCtx, API: api, VerifyClientIdentity: verifyClientIdentity}.Listen(sig)
 		if err != nil {
 			return err
 		}

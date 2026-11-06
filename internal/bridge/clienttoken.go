@@ -9,6 +9,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/df-mc/go-nethernet"
 	"time"
 
 	"github.com/go-jose/go-jose/v4"
@@ -19,6 +20,11 @@ import (
 // identity token a client presents carries times from its own clock, and the JWT default allows a
 // minute only: a PC 83 s fast was refused with error 37 ("token issued in the future").
 const clockLeeway = 2 * time.Minute
+
+// verifyClientIdentity checks the token of a client's identity assertion.
+func verifyClientIdentity(ctx context.Context, identity *nethernet.RemoteIdentity) (*ecdsa.PublicKey, error) {
+	return verifyClientToken(ctx, identity.Assertion.Token)
+}
 
 // verifyClientToken is go-nethernet's default client token check with clockLeeway: the token's
 // times, and the public key of its cpk claim. Its signature is checked by the login, as with the
