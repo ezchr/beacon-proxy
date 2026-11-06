@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
 	"strings"
@@ -65,6 +66,7 @@ const chatSenderWait = 1500 * time.Millisecond
 // relayedChat takes what a relayed player typed. It counts unless the server sends its own chat,
 // which Beacon only knows once it has: the first line waits to see.
 func relayedChat(server, player, xuid, message string) {
+	slog.Info("chat", "server", server, "player", player, "message", message)
 	if _, sends := chatSenders.Load(strings.ToLower(server)); sends {
 		return
 	}

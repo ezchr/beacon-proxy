@@ -147,6 +147,9 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	allowXUID func(string) bool, friendActivity *friendactivity.Store, debug bool, log *slog.Logger) error {
 	log = log.With("broadcast", name)
 	cfg.BroadcastName = name
+	bridge.GamertagLookup = func(ctx context.Context, gamertag string) (string, error) {
+		return xbl.XUIDForGamertag(ctx, authSession, gamertag)
+	}
 	discord.setGamerpic(func(ctx context.Context, xuid string) (string, error) {
 		return xbl.GamerpicForXUID(ctx, authSession, xuid)
 	})

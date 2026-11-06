@@ -157,6 +157,10 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		})
 		added = true
 	}
+	if s.isAdmin() {
+		s.injectModeration(&pk, enum)
+		added = true
+	}
 	if !added && !changed {
 		return raw
 	}

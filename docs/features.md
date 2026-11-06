@@ -81,6 +81,20 @@ join it directly, so the skin is there by XUID for those servers to look up. Set
 
 For Java Edition players, run Velocity (or another Java proxy) next to Beacon as usual.
 
+## Bans and mutes
+
+Admins have these across the whole network, in relay mode:
+
+| Command | Does |
+| --- | --- |
+| `/ban <player> [time] [reason]` | turns the player away at login, and removes them if online |
+| `/banip <player or ip> [time] [reason]` | the same for an address |
+| `/mute <player> [time] [reason]` | stops their chat and `/msg`, `/tell`, `/me` |
+| `/unban`, `/unbanip`, `/unmute` | lifts one |
+| `/banlist`, `/mutelist` | lists them |
+
+Time is such as `30m`, `12h`, `7d` or `4w`, or `perm`; left out, it has no end. They replace a server's commands of the same name for admins, and work for people who are offline. They are saved in `moderation.json`. They cover players relayed through Beacon, so not Java players joining through a Java proxy.
+
 ## Chat to Discord
 
 Beacon can post chat to a Discord channel. Make a webhook in the

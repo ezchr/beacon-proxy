@@ -166,6 +166,18 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	log = log.With("player", id.DisplayName)
 	log.Info("player authenticated via xbox live", "xuid", id.XUID)
+	{
+		ip := ""
+		if _, _, addr, _ := dcVerdict(conn.RemoteAddr()); addr != nil {
+			ip = addr.String()
+		}
+		if msg, banned := n.refuseLogin(id.XUID, id.DisplayName, ip); banned {
+			log.Info("join refused: banned", "xuid", id.XUID)
+			_ = client.WritePacket(&packet.Disconnect{Message: msg})
+			time.Sleep(time.Second)
+			return
+		}
+	}
 	if blocked, verdict, ip, kind := dcVerdict(conn.RemoteAddr()); true {
 		cd := client.ClientData()
 		logJoin(fmt.Sprintf("%s bedrock name=%s xuid=%s ip=%s route=%s device=%d version=%s title=%s %s",
@@ -861,12 +873,15 @@ func (s *switchSession) readClient() {
 				}
 			case packet.IDText:
 				var pk packet.Text
-				if ChatHook != nil && decodeInto(&pk, payload) == nil && pk.TextType == packet.TextTypeChat {
+				if decodeInto(&pk, payload) == nil && pk.TextType == packet.TextTypeChat && s.mutedNow() {
+					continue
+				}
+				if ChatHook != nil && pk.TextType == packet.TextTypeChat {
 					ChatHook(s.serverName(), s.id.DisplayName, s.id.XUID, pk.Message)
 				}
 			case packet.IDCommandRequest:
 				var pk packet.CommandRequest
-				if decodeInto(&pk, payload) == nil && s.handleCommand(pk.CommandLine) {
+				if decodeInto(&pk, payload) == nil && (s.mutedCommand(pk.CommandLine) || s.handleModeration(pk.CommandLine) || s.handleCommand(pk.CommandLine)) {
 					continue
 				}
 				// A bare /geyser is admin-only in Geyser: show players its help instead.
