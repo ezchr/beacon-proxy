@@ -859,6 +859,11 @@ func (s *switchSession) readClient() {
 					delete(s.containers, pk.WindowID)
 					s.mu.Unlock()
 				}
+			case packet.IDText:
+				var pk packet.Text
+				if ChatHook != nil && decodeInto(&pk, payload) == nil && pk.TextType == packet.TextTypeChat {
+					ChatHook(s.serverName(), s.id.DisplayName, s.id.XUID, pk.Message)
+				}
 			case packet.IDCommandRequest:
 				var pk packet.CommandRequest
 				if decodeInto(&pk, payload) == nil && s.handleCommand(pk.CommandLine) {

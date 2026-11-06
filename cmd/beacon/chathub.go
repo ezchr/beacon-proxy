@@ -4,8 +4,11 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
+	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -52,6 +55,20 @@ func (h *chatHub) add(server, text string) {
 	close(h.wake)
 	h.wake = make(chan struct{})
 	h.mu.Unlock()
+}
+
+// nativeChat are the servers whose chat Beacon reads itself (beacon.toml native-chat-servers).
+var nativeChat atomic.Pointer[[]string]
+
+// relayedChat takes what a relayed player typed, for a server that does not send its chat here.
+func relayedChat(server, player, xuid, message string) {
+	list := nativeChat.Load()
+	if list == nil || !slices.ContainsFunc(*list, func(s string) bool { return strings.EqualFold(s, server) }) {
+		return
+	}
+	line := player + ": " + message
+	chat.add(server, line)
+	discord.add(server, line, player, xuid, message)
 }
 
 // since returns the other servers' lines after id, the newest id, and a channel closed on the next line.

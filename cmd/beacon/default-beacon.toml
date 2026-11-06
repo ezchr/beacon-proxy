@@ -101,6 +101,9 @@ cross-server-chat = {{.CrossServerChat}}
 # discord-webhook = ""
 # Which servers to send. Leave it out for all of them.
 # discord-servers = ["survival"]
+# Servers with no plugin sending chat to Beacon: Beacon reads what relayed players type there.
+# It sees a message before the server does, so muted players' messages are included.
+# native-chat-servers = ["survival"]
 
 # Least milliseconds between two joins from one IP address. 0: no limit.
 login-ratelimit = 0

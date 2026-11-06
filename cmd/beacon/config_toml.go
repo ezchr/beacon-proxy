@@ -87,6 +87,7 @@ type tomlConfig struct {
 		CrossServerChat         bool     `toml:"cross-server-chat"`
 		DiscordWebhook          string   `toml:"discord-webhook"`
 		DiscordServers          []string `toml:"discord-servers"`
+		NativeChatServers       []string `toml:"native-chat-servers"`
 		LoginRateLimit          int      `toml:"login-ratelimit"`
 		PacketsPerSecond        int      `toml:"packets-per-second"`
 		SessionsPerIP           int      `toml:"sessions-per-ip"`
@@ -177,6 +178,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.CrossServerChat = a.CrossServerChat
 	cfg.DiscordWebhook, cfg.DiscordServers = a.DiscordWebhook, a.DiscordServers
+	cfg.NativeChatServers = a.NativeChatServers
 	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
 	case "", "off", "motd", "players", "all":
