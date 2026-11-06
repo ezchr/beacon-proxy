@@ -41,7 +41,8 @@ type chatHub struct {
 
 var chat = &chatHub{wake: make(chan struct{})}
 
-// chatEnabled turns the /chat routes on (beacon.toml cross-server-chat); off, they don't exist.
+// chatEnabled turns the /chat routes on (beacon.toml cross-server-chat); off, they exist only for a
+// Discord webhook.
 var chatEnabled bool
 
 func (h *chatHub) add(server, text string) {
@@ -95,7 +96,7 @@ func (h *chatHub) since(server string, after int64) ([]chatLine, int64, <-chan s
 
 // serveChat handles the /chat routes, reporting whether the path was one.
 func serveChat(w http.ResponseWriter, r *http.Request) bool {
-	if !chatEnabled {
+	if !chatEnabled && !discord.on() {
 		return false
 	}
 	switch r.URL.Path {

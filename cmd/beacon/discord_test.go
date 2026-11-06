@@ -53,7 +53,7 @@ func TestDiscordSpeakers(t *testing.T) {
 	d, got := discordFixture(t)
 	d.setGamerpic(func(context.Context, string) (string, error) { return "https://pic/x.png", nil })
 	d.servers = []string{"PVP"}
-	d.add("skygen", "not sent", "Eve", "", "not sent")
+	d.add("creative", "not sent", "Eve", "", "not sent")
 	d.add("pvp", "Rank Ann: one", "Ann", "123", "one")
 	d.add("pvp", "Rank Ann: two", "Ann", "123", "two")
 	d.add("pvp", "Bob: three", "Bob", "", "three")

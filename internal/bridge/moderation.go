@@ -52,7 +52,22 @@ func (e modEntry) left(now time.Time) string {
 	if e.Until == 0 {
 		return "permanent"
 	}
-	return time.Unix(e.Until, 0).Sub(now).Round(time.Minute).String()
+	d := time.Unix(e.Until, 0).Sub(now).Round(time.Minute)
+	switch {
+	case d >= 48*time.Hour:
+		return modAmount(int(d.Round(24*time.Hour)/(24*time.Hour)), "day")
+	case d >= 2*time.Hour:
+		return modAmount(int(d.Round(time.Hour)/time.Hour), "hour")
+	}
+	return modAmount(max(int(d/time.Minute), 1), "minute")
+}
+
+// modAmount says an amount of a unit of time.
+func modAmount(n int, unit string) string {
+	if n == 1 {
+		return "1 " + unit
+	}
+	return strconv.Itoa(n) + " " + unit + "s"
 }
 
 // seenPlayer is who last joined under a name, so that someone offline can be banned.
@@ -189,7 +204,9 @@ func (m *modStore) entries(list map[string]modEntry, now time.Time) map[string]m
 
 var (
 	modStores   sync.Map // by path
-	modTimeForm = regexp.MustCompile(`^(\d{1,6})([mhdw])$`)
+	modTimeForm = regexp.MustCompile(`^(\d{1,6})([a-z]+)$`)
+	// modTimeLike is a word meant as a time, even if it can't be read as one.
+	modTimeLike = regexp.MustCompile(`^\d+[a-z]*$`)
 )
 
 // moderation is the network's store.
@@ -300,11 +317,30 @@ func parseModTime(s string) (time.Duration, bool) {
 		return 0, false
 	}
 	v, _ := strconv.Atoi(m[1])
-	if v == 0 {
+	unit, ok := modTimeUnits[m[2]]
+	if v == 0 || !ok {
 		return 0, false
 	}
-	unit := map[string]time.Duration{"m": time.Minute, "h": time.Hour, "d": 24 * time.Hour, "w": 7 * 24 * time.Hour}[m[2]]
 	return time.Duration(v) * unit, true
+}
+
+// modTimeUnits are the units a time may be in.
+var modTimeUnits = map[string]time.Duration{
+	"m": time.Minute, "min": time.Minute, "mins": time.Minute, "minute": time.Minute, "minutes": time.Minute,
+	"h": time.Hour, "hr": time.Hour, "hrs": time.Hour, "hour": time.Hour, "hours": time.Hour,
+	"d": 24 * time.Hour, "day": 24 * time.Hour, "days": 24 * time.Hour,
+	"w": 7 * 24 * time.Hour, "week": 7 * 24 * time.Hour, "weeks": 7 * 24 * time.Hour,
+	"mo": 30 * 24 * time.Hour, "month": 30 * 24 * time.Hour, "months": 30 * 24 * time.Hour,
+}
+
+// badModTime reports whether args start with what was meant as a time but isn't one, which would
+// otherwise become the start of the reason of a ban with no end.
+func badModTime(args []string) bool {
+	if len(args) == 0 || !modTimeLike.MatchString(strings.ToLower(args[0])) {
+		return false
+	}
+	_, ok := parseModTime(args[0])
+	return !ok
 }
 
 // splitCommand splits a command line into words, keeping quoted ones together: gamertags can have
@@ -428,7 +464,17 @@ func (n *Network) refuseLogin(xuid, name, ip string) (string, bool) {
 }
 
 // modTags are the colour tags of a message, which a console has no use for.
-var modTags = regexp.MustCompile(`</?[a-z]+>`)
+var modTags = regexp.MustCompile(`</?(?:red|green|yellow|grey)>`)
+
+// modHelp is what the console says for a moderation command it can't read.
+var modHelp = []string{
+	"ban <player> [time] [reason]",
+	"banip <player|ip> [time] [reason]",
+	"mute <player> [time] [reason]",
+	"unban <player>, unbanip <player|ip>, unmute <player>",
+	"banlist, mutelist",
+	"Time is such as 30m, 12h, 7d or 4w, or perm. Left out, it has no end.",
+}
 
 // Moderate runs a moderation command for the console or the control API, and returns what it says.
 // Unlike an admin in game, the console may act on an admin.
@@ -445,7 +491,7 @@ func (n *Network) Moderate(line string) []string {
 	s := &switchSession{n: n, reply: say}
 	s.id.DisplayName = "console"
 	if !s.handleModeration(line) && len(out) == 0 {
-		return []string{"Usage: ban, banip, mute, unban, unbanip, unmute, banlist, mutelist"}
+		return modHelp
 	}
 	return out
 }
@@ -502,6 +548,10 @@ func (s *switchSession) handleModeration(line string) bool {
 		s.message("<red>Use %s. Time is such as 30m, 12h, 7d or 4w, or perm.</red>", u)
 		return true
 	}
+	if (name == "ban" || name == "banip" || name == "mute") && badModTime(args[1:]) {
+		s.message("<red>%s is not a time. Use one such as 30m, 12h, 7d or 4w, or perm.</red>", args[1])
+		return true
+	}
 	switch name {
 	case "ban", "mute":
 		return s.punish(name, args[0], args[1:])
@@ -530,6 +580,10 @@ func (s *switchSession) entry(t modTarget, ip string, args []string) modEntry {
 // the player's server: it may be a Java player, whom only the server can reach.
 func (s *switchSession) punish(kind, who string, args []string) bool {
 	t, ok := s.n.findTarget(who)
+	if !ok && s.reply != nil {
+		s.message("<red>Beacon doesn't know %s. For an Xbox player who never joined, use xbox:%s.</red>", who, who)
+		return true
+	}
 	if !ok {
 		s.message("<yellow>Beacon doesn't know %s, so this only goes to your server. For an Xbox player who never joined, use xbox:%s.</yellow>", who, who)
 		return false
@@ -571,6 +625,10 @@ func (s *switchSession) pardon(kind, who string) bool {
 		list, verb = m.Mutes, "muted"
 	}
 	t, ok := s.n.listedTarget(list, who)
+	if !ok && s.reply != nil {
+		s.message("<red>%s is not %s.</red>", who, verb)
+		return true
+	}
 	if !ok {
 		return false
 	}

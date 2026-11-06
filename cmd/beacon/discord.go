@@ -91,6 +91,13 @@ func (d *discordBridge) set(url string, servers []string) {
 	}
 }
 
+// on reports whether a webhook is set.
+func (d *discordBridge) on() bool {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return d.url != ""
+}
+
 // setGamerpic gives the bridge its way to find Xbox pictures.
 func (d *discordBridge) setGamerpic(f func(ctx context.Context, xuid string) (string, error)) {
 	d.mu.Lock()
