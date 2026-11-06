@@ -207,6 +207,7 @@ Sign in once by running `./beacon` by hand in that folder, then
 
 - [Relay and relayless mode](docs/modes.md): what each does and when to pick it.
 - [Features](docs/features.md): everything else Beacon does, and how to set it up.
+- [Debugging](docs/debugging.md): see the packets between a player and your servers.
 - [Player-info forwarding](docs/forwarding.md): how servers know a login came from Beacon, and
   the claim format for writing a check for another server.
 - [Friends tab](docs/friends-tab.md): accounts, friend limits and invites.

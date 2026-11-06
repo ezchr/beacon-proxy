@@ -618,6 +618,7 @@ func (s *switchSession) readBackend(l *link, first bool) {
 				l.err = err
 				return
 			}
+			s.debugPacket("server", id, payload)
 			switch id {
 			case packet.IDItemRegistry, packet.IDAvailableActorIdentifiers, packet.IDBiomeDefinitionList:
 				// Only a server's first item list is its registry: Dragonfly sends a second, short
@@ -783,6 +784,7 @@ func (s *switchSession) readClient() {
 				s.cancel(err)
 				return
 			}
+			s.debugPacket("client", id, payload)
 			if id != packet.IDPlayerAuthInput {
 				s.logSettlingPacket(id)
 			}

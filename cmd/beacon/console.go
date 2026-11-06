@@ -10,6 +10,8 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+
+	"github.com/ezchr/beacon-proxy/internal/bridge"
 )
 
 // runConsole reads commands typed into Beacon's console (stdin), like Velocity's console. It
@@ -89,6 +91,8 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 		return []string{"The world is not listed in the Friends tab."}
 	case "reload":
 		return reloadConfig()
+	case "debug":
+		return bridge.DebugCommand(strings.Join(fields[1:], " "))
 	case "invites", "friendadd":
 		return controlCommand(fields)
 	case "help", "?":
@@ -98,6 +102,7 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 			"send <player|all> <srv>   move players to a server",
 			"broadcast [on|off]        show or hide the world in the Friends tab",
 			"reload                    reread beacon.toml without a restart",
+			"debug                     log packets to a file: type it for how",
 			"invites start|stop|status Xbox invites to the players beacon scrape found",
 			"friendadd <from>|stop|status  friend requests to the players seen on <from>",
 		}

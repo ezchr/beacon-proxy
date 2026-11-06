@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -107,6 +108,9 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case path == "/packetdebug":
+		_, _ = io.WriteString(w, strings.Join(bridge.DebugCommand(r.URL.Query().Get("cmd")), "\n")+"\n")
+		return
 	case path == "/ping":
 		bridge.PingHandler().ServeHTTP(w, r)
 		return

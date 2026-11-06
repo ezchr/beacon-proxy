@@ -23,6 +23,7 @@ curl 127.0.0.1:7777/listing/status
 | `/invites/friends/start`, `/invites/friends/stop`, `/invites/friends/status` | invite the hosting account's own friends |
 | `/friends/add/start?from=<server or world>`, `/friends/add/stop`, `/friends/add/status` | send friend requests to the players recorded from a server or world; the console's `friendadd` does the same |
 | `/broadcast/<name>/invites/...` | the invite routes for an extra hosting account, if it has `invites = true` |
+| `/packetdebug?cmd=<what>` | packet logging, like the `debug` console command; see [Debugging](debugging.md) |
 | `/debug/pprof/...` | Go's profiler, only when Beacon runs with `-debug` |
 
 Send invites and friend requests sparingly: Xbox Live rate-limits them, and accounts that send too

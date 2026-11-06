@@ -1,0 +1,70 @@
+# Debugging with packet logs
+
+Something looks wrong in game and you want to see what really happened: a player gets kicked, an
+item doesn't show, a menu closes. Beacon can write down the packets between a player and your
+servers, so you can see what was sent and by whom.
+
+## Quick start
+
+1. Start logging a player:
+   ```
+   debug Steve
+   ```
+2. Have them do what goes wrong.
+3. Stop and open the file it names:
+   ```
+   debug off
+   ```
+
+Each line is one packet, with its time, the player, the server, who sent it, its name, its size and
+what is in it:
+
+```
+21:04:11.203  Steve    survival client Text            23 B  &{TextType:1 SourceName:Steve Message:hello ...
+21:04:11.240  Steve    survival server MobEquipment    61 B  &{EntityRuntimeID:12 NewItem:...
+```
+
+`client` is the player sending to the server, `server` the other way.
+
+## Commands
+
+| Command | Logs |
+|---|---|
+| `debug` | nothing: says what is running, and how to use it |
+| `debug <player>` | what one player sends and gets, with contents |
+| `debug <player> Text MobEquipment` | only those packets |
+| `debug all` | everyone, names and sizes only |
+| `debug all Text` | everyone, those packets, with contents |
+| `debug off` | stops, and names the file |
+
+Add `full` to include what goes by many times a second, such as movement and chunks. Those are left
+out otherwise, as they would bury everything else. Naming a packet always logs it. A gamertag with a
+space goes in quotes: `debug "Some Player"`. Packet names don't care about capitals.
+
+Start with the player and no packet names. Once you can see which packet matters, name it, and the
+file gets much shorter.
+
+## Where to type it
+
+In Beacon's console. If Beacon runs as a service with no console, use the [control API](control-api.md):
+
+```
+curl '127.0.0.1:7777/packetdebug?cmd=Steve'
+curl '127.0.0.1:7777/packetdebug?cmd=off'
+```
+
+## Where the logs are
+
+In `debug/` beside `beacon.toml`, one file per run, such as `packets-2026-11-06_21-04-11.log`. They stay
+after a restart. The newest 10 are kept.
+
+A run stops by itself after 5 minutes or 50 MB, so a forgotten one can't fill your disk. Starting a
+new run stops the one before it. While nothing is running it costs nothing.
+
+## Before you share a log
+
+It holds what the packets hold, which can be private chat, names and positions. Only you can read the
+file on the server, but read it through before posting it anywhere. Logins are never logged, so it has
+no account tokens.
+
+It only sees players relayed through Beacon, so it needs relay mode and doesn't show Java players.
