@@ -25,6 +25,7 @@ func applyLive(cfg FileConfig) {
 	})
 	bridge.SetPingPassthrough(cfg.PingPassthrough)
 	chatEnabled = cfg.CrossServerChat
+	discord.set(cfg.DiscordWebhook, cfg.DiscordServers)
 }
 
 // reloadConfig rereads beacon.toml (console reload, /beacon reload), applies what can change while
@@ -77,6 +78,7 @@ func reloadConfig() []string {
 	cur.PingPassthrough, cur.LoginRateLimit, cur.PacketsPerSecond = next.PingPassthrough, next.LoginRateLimit, next.PacketsPerSecond
 	cur.SessionsPerIP = next.SessionsPerIP
 	cur.CrossServerChat = next.CrossServerChat
+	cur.DiscordWebhook, cur.DiscordServers = next.DiscordWebhook, next.DiscordServers
 	running = cur
 	return out
 }

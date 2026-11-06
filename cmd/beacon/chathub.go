@@ -42,6 +42,7 @@ var chat = &chatHub{wake: make(chan struct{})}
 var chatEnabled bool
 
 func (h *chatHub) add(server, text string) {
+	discord.add(server, text)
 	h.mu.Lock()
 	h.next++
 	h.lines = append(h.lines, chatLine{ID: h.next, Server: server, Text: text})

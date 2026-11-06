@@ -96,6 +96,12 @@ control-port = {{.ControlPort}}
 # Let your servers share chat through the control API.
 cross-server-chat = {{.CrossServerChat}}
 
+# Send that chat to a Discord channel: paste a channel webhook's address here. It needs
+# cross-server-chat. Keep it private: anyone with it can post to the channel.
+# discord-webhook = ""
+# Which servers to send. Leave it out for all of them.
+# discord-servers = ["survival"]
+
 # Least milliseconds between two joins from one IP address. 0: no limit.
 login-ratelimit = 0
 

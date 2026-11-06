@@ -204,6 +204,9 @@ type FileConfig struct {
 	SessionsPerIP    int `json:"-"`
 	// CrossServerChat serves the /chat routes (chathub.go); beacon.toml only.
 	CrossServerChat bool `json:"-"`
+	// DiscordWebhook and DiscordServers send chat to Discord (discord.go); beacon.toml only.
+	DiscordWebhook string   `json:"-"`
+	DiscordServers []string `json:"-"`
 	// Admins (gamertags or XUIDs) may use the in-game /broadcast.
 	Admins []string `json:"admins,omitempty"`
 	// ListingToggle lets /broadcast and the control port take the world off the Friends tab and

@@ -81,6 +81,19 @@ join it directly, so the skin is there by XUID for those servers to look up. Set
 
 For Java Edition players, run Velocity (or another Java proxy) next to Beacon as usual.
 
+## Chat to Discord
+
+With `cross-server-chat = true`, Beacon can post that chat to a Discord channel. Make a webhook in the
+channel's settings and put it under `[advanced]`:
+
+```toml
+discord-webhook = "https://discord.com/api/webhooks/..."
+discord-servers = ["survival"] # leave out for all servers
+```
+
+It only goes from the game to Discord, and only for servers that send their chat to Beacon. Colours
+are removed and nothing a player types can ping anyone. `reload` applies a change.
+
 ## Cross-server chat
 
 Off by default. With `cross-server-chat = true` under `[advanced]`, servers can share chat through
