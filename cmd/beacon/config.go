@@ -207,8 +207,6 @@ type FileConfig struct {
 	// DiscordWebhook and DiscordServers send chat to Discord (discord.go); beacon.toml only.
 	DiscordWebhook string   `json:"-"`
 	DiscordServers []string `json:"-"`
-	// NativeChatServers are the servers whose chat Beacon reads itself; beacon.toml only.
-	NativeChatServers []string `json:"-"`
 	// Admins (gamertags or XUIDs) may use the in-game /broadcast.
 	Admins []string `json:"admins,omitempty"`
 	// ListingToggle lets /broadcast and the control port take the world off the Friends tab and

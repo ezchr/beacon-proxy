@@ -83,7 +83,7 @@ For Java Edition players, run Velocity (or another Java proxy) next to Beacon as
 
 ## Chat to Discord
 
-Beacon can post chat to a Discord channel. For servers that send their own chat, turn on `cross-server-chat`. Make a webhook in the
+Beacon can post chat to a Discord channel. Make a webhook in the
 channel's settings and put it under `[advanced]`:
 
 ```toml
@@ -91,15 +91,15 @@ discord-webhook = "https://discord.com/api/webhooks/..."
 discord-servers = ["survival"] # leave out for all servers
 ```
 
-A server with no plugin of its own works too: list it in `native-chat-servers` and Beacon reads what
-players type there. That covers players relayed through Beacon only, and Beacon sees a message before
-the server does, so a message the server would refuse, such as from a muted player, is sent too. Don't
-list a server that already sends its chat, or each line shows twice.
+A server needs no plugin: Beacon reads what players relayed through it type. That covers Bedrock
+players, and Beacon sees a message before the server does, so one the server would refuse, such as
+from a muted player, is sent too. A server that sends its own chat to `/chat/send` is used instead,
+which also covers Java players and leaves refused messages out.
 
 Messages show the player's name and picture (Xbox gamerpic, or the skin's face for Java) when the
 server names who spoke in `/chat/send`.
 
-It only goes from the game to Discord, and only for servers that send their chat to Beacon. Colours
+It only goes from the game to Discord. Colours
 are removed and nothing a player types can ping anyone. `reload` applies a change.
 
 ## Cross-server chat

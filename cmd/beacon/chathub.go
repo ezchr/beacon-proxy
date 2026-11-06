@@ -4,11 +4,9 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
-	"slices"
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"time"
 )
 
@@ -57,18 +55,27 @@ func (h *chatHub) add(server, text string) {
 	h.mu.Unlock()
 }
 
-// nativeChat are the servers whose chat Beacon reads itself (beacon.toml native-chat-servers).
-var nativeChat atomic.Pointer[[]string]
+// chatSenders are the servers seen sending their own chat to /chat/send. A server's own lines are
+// the better ones: they have its formatting, and it left out what it refused.
+var chatSenders sync.Map
 
-// relayedChat takes what a relayed player typed, for a server that does not send its chat here.
+// chatSenderWait is how long a player's line waits for their server to send it itself.
+const chatSenderWait = 1500 * time.Millisecond
+
+// relayedChat takes what a relayed player typed. It counts unless the server sends its own chat,
+// which Beacon only knows once it has: the first line waits to see.
 func relayedChat(server, player, xuid, message string) {
-	list := nativeChat.Load()
-	if list == nil || !slices.ContainsFunc(*list, func(s string) bool { return strings.EqualFold(s, server) }) {
+	if _, sends := chatSenders.Load(strings.ToLower(server)); sends {
 		return
 	}
-	line := player + ": " + message
-	chat.add(server, line)
-	discord.add(server, line, player, xuid, message)
+	time.AfterFunc(chatSenderWait, func() {
+		if _, sends := chatSenders.Load(strings.ToLower(server)); sends {
+			return
+		}
+		line := player + ": " + message
+		chat.add(server, line)
+		discord.add(server, line, player, xuid, message)
+	})
 }
 
 // since returns the other servers' lines after id, the newest id, and a channel closed on the next line.
@@ -110,6 +117,7 @@ func serveChat(w http.ResponseWriter, r *http.Request) bool {
 		if len(in.Text) > chatMaxLen {
 			in.Text = in.Text[:chatMaxLen]
 		}
+		chatSenders.Store(strings.ToLower(in.Server), true)
 		chat.add(in.Server, in.Text)
 		discord.add(in.Server, in.Text, in.Player, in.XUID, in.Message)
 		w.WriteHeader(http.StatusNoContent)
