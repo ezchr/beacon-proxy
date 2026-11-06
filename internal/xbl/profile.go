@@ -64,6 +64,21 @@ func GamertagForXUID(ctx context.Context, authSession *session.Session, xuid str
 	return "", fmt.Errorf("look up gamertag for xuid %q: response had no Gamertag setting", xuid)
 }
 
+// GamerpicForXUID is the address of a player's Xbox profile picture.
+func GamerpicForXUID(ctx context.Context, authSession *session.Session, xuid string) (string, error) {
+	url := profileBaseURL + "xuid(" + xuid + ")/profile/settings?settings=GameDisplayPicRaw"
+	user, err := fetchProfile(ctx, authSession, url)
+	if err != nil {
+		return "", fmt.Errorf("look up gamerpic for xuid %q: %w", xuid, err)
+	}
+	for _, s := range user.Settings {
+		if s.ID == "GameDisplayPicRaw" && s.Value != "" {
+			return s.Value, nil
+		}
+	}
+	return "", fmt.Errorf("look up gamerpic for xuid %q: response had none", xuid)
+}
+
 // fetchProfile performs the actual profile.xboxlive.com request and returns the single expected
 // profileUser. Both XUIDForGamertag and GamertagForXUID hit the same endpoint shape with only
 // the selector (gt(...) vs xuid(...)) differing.

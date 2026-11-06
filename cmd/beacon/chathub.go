@@ -13,7 +13,8 @@ import (
 // formatted, with rank and name) and long-polls for the lines of the other servers, which it shows
 // with a tag for the server they came from. Served on the control routes (loopback only).
 //
-//	POST /chat/send   {"server": "pvp", "text": "<formatted line>"}
+//	POST /chat/send   {"server": "pvp", "text": "<formatted line>"}, and optionally "player",
+//	                  "xuid" and "message": who said what, for Discord
 //	GET  /chat/poll?server=pvp&after=<id>   lines from the other servers after id, waiting up to
 //	                                        25 s for one; after=-1 returns only the current id.
 
@@ -42,7 +43,6 @@ var chat = &chatHub{wake: make(chan struct{})}
 var chatEnabled bool
 
 func (h *chatHub) add(server, text string) {
-	discord.add(server, text)
 	h.mu.Lock()
 	h.next++
 	h.lines = append(h.lines, chatLine{ID: h.next, Server: server, Text: text})
@@ -81,6 +81,10 @@ func serveChat(w http.ResponseWriter, r *http.Request) bool {
 		var in struct {
 			Server string `json:"server"`
 			Text   string `json:"text"`
+			// Who spoke and what they said, for Discord; optional, and the XUID of Bedrock players only.
+			Player  string `json:"player"`
+			XUID    string `json:"xuid"`
+			Message string `json:"message"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&in); err != nil || in.Server == "" || in.Text == "" {
 			http.Error(w, "want {server, text}", http.StatusBadRequest)
@@ -90,6 +94,7 @@ func serveChat(w http.ResponseWriter, r *http.Request) bool {
 			in.Text = in.Text[:chatMaxLen]
 		}
 		chat.add(in.Server, in.Text)
+		discord.add(in.Server, in.Text, in.Player, in.XUID, in.Message)
 		w.WriteHeader(http.StatusNoContent)
 		return true
 	case "/chat/poll":

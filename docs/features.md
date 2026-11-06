@@ -91,6 +91,9 @@ discord-webhook = "https://discord.com/api/webhooks/..."
 discord-servers = ["survival"] # leave out for all servers
 ```
 
+Messages show the player's name and picture (Xbox gamerpic, or the skin's face for Java) when the
+server names who spoke in `/chat/send`.
+
 It only goes from the game to Discord, and only for servers that send their chat to Beacon. Colours
 are removed and nothing a player types can ping anyone. `reload` applies a change.
 
