@@ -306,12 +306,12 @@ func (s *switchSession) remoteIP() string {
 
 // banMessage is what a banned player reads.
 func banMessage(e modEntry, now time.Time) string {
-	msg := "§cYou are banned from this network."
+	msg := "You are banned from this network."
 	if e.Reason != "" {
-		msg += "\n§fReason: " + e.Reason
+		msg += "\nReason: " + e.Reason
 	}
 	if e.Until != 0 {
-		msg += "\n§7Time left: " + e.left(now)
+		msg += "\nTime left: " + e.left(now)
 	}
 	return msg
 }

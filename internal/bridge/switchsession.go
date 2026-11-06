@@ -326,7 +326,7 @@ func (s *switchSession) rejoin() {
 	case <-s.ctx.Done():
 		return
 	}
-	const msg = "§eThe server just updated.\n§fJoin again to play."
+	const msg = "The server just updated.\nJoin again to play."
 	host, port, err := net.SplitHostPort(s.n.RejoinAddress)
 	p, perr := strconv.ParseUint(port, 10, 16)
 	if err != nil || perr != nil {
