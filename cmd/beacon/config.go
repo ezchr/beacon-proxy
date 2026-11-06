@@ -204,6 +204,8 @@ type FileConfig struct {
 	SessionsPerIP    int `json:"-"`
 	// CrossServerChat serves the /chat routes (chathub.go); beacon.toml only.
 	CrossServerChat bool `json:"-"`
+	// Moderation is Beacon's own bans and mutes (bridge/moderation.go); beacon.toml only.
+	Moderation bool `json:"-"`
 	// DiscordWebhook and DiscordServers send chat to Discord (discord.go); beacon.toml only.
 	DiscordWebhook string   `json:"-"`
 	DiscordServers []string `json:"-"`
@@ -261,6 +263,7 @@ func defaultConfig() FileConfig {
 		// purpose: its default depends on the transport, and an older file may still name the
 		// address under geyser_address / nethernet_backend_address (see resolveServerAddress).
 		BackendTransport: "raknet",
+		Moderation:       true,
 		HostName:         "Beacon",
 		WorldName:        "Beacon",
 		MaxPlayers:       20,

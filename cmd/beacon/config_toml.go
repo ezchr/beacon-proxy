@@ -85,6 +85,7 @@ type tomlConfig struct {
 		NetworkDir              string   `toml:"network-dir"`
 		RejoinAddress           string   `toml:"rejoin-address"`
 		CrossServerChat         bool     `toml:"cross-server-chat"`
+		Moderation              *bool    `toml:"moderation"`
 		DiscordWebhook          string   `toml:"discord-webhook"`
 		DiscordServers          []string `toml:"discord-servers"`
 		LoginRateLimit          int      `toml:"login-ratelimit"`
@@ -176,6 +177,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.DisableClientEncryption = a.DisableClientEncryption
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.CrossServerChat = a.CrossServerChat
+	cfg.Moderation = a.Moderation == nil || *a.Moderation
 	cfg.DiscordWebhook, cfg.DiscordServers = a.DiscordWebhook, a.DiscordServers
 	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {

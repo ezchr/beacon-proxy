@@ -12,6 +12,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
@@ -69,6 +70,7 @@ type modStore struct {
 	IPBans map[string]modEntry   `json:"ip_bans"` // by address
 	Mutes  map[string]modEntry   `json:"mutes"`   // by XUID
 	Seen   map[string]seenPlayer `json:"seen"`    // by lower-case name
+	Admins map[string]string     `json:"admins"`  // added with the admin command: XUID to name
 }
 
 func newModStore(path string) *modStore {
@@ -87,6 +89,9 @@ func newModStore(path string) *modStore {
 	}
 	if m.Seen == nil {
 		m.Seen = map[string]seenPlayer{}
+	}
+	if m.Admins == nil {
+		m.Admins = map[string]string{}
 	}
 	return m
 }
@@ -195,6 +200,93 @@ func (n *Network) moderation() *modStore {
 	}
 	m, _ := modStores.LoadOrStore(path, newModStore(path))
 	return m.(*modStore)
+}
+
+// moderationOff is set by moderation = false: Beacon then leaves the moderation commands to your
+// servers, and enforces nothing it saved.
+var moderationOff atomic.Bool
+
+// SetModeration turns Beacon's moderation on or off.
+func SetModeration(on bool) { moderationOff.Store(!on) }
+
+// isExtraAdmin reports whether the admin command made a player an admin.
+func (m *modStore) isExtraAdmin(xuid string) bool {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	_, ok := m.Admins[xuid]
+	return ok
+}
+
+// adminCommand runs the console's admin command. In game there is none: an admin account that
+// falls into the wrong hands cannot make more of them.
+func (n *Network) adminCommand(args []string, say func(string)) {
+	m := n.moderation()
+	usage := "Use: admin add <player>, admin remove <player> or admin list"
+	if len(args) == 0 {
+		say(usage)
+		return
+	}
+	switch action := strings.ToLower(args[0]); {
+	case action == "list":
+		m.mu.Lock()
+		names := make([]string, 0, len(m.Admins))
+		for _, name := range m.Admins {
+			names = append(names, name)
+		}
+		m.mu.Unlock()
+		slices.Sort(names)
+		say(fmt.Sprintf("Added admins: %s", strings.Join(names, ", ")))
+		say(fmt.Sprintf("Admins from beacon.toml: %s", strings.Join(n.configAdmins(), ", ")))
+	case (action == "add" || action == "remove") && len(args) == 2:
+		n.changeAdmin(action == "add", args[1], say)
+	default:
+		say(usage)
+	}
+}
+
+// changeAdmin adds or removes an admin.
+func (n *Network) changeAdmin(add bool, who string, say func(string)) {
+	m := n.moderation()
+	t, ok := n.findTarget(who)
+	if !ok {
+		// Removing someone Beacon no longer knows goes by the name saved.
+		m.mu.Lock()
+		for xuid, name := range m.Admins {
+			if !add && strings.EqualFold(name, who) {
+				t, ok = modTarget{xuid: xuid, name: name}, true
+			}
+		}
+		m.mu.Unlock()
+	}
+	if !ok {
+		say(fmt.Sprintf("Beacon doesn't know %s. For an Xbox player who never joined, use xbox:%s.", who, who))
+		return
+	}
+	m.mu.Lock()
+	_, was := m.Admins[t.xuid]
+	if add {
+		m.Admins[t.xuid] = t.name
+	} else {
+		delete(m.Admins, t.xuid)
+	}
+	err := m.saveLocked()
+	m.mu.Unlock()
+	if err != nil {
+		say("It could not be saved: " + err.Error())
+	}
+	switch {
+	case add && was:
+		say(t.name + " already is an admin.")
+	case add:
+		say(t.name + " is now an admin. New commands show after they rejoin.")
+	case was:
+		say(t.name + " is no longer an admin.")
+	default:
+		say(t.name + " wasn't added with this command.")
+	}
+	if !add && n.IsAdmin(t.xuid, t.name) {
+		say(t.name + " is still in admins in beacon.toml: take them out there and reload.")
+	}
 }
 
 // parseModTime reads a time such as 30m, 7d or perm. 0 has no end.
@@ -321,6 +413,9 @@ func banMessage(e modEntry, now time.Time) string {
 func (n *Network) refuseLogin(xuid, name, ip string) (string, bool) {
 	m := n.moderation()
 	m.see(xuid, name, ip)
+	if moderationOff.Load() {
+		return "", false
+	}
 	if n.IsAdmin(xuid, name) {
 		ip = ""
 	}
@@ -339,7 +434,15 @@ var modTags = regexp.MustCompile(`</?[a-z]+>`)
 // Unlike an admin in game, the console may act on an admin.
 func (n *Network) Moderate(line string) []string {
 	var out []string
-	s := &switchSession{n: n, reply: func(text string) { out = append(out, text) }}
+	say := func(text string) { out = append(out, text) }
+	if f := splitCommand(line); len(f) > 0 && strings.EqualFold(f[0], "admin") {
+		n.adminCommand(f[1:], say)
+		return out
+	}
+	if moderationOff.Load() {
+		return []string{"Moderation is off: moderation = false in beacon.toml."}
+	}
+	s := &switchSession{n: n, reply: say}
 	s.id.DisplayName = "console"
 	if !s.handleModeration(line) && len(out) == 0 {
 		return []string{"Usage: ban, banip, mute, unban, unbanip, unmute, banlist, mutelist"}
@@ -352,6 +455,9 @@ var mutedCommands = map[string]bool{"msg": true, "tell": true, "w": true, "whisp
 
 // mutedNow tells a muted player so and reports it.
 func (s *switchSession) mutedNow() bool {
+	if moderationOff.Load() {
+		return false
+	}
 	now := time.Now()
 	e, ok := s.n.moderation().muted(s.id.XUID, now)
 	if !ok {
@@ -370,7 +476,7 @@ func (s *switchSession) mutedCommand(line string) bool {
 // handleModeration runs a moderation command of an admin and reports whether it was one.
 func (s *switchSession) handleModeration(line string) bool {
 	f := splitCommand(line)
-	if len(f) == 0 || (s.reply == nil && !s.isAdmin()) {
+	if len(f) == 0 || moderationOff.Load() || (s.reply == nil && !s.isAdmin()) {
 		return false
 	}
 	name, args := strings.ToLower(f[0]), f[1:]
@@ -600,6 +706,9 @@ func (s *switchSession) listMod(title string, list map[string]modEntry) {
 // injectModeration adds the moderation commands to an admin's command list, in place of a server's
 // own of the same name. enum adds an enum and returns its index.
 func (s *switchSession) injectModeration(pk *packet.AvailableCommands, enum func(string, []string) uint32) {
+	if moderationOff.Load() {
+		return
+	}
 	const valid = protocol.CommandArgValid
 	set := func(name, description string, overloads []protocol.CommandOverload) {
 		for i, c := range pk.Commands {

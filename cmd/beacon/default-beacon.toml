@@ -102,6 +102,11 @@ cross-server-chat = {{.CrossServerChat}}
 # Which servers to send. Leave it out for all of them.
 # discord-servers = ["survival"]
 
+# Beacon's own /ban, /banip, /mute and their /un commands, for Beacon's admins, across all your
+# servers. false: Beacon leaves those commands to your servers, as for a ban plugin of your own,
+# and doesn't enforce the bans and mutes it saved. They come back if you turn it on again.
+# moderation = true
+
 # Least milliseconds between two joins from one IP address. 0: no limit.
 login-ratelimit = 0
 

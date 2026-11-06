@@ -25,6 +25,7 @@ func applyLive(cfg FileConfig) {
 	})
 	bridge.SetPingPassthrough(cfg.PingPassthrough)
 	chatEnabled = cfg.CrossServerChat
+	bridge.SetModeration(cfg.Moderation)
 	discord.set(cfg.DiscordWebhook, cfg.DiscordServers)
 	bridge.ChatHook = relayedChat
 }
@@ -79,6 +80,7 @@ func reloadConfig() []string {
 	cur.PingPassthrough, cur.LoginRateLimit, cur.PacketsPerSecond = next.PingPassthrough, next.LoginRateLimit, next.PacketsPerSecond
 	cur.SessionsPerIP = next.SessionsPerIP
 	cur.CrossServerChat = next.CrossServerChat
+	cur.Moderation = next.Moderation
 	cur.DiscordWebhook, cur.DiscordServers = next.DiscordWebhook, next.DiscordServers
 	running = cur
 	return out

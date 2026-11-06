@@ -96,6 +96,30 @@ Admins have these across the whole network, in relay mode:
 They work from the console too, without the slash, and through the [control API](control-api.md). The console can also ban an admin, which an admin in game can't. Time is such as `30m`, `12h`, `7d` or `4w`, or `perm`; left out, it has no end. They replace a server's commands of the same name for admins, and work for people who are offline. They are saved in `moderation.json`. 
 They cover players relayed through Beacon. Beacon can't reach a Java player who joins through a Java proxy, so a name it doesn't know is passed on to the server you are on, whose own command can act on it. That only covers that server. To ban an Xbox player who has never joined, use `/ban xbox:Gamertag`.
 
+### Admins
+
+Beacon's admins are the `admins` in `beacon.toml`, and anyone added from the console:
+
+```
+admin add Steve
+admin remove Steve
+admin list
+```
+
+This is console and control API only, so an admin in game can't make more admins. It works at once, with no reload; a new admin's commands show after they rejoin. Someone listed in `beacon.toml` has to be taken out there.
+
+Being a Beacon admin has nothing to do with being an op on a server. Someone who isn't a Beacon admin gets their server's commands as usual.
+
+### Turning it off
+
+If your network has its own ban plugin, set `moderation = false` under `[advanced]`. Beacon then:
+
+- stops answering `/ban`, `/banip`, `/mute` and the rest, which go to your servers instead, even from Beacon's admins;
+- stops turning away players it banned, and stops blocking chat of players it muted;
+- keeps what it saved, so turning it back on brings those bans and mutes back.
+
+`reload` applies it. Other admin commands, such as `/send` and `/glist`, stay on.
+
 ## Chat to Discord
 
 Beacon can post chat to a Discord channel. Make a webhook in the

@@ -91,7 +91,7 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 		return []string{"The world is not listed in the Friends tab."}
 	case "reload":
 		return reloadConfig()
-	case "ban", "banip", "mute", "unban", "unbanip", "unmute", "banlist", "mutelist":
+	case "ban", "banip", "mute", "unban", "unbanip", "unmute", "banlist", "mutelist", "admin":
 		if network == nil {
 			return []string{fields[0] + " needs mode = \"relay\"."}
 		}
@@ -109,6 +109,7 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 			"reload                    reread beacon.toml without a restart",
 			"debug                     log packets to a file: type it for how",
 			"ban, banip, mute          and unban, unbanip, unmute, banlist, mutelist",
+			"admin add|remove <player> make or unmake a Beacon admin; admin list",
 			"invites start|stop|status Xbox invites to the players beacon scrape found",
 			"friendadd <from>|stop|status  friend requests to the players seen on <from>",
 		}

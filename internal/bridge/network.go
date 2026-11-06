@@ -286,7 +286,17 @@ func (n *Network) DefaultServer() string { return n.conf().try[0] }
 // IsAdmin reports whether a gamertag (any case) or XUID is one of the admins.
 func (n *Network) IsAdmin(xuid, name string) bool {
 	a := n.conf().admins
-	return a[xuid] || a[strings.ToLower(name)]
+	return a[xuid] || a[strings.ToLower(name)] || n.moderation().isExtraAdmin(xuid)
+}
+
+// configAdmins lists the admins of beacon.toml.
+func (n *Network) configAdmins() []string {
+	var out []string
+	for a := range n.conf().admins {
+		out = append(out, a)
+	}
+	slices.Sort(out)
+	return out
 }
 
 // joinOrder is the servers a player of protocol id tries to join, in order: the forced host's
