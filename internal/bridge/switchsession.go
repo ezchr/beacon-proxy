@@ -40,6 +40,8 @@ type switchSession struct {
 	cancel context.CancelCauseFunc
 	// packGen is Network.packGen when this client logged in.
 	packGen uint64
+	// reply takes messages in place of a client: the console's stand-in session (moderation.go).
+	reply func(string)
 	// rejoining is set once the player is being sent to join again (record).
 	rejoining atomic.Bool
 
@@ -346,6 +348,10 @@ func (s *switchSession) disconnect(msg string) {
 
 // message sends the player a system chat line.
 func (s *switchSession) message(format string, a ...any) {
+	if s.reply != nil {
+		s.reply(modTags.ReplaceAllString(fmt.Sprintf(format, a...), ""))
+		return
+	}
 	s.sendClient(&packet.Text{TextType: packet.TextTypeRaw, Message: text.Colourf(format, a...)})
 }
 

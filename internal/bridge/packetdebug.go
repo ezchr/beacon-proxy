@@ -175,6 +175,15 @@ func (s *switchSession) debugPacket(dir string, id uint32, payload []byte) {
 	d.write(line, true)
 }
 
+// debugDevice names a device OS number.
+func debugDevice(os int) string {
+	names := []string{"unknown", "Android", "iOS", "macOS", "FireOS", "GearVR", "HoloLens", "Windows UWP", "Windows", "Dedicated", "tvOS", "PlayStation", "Switch", "Xbox", "Windows Phone", "Linux"}
+	if os > 0 && os < len(names) {
+		return names[os]
+	}
+	return "device " + strconv.Itoa(os)
+}
+
 // debugWho is the line that says who a player is, the first time they show up in a log.
 func (s *switchSession) debugWho() string {
 	ip := "unknown"
@@ -183,7 +192,7 @@ func (s *switchSession) debugWho() string {
 			ip = a
 		}
 	}
-	return fmt.Sprintf("# player %s xuid=%s ip=%s device=%v model=%q version=%s", s.id.DisplayName, s.id.XUID, ip, s.cd.DeviceOS, s.cd.DeviceModel, s.cd.GameVersion)
+	return fmt.Sprintf("# player %s xuid=%s ip=%s device=%s model=%q version=%s", s.id.DisplayName, s.id.XUID, ip, debugDevice(int(s.cd.DeviceOS)), s.cd.DeviceModel, s.cd.GameVersion)
 }
 
 // debugLogin is what the player's login said, read from it: the login packet itself holds their

@@ -108,6 +108,13 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch {
+	case path == "/moderation":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, strings.Join(network.Moderate(r.URL.Query().Get("cmd")), "\n")+"\n")
+		return
 	case path == "/packetdebug":
 		_, _ = io.WriteString(w, strings.Join(bridge.DebugCommand(r.URL.Query().Get("cmd")), "\n")+"\n")
 		return

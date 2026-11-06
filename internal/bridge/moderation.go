@@ -295,6 +295,9 @@ func (n *Network) findTarget(name string) (modTarget, bool) {
 
 // remoteIP is the player's address.
 func (s *switchSession) remoteIP() string {
+	if s.conn == nil {
+		return ""
+	}
 	if _, _, ip, _ := dcVerdict(s.conn.RemoteAddr()); ip != nil {
 		return ip.String()
 	}
@@ -313,13 +316,13 @@ func banMessage(e modEntry, now time.Time) string {
 	return msg
 }
 
-// refuseLogin notes a joining player and returns why they may not join, if so. Admins always may,
-// so that a ban on a shared address cannot lock them out.
+// refuseLogin notes a joining player and returns why they may not join, if so. An address ban does
+// not stop admins, so that one on a shared address cannot lock them out.
 func (n *Network) refuseLogin(xuid, name, ip string) (string, bool) {
 	m := n.moderation()
 	m.see(xuid, name, ip)
 	if n.IsAdmin(xuid, name) {
-		return "", false
+		ip = ""
 	}
 	now := time.Now()
 	e, ok := m.refused(xuid, ip, now)
@@ -327,6 +330,21 @@ func (n *Network) refuseLogin(xuid, name, ip string) (string, bool) {
 		return "", false
 	}
 	return banMessage(e, now), true
+}
+
+// modTags are the colour tags of a message, which a console has no use for.
+var modTags = regexp.MustCompile(`</?[a-z]+>`)
+
+// Moderate runs a moderation command for the console or the control API, and returns what it says.
+// Unlike an admin in game, the console may act on an admin.
+func (n *Network) Moderate(line string) []string {
+	var out []string
+	s := &switchSession{n: n, reply: func(text string) { out = append(out, text) }}
+	s.id.DisplayName = "console"
+	if !s.handleModeration(line) && len(out) == 0 {
+		return []string{"Usage: ban, banip, mute, unban, unbanip, unmute, banlist, mutelist"}
+	}
+	return out
 }
 
 // mutedCommands talk to other players, so a muted player cannot use them.
@@ -352,7 +370,7 @@ func (s *switchSession) mutedCommand(line string) bool {
 // handleModeration runs a moderation command of an admin and reports whether it was one.
 func (s *switchSession) handleModeration(line string) bool {
 	f := splitCommand(line)
-	if len(f) == 0 || !s.isAdmin() {
+	if len(f) == 0 || (s.reply == nil && !s.isAdmin()) {
 		return false
 	}
 	name, args := strings.ToLower(f[0]), f[1:]
@@ -410,7 +428,7 @@ func (s *switchSession) punish(kind, who string, args []string) bool {
 		s.message("<yellow>Beacon doesn't know %s, so this only goes to your server. For an Xbox player who never joined, use xbox:%s.</yellow>", who, who)
 		return false
 	}
-	if s.n.IsAdmin(t.xuid, t.name) {
+	if s.reply == nil && s.n.IsAdmin(t.xuid, t.name) { // the console may
 		s.message("<red>%s is an admin.</red>", t.name)
 		return true
 	}
