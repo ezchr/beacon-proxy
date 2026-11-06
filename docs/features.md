@@ -37,13 +37,13 @@ player counts (`"players"`) or both (`"all"`).
 ## Reloading
 
 `reload` in the console, or `/beacon reload` in game for admins, rereads `beacon.toml` without a
-restart. The servers, `try`, forced hosts, admins, ping passthrough, rate limits and cross-server
-chat change at once; players stay where they are. It lists anything else you changed, which needs
+restart. The servers, `try`, forced hosts, admins, ping passthrough, rate limits, `moderation`,
+cross-server chat and the Discord webhook change at once; players stay where they are. It lists anything else you changed, which needs
 a restart (`mode`, `bind`, `motd`, accounts and so on).
 
 ## Game versions
 
-Each Beacon release serves one Bedrock version (1.0.0: 1.26.60), and your servers run that same
+Each Beacon release serves one Bedrock version (this one: 1.26.60), and your servers run that same
 version. Players on another version get a message saying which version the server takes, instead
 of a broken join.
 
@@ -67,7 +67,17 @@ of a broken join.
 - **Rate limits** (under `[advanced]`, off by default): `login-ratelimit` is the least time in
   milliseconds between two joins from one IP address, `packets-per-second` the most packets a
   player may send in a second; a player past either is sent away. `sessions-per-ip` is the most
-  players online at once from one IP address; a player joining again from it still gets in.
+  players online at once from one IP address; a player joining again from it still gets in. A
+  good start:
+
+  ```toml
+  login-ratelimit = 500
+  packets-per-second = 500
+  sessions-per-ip = 4
+  ```
+
+  In our tests a player stayed under 100 packets a second, even moving between servers, so 500
+  only stops floods. A player sent away for it reads "Too many packets.", and Beacon's log says `packet rate limit` with their name.
 
 ## Skins for Java players
 
@@ -83,7 +93,16 @@ For Java Edition players, run Velocity (or another Java proxy) next to Beacon as
 
 ## Bans and mutes
 
-Admins have these across the whole network, in relay mode:
+Beacon's admins have these across the whole network, in relay mode. There's nothing to set up:
+
+```
+/ban Steve 7d griefing
+/ban "Some Player"
+/banip Steve 30d
+/mute Steve 1h spam
+/unban Steve
+/banlist
+```
 
 | Command | Does |
 | --- | --- |
@@ -93,8 +112,22 @@ Admins have these across the whole network, in relay mode:
 | `/unban`, `/unbanip`, `/unmute` | lifts one |
 | `/banlist`, `/mutelist` | lists them |
 
-They work from the console too, without the slash, and through the [control API](control-api.md). The console can also ban an admin, which an admin in game can't. Time is such as `30m`, `12h`, `7d` or `4w`, or `perm`; left out, it has no end. They replace a server's commands of the same name for admins, and work for people who are offline. They are saved in `moderation.json`. 
-They cover players relayed through Beacon. Beacon can't reach a Java player who joins through a Java proxy, so a name it doesn't know is passed on to the server you are on, whose own command can act on it. That only covers that server. To ban an Xbox player who has never joined, use `/ban xbox:Gamertag`.
+- **Time** is such as `30m`, `12h`, `7d`, `4w` or `3months`, or `perm`. Left out, it has no end. A
+  time Beacon can't read, like `7x`, is refused instead of banning for good.
+- **Names:** players online are suggested as you type, and `/unban` and `/unmute` suggest who is
+  on the list; other names can be typed out. A gamertag with a space goes in quotes.
+- **Offline players** work too, if they have joined before; they are saved in `moderation.json`. To
+  ban an Xbox player who has never joined, use `/ban xbox:Gamertag`.
+- **Console:** all of these work there without the slash, and through the
+  [control API](control-api.md). The console can also ban an admin, which an admin in game can't.
+- **An address ban** doesn't stop admins, so one on a shared address can't lock them out.
+
+For admins these replace a server's commands of the same name. Everyone else still gets the
+server's own.
+
+They cover players relayed through Beacon. Beacon can't reach a Java player who joins through a
+Java proxy, so an admin's command with a name Beacon doesn't know is passed on to the server they
+are on, whose own command can act on it. That only covers that server.
 
 ### Admins
 
@@ -122,24 +155,36 @@ If your network has its own ban plugin, set `moderation = false` under `[advance
 
 ## Chat to Discord
 
-Beacon can post chat to a Discord channel. Make a webhook in the
-channel's settings and put it under `[advanced]`:
+Beacon can post chat to a Discord channel, under each player's name and picture.
 
-```toml
-discord-webhook = "https://discord.com/api/webhooks/..."
-discord-servers = ["survival"] # leave out for all servers
+1. In Discord, open the channel's settings, then **Integrations**, **Webhooks**, **New Webhook**,
+   and copy its URL. Keep it private: anyone who has it can post to the channel.
+2. Put it under `[advanced]` in `beacon.toml`:
+
+   ```toml
+   discord-webhook = "https://discord.com/api/webhooks/..."
+   discord-servers = ["survival"] # leave out for all servers
+   ```
+
+3. Type `reload` in the console.
+
+A server needs no plugin: in relay mode Beacon reads what players type, and also prints it to its
+log. That covers Bedrock players. Beacon sees a message before the server does, so one the server
+would refuse, such as from a player that server muted, is sent too. Players muted with Beacon's own
+`/mute` are never sent.
+
+To cover Java players as well, have the server post its own chat to Beacon. Beacon then uses that
+instead, which also leaves out what the server refused:
+
+```
+curl 127.0.0.1:7777/chat/send -d '{"server":"survival","text":"<Steve> hello","player":"Steve","xuid":"2535400000000000","message":"hello"}'
 ```
 
-A server needs no plugin: Beacon reads what players relayed through it type. That covers Bedrock
-players, and Beacon sees a message before the server does, so one the server would refuse, such as
-from a muted player, is sent too. A server that sends its own chat to `/chat/send` is used instead,
-which also covers Java players and leaves refused messages out.
+`server` and `text` are needed. `player` and `message` show the line under the player's name;
+`xuid` gives a Bedrock player their Xbox picture, and with none the picture is the skin's face.
 
-Messages show the player's name and picture (Xbox gamerpic, or the skin's face for Java) when the
-server names who spoke in `/chat/send`.
-
-It only goes from the game to Discord. Colours
-are removed and nothing a player types can ping anyone. `reload` applies a change.
+It only goes from the game to Discord. Colours are removed, and nothing a player types can ping
+anyone.
 
 ## Cross-server chat
 

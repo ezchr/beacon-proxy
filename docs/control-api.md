@@ -18,14 +18,23 @@ curl 127.0.0.1:7777/listing/status
 |---|---|
 | `/ping?xuid=<xuid>` | a connected player's real round trip in ms (their device to Beacon, plus Beacon to the server), for a `/ping` command on your server. `not connected` when Beacon doesn't have them. |
 | `/listing/status`, `/listing/on`, `/listing/off` | show or hide the world on the Friends tab, like `/broadcast on\|off` (needs `listing-toggle = true`) |
-| `/chat/send`, `/chat/poll` | chat across your servers (`/chat/send` also takes `player`, `xuid` and `message`, for Discord), when `cross-server-chat = true`: a server posts its players' messages and polls for the others' |
+| `/chat/send`, `/chat/poll` | chat across your servers, when `cross-server-chat = true` or a Discord webhook is set: a server posts its players' messages and polls for the others'. See [Chat to Discord](features.md#chat-to-discord) for what `/chat/send` takes |
 | `/invites/start`, `/invites/stop`, `/invites/status` | send Xbox invites to the players [`beacon scrape`](scraper.md) found (and any in `invite_queue.txt`); the console's `invites` command does the same |
 | `/invites/friends/start`, `/invites/friends/stop`, `/invites/friends/status` | invite the hosting account's own friends |
 | `/friends/add/start?from=<server or world>`, `/friends/add/stop`, `/friends/add/status` | send friend requests to the players recorded from a server or world; the console's `friendadd` does the same |
 | `/broadcast/<name>/invites/...` | the invite routes for an extra hosting account, if it has `invites = true` |
-| `/moderation?cmd=<command>` | a moderation command, like `ban+Steve+7d`, as in the console |
+| `/moderation?cmd=<command>` | a moderation or `admin` command, as in the console; see below |
 | `/packetdebug?cmd=<what>` | packet logging, like the `debug` console command; see [Debugging](debugging.md) |
 | `/debug/pprof/...` | Go's profiler, only when Beacon runs with `-debug` |
+
+Moderation commands go in `cmd`, with `+` for spaces and `%22` for the quotes around a name with a
+space:
+
+```
+curl '127.0.0.1:7777/moderation?cmd=ban+Steve+7d+griefing'
+curl '127.0.0.1:7777/moderation?cmd=mute+%22Some+Player%22+1h'
+curl '127.0.0.1:7777/moderation?cmd=admin+add+Steve'
+```
 
 Send invites and friend requests sparingly: Xbox Live rate-limits them, and accounts that send too
 many can be restricted.

@@ -107,6 +107,9 @@ cross-server-chat = {{.CrossServerChat}}
 # and doesn't enforce the bans and mutes it saved. They come back if you turn it on again.
 # moderation = true
 
+# Limits against floods. A good start: login-ratelimit = 500, packets-per-second = 500 and
+# sessions-per-ip = 4.
+
 # Least milliseconds between two joins from one IP address. 0: no limit.
 login-ratelimit = 0
 

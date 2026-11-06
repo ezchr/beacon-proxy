@@ -117,6 +117,12 @@ All on by default unless noted; details in [Features](docs/features.md).
   Beacon merges and renumbers them, so players move between a vanilla server and a modded one.
 - **Private command blocks:** players can't read the commands in command blocks and NPCs.
 - **Datacenter block (opt-in):** turns away joins from hosting providers' IP ranges you list.
+- **Bans and mutes:** `/ban`, `/banip` and `/mute` across all your servers, for offline players
+  too, with an optional time.
+- **Chat to Discord (opt-in):** posts chat to a Discord channel under each player's name and
+  picture. Your servers need no plugin.
+- **Packet logs:** `debug Steve` writes what a player sends and gets to a file, for when something
+  goes wrong in game. See [Debugging](docs/debugging.md).
 - **Skins for Java players:** uploads Bedrock skins to GeyserMC's skin API, for servers with Java
   players.
 - **HTTPS certificates (opt-in)** for joining by address: a free one from Let's Encrypt (`domain`)
@@ -139,6 +145,8 @@ All on by default unless noted; details in [Features](docs/features.md).
 | `ping-passthrough` | what the server list takes from your first server: `"off"`, `"motd"`, `"players"` or `"all"` |
 | `login-ratelimit`, `packets-per-second`, `sessions-per-ip` | limits under `[advanced]`: least milliseconds between joins from one IP, most packets per player per second, most players online from one IP; `0` means no limit |
 | `[broadcast]` | the Friends-tab side: host name, admins, friend requests; see [Friends tab](docs/friends-tab.md) |
+| `moderation` | under `[advanced]`: `false` leaves `/ban`, `/mute` and the rest to your servers, if you have your own ban plugin |
+| `discord-webhook`, `discord-servers` | under `[advanced]`: send chat to a Discord channel; see [Chat to Discord](docs/features.md#chat-to-discord) |
 | `control-port` | a local HTTP API on 127.0.0.1 for your servers and scripts (player ping, cross-server chat, Friends-tab listing, invites); see [control API](docs/control-api.md) |
 
 The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead of the secret file.
@@ -157,8 +165,17 @@ The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead o
 ## Commands
 
 In game, for everyone: `/server [name]`.
-In game, for the `admins` in `beacon.toml`: `/glist`, `/send <player|all|current> <server>`,
-`/broadcast [on|off]`, `/beacon reload`.
+In game, for Beacon's admins: `/glist`, `/send <player|all|current> <server>`,
+`/broadcast [on|off]`, `/beacon reload`, and [bans and mutes](docs/features.md#bans-and-mutes):
+
+```
+/ban Steve 7d griefing
+/banip Steve 30d
+/mute Steve 1h spam
+/unban Steve
+```
+
+Admins are the `admins` in `beacon.toml`, and anyone you add with `admin add <player>` in the console.
 
 In Beacon's console:
 
@@ -171,7 +188,13 @@ In Beacon's console:
 | `invites start\|stop\|status` | Xbox invites to the players `beacon scrape` found |
 | `friendadd <server>\|stop\|status` | friend requests to the players seen on a server |
 | `reload` | reread `beacon.toml` without a restart, and say what still needs one |
+| `ban`, `banip`, `mute`, `unban`, `unbanip`, `unmute`, `banlist`, `mutelist` | as in game, without the slash |
+| `admin add\|remove <player>`, `admin list` | make or unmake a Beacon admin |
+| `debug` | log packets to a file; type it alone for how, or see [Debugging](docs/debugging.md) |
 | `help` | list the commands |
+
+Running as a service, with no console? `ban`, `admin` and `debug` work through the
+[control API](docs/control-api.md) too.
 
 From a shell:
 
