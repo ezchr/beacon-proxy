@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/ezchr/beacon-proxy/internal/bridge"
+	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"os"
 	"strings"
 	"sync/atomic"
@@ -258,15 +259,12 @@ func defaultConfig() FileConfig {
 		// purpose: its default depends on the transport, and an older file may still name the
 		// address under geyser_address / nethernet_backend_address (see resolveServerAddress).
 		BackendTransport: "raknet",
-		HostName:         "Nether2Rak",
-		WorldName:        "Nether2Rak",
+		HostName:         "Beacon",
+		WorldName:        "Beacon",
 		MaxPlayers:       20,
-		// These matched the MCXboxBroadcastStandalone.jar you uploaded (Bedrock_v2168, build
-		// 149) at the time this was written. Bedrock's protocol number changes with nearly
-		// every release - CHECK Geyser's own startup log for "protocol X" and keep this in
-		// sync, or joins will fail with an outdated-client/server disconnect.
-		Protocol:                   2168,
-		Version:                    "1.26.44",
+		// What this build speaks, so that a new config never names an older game version.
+		Protocol:                   protocol.CurrentProtocol,
+		Version:                    protocol.CurrentVersion,
 		UpdateIntervalSeconds:      30,
 		Compression:                "snappy",
 		CompressionThreshold:       256,
