@@ -1,5 +1,5 @@
-// Command beacon broadcasts a locally-running Geyser instance over Xbox Live as a joinable
-// Friends-tab world, and relays real players straight into Geyser over NetherNet - without the
+// Command beacon broadcasts a Bedrock server over Xbox Live as a joinable Friends-tab world,
+// and relays real players straight into the server over NetherNet - without the
 // fake-handshake-then-TransferPacket trick MCXboxBroadcast uses. See the accompanying README
 // for the full explanation of why that distinction matters and what's still unverified.
 package main
@@ -252,7 +252,7 @@ func main() {
 	switch backendTransport {
 	case "network":
 	case "", bridge.TransportRakNet:
-		log.Info("relaying into backend over raknet", "address", cfg.GeyserAddress)
+		log.Info("relaying into backend over raknet", "address", cfg.RakNetServerAddress)
 	case bridge.TransportNetherNet, bridge.TransportNetherNetNoRelay:
 		normalized, err := bridge.NormalizeNetherNetAddress(cfg.NetherNetBackendAddress)
 		if err != nil {
@@ -433,10 +433,10 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 		}
 		// Debug-only override to force a near-immediate renewal for testing the reconnect
 		// behavior live, without waiting ~4h for a real one. Unset in normal operation.
-		if s := os.Getenv("NETHER2RAK_DEBUG_RENEW_SECONDS"); s != "" {
+		if s := os.Getenv("BEACON_DEBUG_RENEW_SECONDS"); s != "" {
 			if secs, err := strconv.Atoi(s); err == nil {
 				renewIn = time.Duration(secs) * time.Second
-				log.Warn("NETHER2RAK_DEBUG_RENEW_SECONDS override active", "renewIn", renewIn)
+				log.Warn("BEACON_DEBUG_RENEW_SECONDS override active", "renewIn", renewIn)
 			}
 		}
 		go func() {
@@ -672,7 +672,7 @@ func relayConfig(cfg FileConfig, authSession *session.Session, allowXUID func(st
 	return bridge.Config{
 		NetherNetIdentity:       identityCacheFor(authSession, log).Identity,
 		BackendTransport:        cfg.BackendTransport,
-		GeyserAddress:           cfg.GeyserAddress,
+		RakNetServerAddress:     cfg.RakNetServerAddress,
 		NetherNetBackendAddress: cfg.NetherNetBackendAddress,
 		DisableClientEncryption: cfg.DisableClientEncryption,
 		ForwardingSecret:        cfg.ForwardingSecret,
@@ -725,8 +725,7 @@ func checkOwnPresence(ctx context.Context, authSession *session.Session, xuid st
 }
 
 // tokenSource performs (or reloads a cached) Microsoft device-code login, printing the
-// "go to microsoft.com/link and enter this code" instructions to stdout - headless equivalent
-// of what auth_utils.go does with a Fyne popup, and what MCXboxBroadcast's Java logs do too.
+// "go to microsoft.com/link and enter this code" instructions to stdout.
 //
 // file is the token cache (token.json for the primary broadcast, each extra broadcast's own
 // token_file otherwise); label names the broadcast in the sign-in prompt.

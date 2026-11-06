@@ -475,7 +475,7 @@ func migrateLegacyConfig() error {
 		v.Try = []string{"main"}
 	default:
 		v.Mode = modeRelay
-		s := bridge.ServerConfig{Name: "main", Address: old.GeyserAddress, Transport: bridge.TransportRakNet}
+		s := bridge.ServerConfig{Name: "main", Address: old.RakNetServerAddress, Transport: bridge.TransportRakNet}
 		if usesNetherNet(old) {
 			s = bridge.ServerConfig{Name: "main", Address: "http://" + strings.TrimPrefix(old.NetherNetBackendAddress, "http://")}
 		}

@@ -17,17 +17,17 @@ import (
 // Other protocol versions.
 //
 // The relay decodes and encodes packets with gophertunnel's own structs, which are those of
-// protocol.CurrentProtocol (1.26.50). A peer of another version registered with RegisterProtocol
+// protocol.CurrentProtocol. A peer of another version registered with RegisterProtocol
 // (a minecraft.Protocol, as Dragonfly and gophertunnel's Listener use them) gets its packets
-// translated at the ProxyConn: ReadPackets hands out every packet in the 1.26.50 format, and
+// translated at the ProxyConn: ReadPackets hands out every packet in that format, and
 // WritePackets turns them back into the peer's format. The rest of the relay never sees another
 // version.
 //
 // Only packets whose format differs are translated (see newWire), and one that passes through the
 // relay unchanged reaches the other peer as the exact bytes it came in as: the translated copy
-// carries the original behind its length (tag/untag), so fields 1.26.50 has no place for are not
+// carries the original behind its length (tag/untag), so fields it has no place for are not
 // lost between a client and a server of the same newer version. A packet the relay changed, or
-// built itself, is translated from the 1.26.50 struct.
+// built itself, is translated from that struct.
 
 var (
 	protocolsMu sync.RWMutex

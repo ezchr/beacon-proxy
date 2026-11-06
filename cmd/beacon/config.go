@@ -13,7 +13,7 @@ import (
 type FileConfig struct {
 	// BackendTransport selects how the relay reaches the backend server:
 	//
-	//	"raknet"            - (default) any RakNet Bedrock server (Geyser, older BDS, PocketMine,
+	//	"raknet"            - any RakNet Bedrock server (older BDS, PocketMine,
 	//	                      Nukkit/PNX...), dialed at ServerAddress.
 	//	"nethernet"         - a server started with transport=nethernet, reached at
 	//	                      ServerAddress over WebRTC. The relay is then NetherNet on
@@ -38,7 +38,7 @@ type FileConfig struct {
 	// whatever BackendTransport is:
 	//
 	//	"raknet"                         - the server's RakNet (UDP) port, e.g. "127.0.0.1:19132".
-	//	                                   A Geyser listener here MUST have encryption disabled -
+	//	                                   A listener here MUST have encryption disabled -
 	//	                                   see proxy/dial.go's ForwardLogin comment.
 	//	"nethernet", "nethernet-norelay" - the server's TCP server-port, where a BDS running
 	//	                                   transport=nethernet serves /v1/join, e.g.
@@ -50,11 +50,11 @@ type FileConfig struct {
 	// Empty means the mode's default (127.0.0.1:19132 for raknet, 127.0.0.1:19134 otherwise).
 	ServerAddress string `json:"server_address"`
 
-	// GeyserAddress and NetherNetBackendAddress are what ServerAddress used to be split into, one
+	// RakNetServerAddress and NetherNetBackendAddress are what ServerAddress used to be split into, one
 	// per kind of backend. They are still read so older config files keep working (see
 	// resolveServerAddress), and after loading they hold ServerAddress in the form each transport
 	// needs, so the rest of the code reads them as before. New configs should not set them.
-	GeyserAddress           string `json:"geyser_address,omitempty"`
+	RakNetServerAddress     string `json:"geyser_address,omitempty"`
 	NetherNetBackendAddress string `json:"nethernet_backend_address,omitempty"`
 
 	// Notes are things worth telling the operator about the file that was loaded - old setting
@@ -88,9 +88,8 @@ type FileConfig struct {
 	// Example: "fake_player_drift": {"min": 16, "max": 26, "max_step": 2}. See drift.go.
 	FakePlayerDrift *PlayerDriftConfig `json:"fake_player_drift,omitempty"`
 
-	// Protocol/Version must match the Bedrock protocol Geyser is actually speaking. Check
-	// Geyser's own logs/supported-versions for the current value - this changes with every
-	// Bedrock update (see the 26.40 devlog notes about protocol drift).
+	// Protocol/Version are the Bedrock version advertised. The default is the one this build
+	// speaks; it changes with every Bedrock update.
 	Protocol int32  `json:"protocol"`
 	Version  string `json:"version"`
 
@@ -254,8 +253,8 @@ type BroadcastConfig struct {
 
 func defaultConfig() FileConfig {
 	return FileConfig{
-		// Defaults preserve the original behaviour exactly: RakNet into Geyser. The NetherNet
-		// backend is strictly opt-in via backend_transport. ServerAddress is left empty on
+		// An old JSON config with no backend_transport meant RakNet, so it still does; beacon.toml
+		// defaults to NetherNet (config_toml.go). ServerAddress is left empty on
 		// purpose: its default depends on the transport, and an older file may still name the
 		// address under geyser_address / nethernet_backend_address (see resolveServerAddress).
 		BackendTransport: "raknet",
@@ -281,7 +280,7 @@ func loadConfig(path string) (FileConfig, error) {
 		cfg := defaultConfig()
 		resolveServerAddress(&cfg, nil)
 		resolveControlPort(&cfg, nil)
-		cfg.GeyserAddress, cfg.NetherNetBackendAddress = "", "" // new files carry server_address only
+		cfg.RakNetServerAddress, cfg.NetherNetBackendAddress = "", "" // new files carry server_address only
 		out, _ := json.MarshalIndent(cfg, "", "  ")
 		_ = os.WriteFile(path, out, 0644)
 		resolveServerAddress(&cfg, nil)
@@ -319,7 +318,7 @@ func usesNetherNet(cfg FileConfig) bool {
 
 // resolveServerAddress settles the one backend address: server_address if the file sets it,
 // otherwise the older per-transport key that applies to the chosen transport, otherwise the
-// transport's default. It then fills GeyserAddress / NetherNetBackendAddress from it in the form
+// transport's default. It then fills RakNetServerAddress / NetherNetBackendAddress from it in the form
 // the transport uses, which is what the rest of the code reads. present is the set of keys in
 // the file (nil for a freshly written default) and only decides which notes are added.
 func resolveServerAddress(cfg *FileConfig, present map[string]json.RawMessage) {
@@ -332,7 +331,7 @@ func resolveServerAddress(cfg *FileConfig, present map[string]json.RawMessage) {
 	_, hasUnused := present[unusedKey]
 
 	if cfg.ServerAddress == "" {
-		legacy := cfg.GeyserAddress
+		legacy := cfg.RakNetServerAddress
 		if nether {
 			legacy = cfg.NetherNetBackendAddress
 		}
@@ -363,7 +362,7 @@ func resolveServerAddress(cfg *FileConfig, present map[string]json.RawMessage) {
 	} else {
 		// RakNet has no URL form; tolerate one pasted from a NetherNet config.
 		address = strings.TrimPrefix(strings.TrimPrefix(address, "http://"), "https://")
-		cfg.GeyserAddress = strings.TrimSuffix(address, "/")
+		cfg.RakNetServerAddress = strings.TrimSuffix(address, "/")
 	}
 }
 

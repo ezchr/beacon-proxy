@@ -35,8 +35,8 @@ func TestServerAddressUsedForEveryTransport(t *testing.T) {
 		t.Fatalf("nethernet address = %q", cfg.NetherNetBackendAddress)
 	}
 	cfg = loadFrom(t, `{"backend_transport":"raknet","server_address":"1.2.3.4:19132"}`)
-	if cfg.GeyserAddress != "1.2.3.4:19132" {
-		t.Fatalf("raknet address = %q", cfg.GeyserAddress)
+	if cfg.RakNetServerAddress != "1.2.3.4:19132" {
+		t.Fatalf("raknet address = %q", cfg.RakNetServerAddress)
 	}
 	if len(cfg.Notes) != 0 {
 		t.Fatalf("a clean config should give no notes, got %v", cfg.Notes)
@@ -55,8 +55,8 @@ func TestOldKeysStillWork(t *testing.T) {
 	}
 
 	cfg = loadFrom(t, `{"geyser_address":"10.0.0.5:19142"}`)
-	if cfg.GeyserAddress != "10.0.0.5:19142" || cfg.ServerAddress != "10.0.0.5:19142" {
-		t.Fatalf("raknet via old key: server %q geyser %q", cfg.ServerAddress, cfg.GeyserAddress)
+	if cfg.RakNetServerAddress != "10.0.0.5:19142" || cfg.ServerAddress != "10.0.0.5:19142" {
+		t.Fatalf("raknet via old key: server %q geyser %q", cfg.ServerAddress, cfg.RakNetServerAddress)
 	}
 }
 
@@ -75,15 +75,15 @@ func TestDefaultsFollowTransport(t *testing.T) {
 	if cfg := loadFrom(t, `{"backend_transport":"nethernet-norelay"}`); cfg.NetherNetBackendAddress != defaultNetherNetAddress {
 		t.Fatalf("nethernet default = %q", cfg.NetherNetBackendAddress)
 	}
-	if cfg := loadFrom(t, `{}`); cfg.GeyserAddress != defaultRakNetAddress {
-		t.Fatalf("raknet default = %q", cfg.GeyserAddress)
+	if cfg := loadFrom(t, `{}`); cfg.RakNetServerAddress != defaultRakNetAddress {
+		t.Fatalf("raknet default = %q", cfg.RakNetServerAddress)
 	}
 }
 
 func TestRakNetDropsURLScheme(t *testing.T) {
 	cfg := loadFrom(t, `{"backend_transport":"raknet","server_address":"http://1.2.3.4:19132/"}`)
-	if cfg.GeyserAddress != "1.2.3.4:19132" {
-		t.Fatalf("got %q", cfg.GeyserAddress)
+	if cfg.RakNetServerAddress != "1.2.3.4:19132" {
+		t.Fatalf("got %q", cfg.RakNetServerAddress)
 	}
 }
 
@@ -109,8 +109,8 @@ func TestFreshConfigWritesServerAddressOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.GeyserAddress != defaultRakNetAddress {
-		t.Fatalf("runtime address = %q", cfg.GeyserAddress)
+	if cfg.RakNetServerAddress != defaultRakNetAddress {
+		t.Fatalf("runtime address = %q", cfg.RakNetServerAddress)
 	}
 	b, _ := os.ReadFile(path)
 	body := string(b)

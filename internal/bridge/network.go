@@ -101,8 +101,8 @@ type ServerConfig struct {
 	// still on 1.26.50. Empty: every version the relay serves (proxy.SupportedProtocols).
 	Protocols []int32 `json:"protocols,omitempty"`
 	// Native lists the newer versions the server speaks itself. A player of any other version the
-	// server takes logs in with the relay's own (1.26.50) and the relay translates their packets,
-	// so a 1.26.50 server takes 1.26.60 players unchanged.
+	// server takes logs in with the relay's own and the relay translates their packets,
+	// so a server takes players of a version it does not speak.
 	Native []int32 `json:"native,omitempty"`
 }
 
@@ -615,7 +615,7 @@ func (n *Network) dialServer(ctx context.Context, s ServerConfig, protocolID int
 	cfg := Config{BackendTransport: s.Transport, NetherNetIdentity: n.Identity, Log: n.Log}
 	switch strings.ToLower(s.Transport) {
 	case TransportRakNet:
-		cfg.GeyserAddress = s.Address
+		cfg.RakNetServerAddress = s.Address
 	default:
 		cfg.BackendTransport = TransportNetherNet
 		cfg.NetherNetBackendAddress = s.Address

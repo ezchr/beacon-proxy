@@ -153,7 +153,7 @@ func refreshRealPlayers(ctx context.Context, cfg FileConfig) (changed bool, err 
 	n, err := bridge.BackendPlayers(ctx, bridge.Config{
 		BackendTransport:        cfg.BackendTransport,
 		NetherNetBackendAddress: cfg.NetherNetBackendAddress,
-		GeyserAddress:           cfg.GeyserAddress,
+		RakNetServerAddress:     cfg.RakNetServerAddress,
 	})
 	if err != nil {
 		return false, err
