@@ -96,12 +96,6 @@ control-port = {{.ControlPort}}
 # Let your servers share chat through the control API.
 cross-server-chat = {{.CrossServerChat}}
 
-# Send chat to a Discord channel: paste a channel webhook's address here.
-# Keep it private: anyone with it can post to the channel.
-# discord-webhook = ""
-# Which servers to send. Leave it out for all of them.
-# discord-servers = ["survival"]
-
 # Beacon's own /ban, /banip, /mute and their /un commands, for Beacon's admins, across all your
 # servers. false: Beacon leaves those commands to your servers, as for a ban plugin of your own,
 # and doesn't enforce the bans and mutes it saved. They come back if you turn it on again.

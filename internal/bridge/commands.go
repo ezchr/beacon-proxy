@@ -167,9 +167,6 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 	return encodePacket(&pk)
 }
 
-// ChatHook is told what a relayed player types in chat, before their server has any say on it.
-var ChatHook func(server, player, xuid, message string)
-
 // ReloadHook reloads beacon.toml and describes what changed (/beacon reload); set by the program.
 var ReloadHook func() []string
 

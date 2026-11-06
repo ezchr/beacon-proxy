@@ -3,10 +3,8 @@ package main
 import (
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net/http"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 )
@@ -15,8 +13,7 @@ import (
 // formatted, with rank and name) and long-polls for the lines of the other servers, which it shows
 // with a tag for the server they came from. Served on the control routes (loopback only).
 //
-//	POST /chat/send   {"server": "pvp", "text": "<formatted line>"}, and optionally "player",
-//	                  "xuid" and "message": who said what, for Discord
+//	POST /chat/send   {"server": "pvp", "text": "<formatted line>"}
 //	GET  /chat/poll?server=pvp&after=<id>   lines from the other servers after id, waiting up to
 //	                                        25 s for one; after=-1 returns only the current id.
 
@@ -41,8 +38,7 @@ type chatHub struct {
 
 var chat = &chatHub{wake: make(chan struct{})}
 
-// chatEnabled turns the /chat routes on (beacon.toml cross-server-chat); off, they exist only for a
-// Discord webhook.
+// chatEnabled turns the /chat routes on (beacon.toml cross-server-chat); off, they don't exist.
 var chatEnabled bool
 
 func (h *chatHub) add(server, text string) {
@@ -55,30 +51,6 @@ func (h *chatHub) add(server, text string) {
 	close(h.wake)
 	h.wake = make(chan struct{})
 	h.mu.Unlock()
-}
-
-// chatSenders are the servers seen sending their own chat to /chat/send. A server's own lines are
-// the better ones: they have its formatting, and it left out what it refused.
-var chatSenders sync.Map
-
-// chatSenderWait is how long a player's line waits for their server to send it itself.
-const chatSenderWait = 1500 * time.Millisecond
-
-// relayedChat takes what a relayed player typed. It counts unless the server sends its own chat,
-// which Beacon only knows once it has: the first line waits to see.
-func relayedChat(server, player, xuid, message string) {
-	slog.Info("chat", "server", server, "player", player, "message", message)
-	if _, sends := chatSenders.Load(strings.ToLower(server)); sends {
-		return
-	}
-	time.AfterFunc(chatSenderWait, func() {
-		if _, sends := chatSenders.Load(strings.ToLower(server)); sends {
-			return
-		}
-		line := player + ": " + message
-		chat.add(server, line)
-		discord.add(server, line, player, xuid, message)
-	})
 }
 
 // since returns the other servers' lines after id, the newest id, and a channel closed on the next line.
@@ -96,7 +68,7 @@ func (h *chatHub) since(server string, after int64) ([]chatLine, int64, <-chan s
 
 // serveChat handles the /chat routes, reporting whether the path was one.
 func serveChat(w http.ResponseWriter, r *http.Request) bool {
-	if !chatEnabled && !discord.on() {
+	if !chatEnabled {
 		return false
 	}
 	switch r.URL.Path {
@@ -108,10 +80,6 @@ func serveChat(w http.ResponseWriter, r *http.Request) bool {
 		var in struct {
 			Server string `json:"server"`
 			Text   string `json:"text"`
-			// Who spoke and what they said, for Discord; optional, and the XUID of Bedrock players only.
-			Player  string `json:"player"`
-			XUID    string `json:"xuid"`
-			Message string `json:"message"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 8192)).Decode(&in); err != nil || in.Server == "" || in.Text == "" {
 			http.Error(w, "want {server, text}", http.StatusBadRequest)
@@ -120,9 +88,7 @@ func serveChat(w http.ResponseWriter, r *http.Request) bool {
 		if len(in.Text) > chatMaxLen {
 			in.Text = in.Text[:chatMaxLen]
 		}
-		chatSenders.Store(strings.ToLower(in.Server), true)
 		chat.add(in.Server, in.Text)
-		discord.add(in.Server, in.Text, in.Player, in.XUID, in.Message)
 		w.WriteHeader(http.StatusNoContent)
 		return true
 	case "/chat/poll":

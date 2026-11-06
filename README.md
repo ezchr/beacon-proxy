@@ -119,8 +119,6 @@ All on by default unless noted; details in [Features](docs/features.md).
 - **Datacenter block (opt-in):** turns away joins from hosting providers' IP ranges you list.
 - **Bans and mutes:** `/ban`, `/banip` and `/mute` across all your servers, for offline players
   too, with an optional time.
-- **Chat to Discord (opt-in):** posts chat to a Discord channel under each player's name and
-  picture. Your servers need no plugin.
 - **Packet logs:** `debug Steve` writes what a player sends and gets to a file, for when something
   goes wrong in game. See [Debugging](docs/debugging.md).
 - **Skins for Java players:** uploads Bedrock skins to GeyserMC's skin API, for servers with Java
@@ -146,7 +144,6 @@ All on by default unless noted; details in [Features](docs/features.md).
 | `login-ratelimit`, `packets-per-second`, `sessions-per-ip` | limits under `[advanced]`: least milliseconds between joins from one IP, most packets per player per second, most players online from one IP; `0` means no limit |
 | `[broadcast]` | the Friends-tab side: host name, admins, friend requests; see [Friends tab](docs/friends-tab.md) |
 | `moderation` | under `[advanced]`: `false` leaves `/ban`, `/mute` and the rest to your servers, if you have your own ban plugin |
-| `discord-webhook`, `discord-servers` | under `[advanced]`: send chat to a Discord channel; see [Chat to Discord](docs/features.md#chat-to-discord) |
 | `control-port` | a local HTTP API on 127.0.0.1 for your servers and scripts (player ping, cross-server chat, Friends-tab listing, invites); see [control API](docs/control-api.md) |
 
 The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead of the secret file.

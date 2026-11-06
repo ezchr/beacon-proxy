@@ -18,7 +18,7 @@ curl 127.0.0.1:7777/listing/status
 |---|---|
 | `/ping?xuid=<xuid>` | a connected player's real round trip in ms (their device to Beacon, plus Beacon to the server), for a `/ping` command on your server. `not connected` when Beacon doesn't have them. |
 | `/listing/status`, `/listing/on`, `/listing/off` | show or hide the world on the Friends tab, like `/broadcast on\|off` (needs `listing-toggle = true`) |
-| `/chat/send`, `/chat/poll` | chat across your servers, when `cross-server-chat = true` or a Discord webhook is set: a server posts its players' messages and polls for the others'. See [Chat to Discord](features.md#chat-to-discord) for what `/chat/send` takes |
+| `/chat/send`, `/chat/poll` | chat across your servers, when `cross-server-chat = true`: a server posts its players' messages and polls for the others' |
 | `/invites/start`, `/invites/stop`, `/invites/status` | send Xbox invites to the players [`beacon scrape`](scraper.md) found (and any in `invite_queue.txt`); the console's `invites` command does the same |
 | `/invites/friends/start`, `/invites/friends/stop`, `/invites/friends/status` | invite the hosting account's own friends |
 | `/friends/add/start?from=<server or world>`, `/friends/add/stop`, `/friends/add/status` | send friend requests to the players recorded from a server or world; the console's `friendadd` does the same |

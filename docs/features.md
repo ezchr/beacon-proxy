@@ -37,8 +37,8 @@ player counts (`"players"`) or both (`"all"`).
 ## Reloading
 
 `reload` in the console, or `/beacon reload` in game for admins, rereads `beacon.toml` without a
-restart. The servers, `try`, forced hosts, admins, ping passthrough, rate limits, `moderation`,
-cross-server chat and the Discord webhook change at once; players stay where they are. It lists anything else you changed, which needs
+restart. The servers, `try`, forced hosts, admins, ping passthrough, rate limits, `moderation`
+and cross-server chat change at once; players stay where they are. It lists anything else you changed, which needs
 a restart (`mode`, `bind`, `motd`, accounts and so on).
 
 ## Game versions
@@ -152,39 +152,6 @@ If your network has its own ban plugin, set `moderation = false` under `[advance
 - keeps what it saved, so turning it back on brings those bans and mutes back.
 
 `reload` applies it. Other admin commands, such as `/send` and `/glist`, stay on.
-
-## Chat to Discord
-
-Beacon can post chat to a Discord channel, under each player's name and picture.
-
-1. In Discord, open the channel's settings, then **Integrations**, **Webhooks**, **New Webhook**,
-   and copy its URL. Keep it private: anyone who has it can post to the channel.
-2. Put it under `[advanced]` in `beacon.toml`:
-
-   ```toml
-   discord-webhook = "https://discord.com/api/webhooks/..."
-   discord-servers = ["survival"] # leave out for all servers
-   ```
-
-3. Type `reload` in the console.
-
-A server needs no plugin: in relay mode Beacon reads what players type, and also prints it to its
-log. That covers Bedrock players. Beacon sees a message before the server does, so one the server
-would refuse, such as from a player that server muted, is sent too. Players muted with Beacon's own
-`/mute` are never sent.
-
-To cover Java players as well, have the server post its own chat to Beacon. Beacon then uses that
-instead, which also leaves out what the server refused:
-
-```
-curl 127.0.0.1:7777/chat/send -d '{"server":"survival","text":"<Steve> hello","player":"Steve","xuid":"2535400000000000","message":"hello"}'
-```
-
-`server` and `text` are needed. `player` and `message` show the line under the player's name;
-`xuid` gives a Bedrock player their Xbox picture, and with none the picture is the skin's face.
-
-It only goes from the game to Discord. Colours are removed, and nothing a player types can ping
-anyone.
 
 ## Cross-server chat
 

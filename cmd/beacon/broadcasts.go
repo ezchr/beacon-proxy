@@ -150,9 +150,6 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	bridge.GamertagLookup = func(ctx context.Context, gamertag string) (string, error) {
 		return xbl.XUIDForGamertag(ctx, authSession, gamertag)
 	}
-	discord.setGamerpic(func(ctx context.Context, xuid string) (string, error) {
-		return xbl.GamerpicForXUID(ctx, authSession, xuid)
-	})
 	// The relay counts the players who joined through this world; relayless players never pass
 	// through Beacon, so there the server's own count is shown.
 	if cfg.BackendTransport != bridge.TransportNetherNetNoRelay {

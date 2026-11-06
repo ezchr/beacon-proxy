@@ -76,23 +76,21 @@ type tomlConfig struct {
 	} `toml:"broadcast"`
 
 	Advanced struct {
-		ControlPort             int      `toml:"control-port"`
-		Compression             string   `toml:"compression"`
-		CompressionThreshold    int      `toml:"compression-threshold"`
-		DisableClientEncryption bool     `toml:"disable-client-encryption"`
-		Protocol                int32    `toml:"protocol"`
-		Version                 string   `toml:"version"`
-		NetworkDir              string   `toml:"network-dir"`
-		RejoinAddress           string   `toml:"rejoin-address"`
-		CrossServerChat         bool     `toml:"cross-server-chat"`
-		Moderation              *bool    `toml:"moderation"`
-		DiscordWebhook          string   `toml:"discord-webhook"`
-		DiscordServers          []string `toml:"discord-servers"`
-		LoginRateLimit          int      `toml:"login-ratelimit"`
-		PacketsPerSecond        int      `toml:"packets-per-second"`
-		SessionsPerIP           int      `toml:"sessions-per-ip"`
-		ACMEHTTPAddress         string   `toml:"acme-http-address"`
-		FakePlayerCount         int      `toml:"fake-player-count"`
+		ControlPort             int    `toml:"control-port"`
+		Compression             string `toml:"compression"`
+		CompressionThreshold    int    `toml:"compression-threshold"`
+		DisableClientEncryption bool   `toml:"disable-client-encryption"`
+		Protocol                int32  `toml:"protocol"`
+		Version                 string `toml:"version"`
+		NetworkDir              string `toml:"network-dir"`
+		RejoinAddress           string `toml:"rejoin-address"`
+		CrossServerChat         bool   `toml:"cross-server-chat"`
+		Moderation              *bool  `toml:"moderation"`
+		LoginRateLimit          int    `toml:"login-ratelimit"`
+		PacketsPerSecond        int    `toml:"packets-per-second"`
+		SessionsPerIP           int    `toml:"sessions-per-ip"`
+		ACMEHTTPAddress         string `toml:"acme-http-address"`
+		FakePlayerCount         int    `toml:"fake-player-count"`
 		FakePlayerDrift         *struct {
 			Min     int `toml:"min"`
 			Max     int `toml:"max"`
@@ -178,7 +176,6 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.CrossServerChat = a.CrossServerChat
 	cfg.Moderation = a.Moderation == nil || *a.Moderation
-	cfg.DiscordWebhook, cfg.DiscordServers = a.DiscordWebhook, a.DiscordServers
 	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
 	case "", "off", "motd", "players", "all":

@@ -884,9 +884,6 @@ func (s *switchSession) readClient() {
 				if decodeInto(&pk, payload) == nil && pk.TextType == packet.TextTypeChat && s.mutedNow() {
 					continue
 				}
-				if ChatHook != nil && pk.TextType == packet.TextTypeChat {
-					ChatHook(s.serverName(), s.id.DisplayName, s.id.XUID, pk.Message)
-				}
 			case packet.IDCommandRequest:
 				var pk packet.CommandRequest
 				if decodeInto(&pk, payload) == nil && (s.mutedCommand(pk.CommandLine) || s.handleModeration(pk.CommandLine) || s.handleCommand(pk.CommandLine)) {
