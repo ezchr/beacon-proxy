@@ -912,6 +912,7 @@ func (s *switchSession) readClient() {
 			case packet.IDCommandRequest:
 				var pk packet.CommandRequest
 				if decodeInto(&pk, payload) == nil && (s.mutedCommand(pk.CommandLine) || s.handleModeration(pk.CommandLine) || s.handleCommand(pk.CommandLine)) {
+					s.noteStaffCommand(pk.CommandLine)
 					continue
 				}
 				// A bare /geyser is admin-only in Geyser: show players its help instead.
