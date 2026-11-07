@@ -73,6 +73,7 @@ Under `[broadcast]` in `beacon.toml`:
 |---|---|
 | `host-name` | the name shown as the world's host; default: the `motd` |
 | `server` | the server players joining through this world land on first; default: the first in `try` |
+| `player-count` | what the world's player count shows: `world` (players who joined through it, the default), `server` (everyone on its server) or `network` (everyone on every server); each extra world can set its own. A world still holds at most 30 players who joined through it |
 | `admins` | gamertags or XUIDs that may use `/glist`, `/send` and `/broadcast` |
 | `accept-friends` | accept friend requests automatically |
 | `listing-toggle` | lets admins hide worlds from the Friends tab: `/broadcast off` hides every world, `/broadcast off <world>` one (`main`, or an extra world's `name`), `/broadcast` shows which are listed. Players already in stay, and joining by IP still works |

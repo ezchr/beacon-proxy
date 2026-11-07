@@ -69,3 +69,14 @@ func serverPlayers(ctx context.Context, s ServerConfig) (int, error) {
 	}
 	return entry.Players, nil
 }
+
+// ServerPlayerCount is one server's own player count, for player-count = "server".
+func (n *Network) ServerPlayerCount(ctx context.Context, name string) (int, error) {
+	s := n.conf().server(name)
+	if s == nil {
+		return 0, fmt.Errorf("no server called %q", name)
+	}
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	return serverPlayers(ctx, *s)
+}

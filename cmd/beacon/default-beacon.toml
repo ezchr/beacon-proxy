@@ -67,8 +67,9 @@ accept-friends = {{.AcceptFriends}}
 listing-toggle = {{.ListingToggle}}
 
 # What the Friends tab's player count shows: "world" (the players who joined through that world) or,
-# with several servers, "network" (everyone on every server, however they joined). Either way a
-# world still holds at most 30 players who joined through it.
+# with several servers, "server" (everyone on the world's server) or "network" (everyone on every
+# server). Each extra world can set its own. Either way a world holds at most 30 players who
+# joined through it.
 player-count = {{q (or .PlayerCount "world")}}
 
 # With several servers: where players joining through this world land first, one of the names
@@ -98,6 +99,9 @@ version = {{q .Version}}
 {{- end}}
 # Where players joining through this world land first. Empty: the first in try.
 server = {{q .Server}}
+# This world's player count: "world", "server" or "network" (see [broadcast]). Empty: the same as
+# [broadcast].
+player-count = {{q .PlayerCount}}
 {{- end}}
 
 [advanced]

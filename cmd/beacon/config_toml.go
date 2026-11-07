@@ -75,6 +75,7 @@ type tomlConfig struct {
 			Protocol      int32  `toml:"protocol"`
 			Version       string `toml:"version"`
 			Server        string `toml:"server"`
+			PlayerCount   string `toml:"player-count"`
 		} `toml:"extra"`
 	} `toml:"broadcast"`
 
@@ -150,12 +151,11 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.ListingToggle = t.Broadcast.ListingToggle
 	cfg.AllowedXUIDs = t.Broadcast.AllowedXUIDs
 	cfg.FirstServer = t.Broadcast.Server
-	switch pc := strings.ToLower(strings.TrimSpace(t.Broadcast.PlayerCount)); pc {
-	case "", "world", "network":
-		cfg.PlayerCount = pc
-	default:
-		return FileConfig{}, fmt.Errorf("[broadcast] player-count = %q: use \"world\" or \"network\"", t.Broadcast.PlayerCount)
+	pc, err := playerCountMode(t.Broadcast.PlayerCount)
+	if err != nil {
+		return FileConfig{}, fmt.Errorf("[broadcast] %w", err)
 	}
+	cfg.PlayerCount = pc
 	if t.Broadcast.UpdateInterval > 0 {
 		cfg.UpdateIntervalSeconds = t.Broadcast.UpdateInterval
 	}
@@ -164,10 +164,14 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 		if name == "" {
 			name = fmt.Sprintf("extra-%d", i+1)
 		}
+		pc, err := playerCountMode(e.PlayerCount)
+		if err != nil {
+			return FileConfig{}, fmt.Errorf("[[broadcast.extra]] %s: %w", name, err)
+		}
 		cfg.ExtraBroadcasts = append(cfg.ExtraBroadcasts, BroadcastConfig{
 			Name: name, TokenFile: e.TokenFile, HostName: e.HostName, WorldName: e.WorldName,
 			Invites: e.Invites, NoFriendAccept: e.AcceptFriends != nil && !*e.AcceptFriends,
-			Protocol: e.Protocol, Version: e.Version, Server: e.Server,
+			Protocol: e.Protocol, Version: e.Version, Server: e.Server, PlayerCount: pc,
 		})
 	}
 
@@ -499,4 +503,14 @@ func migrateLegacyConfig() error {
 		return err
 	}
 	return os.Rename(legacyConfigFile, legacyConfigFile+".migrated")
+}
+
+// playerCountMode checks a player-count setting: "world", "server" or "network" (empty: unset).
+func playerCountMode(v string) (string, error) {
+	switch pc := strings.ToLower(strings.TrimSpace(v)); pc {
+	case "", "world", "server", "network":
+		return pc, nil
+	default:
+		return "", fmt.Errorf("player-count = %q: use \"world\", \"server\" or \"network\"", v)
+	}
 }

@@ -189,9 +189,13 @@ type FileConfig struct {
 	// DefaultServer). Set per world with `server` under [broadcast] or [[broadcast.extra]].
 	FirstServer string `json:"-"`
 	// PlayerCount is what the Friends tab counts: "world" (default) the players who joined through
-	// that world, "network" every player on every server behind the relay.
+	// that world, "server" the players on the world's server, "network" every player on every server
+	// behind the relay. Each extra world can set its own.
 	PlayerCount string `json:"player_count,omitempty"`
-	NetworkDir  string `json:"network_dir,omitempty"`
+	// ReadPlayers is this broadcast's server count as last read ("server"/"network" modes, or a
+	// relayless backend); -1 until read. Set per broadcast by runBroadcast.
+	ReadPlayers *atomic.Int64 `json:"-"`
+	NetworkDir  string        `json:"network_dir,omitempty"`
 
 	// TLSDomain (an automatic Let's Encrypt certificate) or TLSCert and TLSKey (files) make the
 	// direct-IP door answer HTTPS too (tlsconfig.go); beacon.toml only.
@@ -251,6 +255,8 @@ type BroadcastConfig struct {
 	// Server is where players joining through this world land first. Default: the network's
 	// default server.
 	Server string `json:"server,omitempty"`
+	// PlayerCount is this world's own player-count mode; empty: the one under [broadcast].
+	PlayerCount string `json:"player_count,omitempty"`
 	// NoFriendAccept: as FileConfig.NoFriendAccept, for this broadcast's account. Not inherited
 	// from the primary - each account's friends list is its own.
 	NoFriendAccept bool `json:"no_friend_accept"`

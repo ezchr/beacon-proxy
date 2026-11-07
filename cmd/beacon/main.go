@@ -619,14 +619,14 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 					continue
 				}
 				if countFailing {
-					log.Info("reading the backend's player count again", "players", realPlayers.Load())
+					log.Info("reading the backend's player count again", "players", readPlayers(cfg).Load())
 					countFailing = false
 				}
 				if !changed {
 					continue
 				}
 				log.Info("backend player count changed, updating the Friends tab",
-					"players", realPlayers.Load(), "advertised", advertisedPlayers(cfg))
+					"players", readPlayers(cfg).Load(), "advertised", advertisedPlayers(cfg))
 				xblSession.SetWorldInfo(worldInfo())
 				if err := xblSession.Update(sessionCtx); err != nil {
 					log.Error("failed to update session with the new player count", "err", err)

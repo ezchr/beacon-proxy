@@ -174,7 +174,8 @@ func accountsAdd(name string, log *slog.Logger) error {
 	}
 
 	block := fmt.Sprintf("\n# Added by beacon accounts add (%s).\n[[broadcast.extra]]\nname = %s\ntoken-file = %s\n"+
-		"# With several servers: where players joining through this world land first. Empty: the first in try.\nserver = \"\"\n",
+		"# With several servers: where players joining through this world land first. Empty: the first in try.\nserver = \"\"\n"+
+		"# This world's player count: \"world\", \"server\" or \"network\". Empty: the same as [broadcast].\nplayer-count = \"\"\n",
 		gamertag, tomlQuote(name), tomlQuote(file))
 	f, err := os.OpenFile(tomlConfigFile, os.O_APPEND|os.O_WRONLY, 0o644)
 	if err != nil {

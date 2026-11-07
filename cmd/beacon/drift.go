@@ -1,6 +1,7 @@
 package main
 
 import (
+	"cmp"
 	"context"
 	"math/rand/v2"
 	"sync"
@@ -127,7 +128,7 @@ func advertisedPlayers(cfg FileConfig) int {
 	}
 	// Relayless: the backend's count, as last read by refreshRealPlayers. Unknown (never read yet)
 	// and 0 both show as 1.
-	return max(int(realPlayers.Load()), 1)
+	return max(int(readPlayers(cfg).Load()), 1)
 }
 
 // realPlayerPollInterval is how often the backend's real player count is read when it is the one
@@ -150,12 +151,18 @@ func advertisesRealPlayers(cfg FileConfig) bool {
 
 // refreshRealPlayers reads the backend's player count and reports whether it changed.
 func refreshRealPlayers(ctx context.Context, cfg FileConfig) (changed bool, err error) {
-	if countsNetwork(cfg) {
-		n, err := network.PlayerCount(ctx)
+	if countsNetwork(cfg) || countsServer(cfg) {
+		var n int
+		var err error
+		if countsNetwork(cfg) {
+			n, err = network.PlayerCount(ctx)
+		} else {
+			n, err = network.ServerPlayerCount(ctx, cmp.Or(cfg.FirstServer, network.DefaultServer()))
+		}
 		if err != nil {
 			return false, err
 		}
-		return realPlayers.Swap(int64(n)) != int64(n), nil
+		return readPlayers(cfg).Swap(int64(n)) != int64(n), nil
 	}
 	n, err := bridge.BackendPlayers(ctx, bridge.Config{
 		BackendTransport:        cfg.BackendTransport,
@@ -165,11 +172,26 @@ func refreshRealPlayers(ctx context.Context, cfg FileConfig) (changed bool, err 
 	if err != nil {
 		return false, err
 	}
-	return realPlayers.Swap(int64(n)) != int64(n), nil
+	return readPlayers(cfg).Swap(int64(n)) != int64(n), nil
 }
 
 // countsNetwork reports whether the Friends tab shows every player on the network (player-count =
 // "network", with a [servers] list) instead of the players who joined through that world.
 func countsNetwork(cfg FileConfig) bool {
 	return cfg.PlayerCount == "network" && network != nil
+}
+
+// countsServer reports whether the Friends tab shows the players on the world's own server
+// (player-count = "server", with a [servers] list).
+func countsServer(cfg FileConfig) bool {
+	return cfg.PlayerCount == "server" && network != nil
+}
+
+// readPlayers is where this broadcast keeps the count it reads; the process-wide one for a config
+// that never went through runBroadcast.
+func readPlayers(cfg FileConfig) *atomic.Int64 {
+	if cfg.ReadPlayers != nil {
+		return cfg.ReadPlayers
+	}
+	return &realPlayers
 }

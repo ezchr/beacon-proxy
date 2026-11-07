@@ -92,6 +92,9 @@ func (b BroadcastConfig) forBroadcast(cfg FileConfig) FileConfig {
 	cfg.BroadcastName, cfg.InvitesEnabled = b.Name, b.Invites
 	cfg.NoFriendAccept = b.NoFriendAccept
 	cfg.FirstServer = b.Server
+	if b.PlayerCount != "" {
+		cfg.PlayerCount = b.PlayerCount
+	}
 	if b.Protocol != 0 {
 		cfg.Protocol, cfg.Version = b.Protocol, b.Version
 		if cfg.Version == "" {
@@ -153,7 +156,9 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	}
 	// The relay counts the players who joined through this world; relayless players never pass
 	// through Beacon, so there the server's own count is shown.
-	if cfg.BackendTransport != bridge.TransportNetherNetNoRelay && !countsNetwork(cfg) {
+	cfg.ReadPlayers = new(atomic.Int64)
+	cfg.ReadPlayers.Store(-1)
+	if cfg.BackendTransport != bridge.TransportNetherNetNoRelay && !countsNetwork(cfg) && !countsServer(cfg) {
 		cfg.WorldPlayers = new(atomic.Int64)
 	}
 	if !proxy.Supported(cfg.Protocol) {
