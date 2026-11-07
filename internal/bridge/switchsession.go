@@ -44,6 +44,8 @@ type switchSession struct {
 	reply func(string)
 	// limited marks a stand-in session (reply) as a moderator's (ModerateAs).
 	limited bool
+	// keepTags keeps the colour tags in what a stand-in session says (the Java proxy shows them).
+	keepTags bool
 	// rejoining is set once the player is being sent to join again (record).
 	rejoining atomic.Bool
 
@@ -358,6 +360,10 @@ func (s *switchSession) disconnect(msg string) {
 // message sends the player a system chat line.
 func (s *switchSession) message(format string, a ...any) {
 	if s.reply != nil {
+		if s.keepTags {
+			s.reply(fmt.Sprintf(format, a...))
+			return
+		}
 		s.reply(modTags.ReplaceAllString(fmt.Sprintf(format, a...), ""))
 		return
 	}

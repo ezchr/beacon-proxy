@@ -157,6 +157,25 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case path == "/packetdebug":
 		_, _ = io.WriteString(w, strings.Join(bridge.DebugCommand(r.URL.Query().Get("cmd")), "\n")+"\n")
 		return
+	case path == "/broadcast/run":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		lines, ok := network.RunBroadcast(r.URL.Query().Get("args"), r.URL.Query().Get("by"))
+		if !ok {
+			http.Error(w, "listing-toggle is off", http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, strings.Join(lines, "\n")+"\n")
+		return
+	case path == "/broadcast/worlds":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, strings.Join(network.BroadcastWorlds(), "\n")+"\n")
+		return
 	case path == "/glist":
 		if network == nil {
 			http.Error(w, "needs relay mode", http.StatusNotFound)

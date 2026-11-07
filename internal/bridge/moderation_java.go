@@ -113,7 +113,7 @@ func (n *Network) ModerateAs(line, by string, moderator bool) []string {
 			}
 		}
 	}
-	s := &switchSession{n: n, reply: say, limited: moderator}
+	s := &switchSession{n: n, reply: say, limited: moderator, keepTags: true}
 	s.id.DisplayName = by
 	s.id.XUID = "java:" + strings.ToLower(by) // who made what they do (moderators.go)
 	if !s.handleModeration(line) && len(out) == 0 {
@@ -124,3 +124,23 @@ func (n *Network) ModerateAs(line, by string, moderator bool) []string {
 
 // isJavaKey reports whether a list key is a Java player's.
 func isJavaKey(key string) bool { return strings.HasPrefix(key, "java:") }
+
+// RunBroadcast runs /broadcast for an admin the Java proxy let use it, exactly as Beacon's own
+// /broadcast does, and returns what it says; false when Beacon has no Friends-tab listing switch.
+func (n *Network) RunBroadcast(args, by string) ([]string, bool) {
+	var out []string
+	s := &switchSession{n: n, reply: func(m string) { out = append(out, m) }, keepTags: true}
+	s.id.DisplayName = by
+	if !s.handleCommand("broadcast " + args) {
+		return nil, false
+	}
+	return out, true
+}
+
+// BroadcastWorlds are the world names /broadcast takes, for a Java proxy's suggestions.
+func (n *Network) BroadcastWorlds() []string {
+	if n.Listing == nil {
+		return nil
+	}
+	return n.Listing.Worlds()
+}

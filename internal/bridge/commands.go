@@ -269,7 +269,7 @@ func (s *switchSession) handleCommand(line string) bool {
 		if s.n.Listing == nil {
 			return false
 		}
-		if !s.isAdmin() {
+		if s.reply == nil && !s.isAdmin() { // a stand-in (RunBroadcast) was let through by the Java proxy
 			s.message("<red>You don't have permission to use this command.</red>")
 			return true
 		}
