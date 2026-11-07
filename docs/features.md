@@ -123,6 +123,13 @@ Beacon's admins have these across the whole network, in relay mode. There's noth
   ban an Xbox player who has never joined, use `/ban xbox:Gamertag`.
 - **Console:** all of these work there without the slash, and through the
   [control API](control-api.md). The console can also ban an admin, which an admin in game can't.
+- **Java players** (crossplay behind a Java proxy such as Velocity): the proxy can ask Beacon at
+  each Java login and every few seconds after, through the control API's `/moderation/java/...`
+  routes, so the same list covers them. A Java player who logged in is then found by name like a
+  Bedrock player; when a Bedrock player has the same name, `/ban java:Steve` means the Java one.
+  Java names prove nothing on an offline-mode server, so no Java player counts as an admin, and an
+  address ban stops them all. The proxy can pass its own admins' commands to `/moderation` with
+  `&by=<name>`; those can't ban Beacon's admins.
 - **An address ban** doesn't stop admins, so one on a shared address can't lock them out.
 
 For admins these replace a server's commands of the same name. Everyone else still gets the

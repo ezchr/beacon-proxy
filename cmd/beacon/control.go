@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"log/slog"
 	"net"
@@ -113,7 +114,39 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, "needs relay mode", http.StatusNotFound)
 			return
 		}
-		_, _ = io.WriteString(w, strings.Join(network.Moderate(r.URL.Query().Get("cmd")), "\n")+"\n")
+		// by: the name of who runs it, when the Java proxy passes on an admin's command.
+		_, _ = io.WriteString(w, strings.Join(network.ModerateAs(r.URL.Query().Get("cmd"), r.URL.Query().Get("by")), "\n")+"\n")
+		return
+	case path == "/moderation/java/login":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		q := r.URL.Query()
+		msg, banned := network.JavaLogin(q.Get("uuid"), q.Get("name"), q.Get("ip"))
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"banned": banned, "message": msg})
+		return
+	case path == "/moderation/java/state":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		var players []struct {
+			UUID string `json:"uuid"`
+			Name string `json:"name"`
+			IP   string `json:"ip"`
+		}
+		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&players); err != nil {
+			http.Error(w, "send a JSON list of {uuid, name, ip}", http.StatusBadRequest)
+			return
+		}
+		list := make([]bridge.JavaPlayer, 0, len(players))
+		for _, p := range players {
+			list = append(list, bridge.JavaPlayer{UUID: p.UUID, Name: p.Name, IP: p.IP})
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(network.JavaState(list))
 		return
 	case path == "/packetdebug":
 		_, _ = io.WriteString(w, strings.Join(bridge.DebugCommand(r.URL.Query().Get("cmd")), "\n")+"\n")

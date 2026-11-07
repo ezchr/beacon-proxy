@@ -391,6 +391,9 @@ type modTarget struct {
 // Java player, who never comes through here and could share a name with a stranger's Xbox account,
 // so Xbox Live is only asked with xbox:<gamertag>.
 func (n *Network) findTarget(name string) (modTarget, bool) {
+	if javaName, ok := strings.CutPrefix(name, "java:"); ok {
+		return n.findJava(javaName) // only the Java player of that name (moderation_java.go)
+	}
 	if gamertag, ok := strings.CutPrefix(name, "xbox:"); ok {
 		if GamertagLookup == nil {
 			return modTarget{}, false
@@ -418,7 +421,7 @@ func (n *Network) findTarget(name string) (modTarget, bool) {
 	if seen {
 		return modTarget{xuid: p.XUID, name: p.Name, ip: p.IP}, true
 	}
-	return modTarget{}, false
+	return n.findJava(name) // a Java player seen through the Java proxy
 }
 
 // remoteIP is the player's address.
@@ -588,7 +591,7 @@ func (s *switchSession) punish(kind, who string, args []string) bool {
 		s.message("<yellow>Beacon doesn't know %s, so this only goes to your server. For an Xbox player who never joined, use xbox:%s.</yellow>", who, who)
 		return false
 	}
-	if s.reply == nil && s.n.IsAdmin(t.xuid, t.name) { // the console may
+	if s.reply == nil && !isJavaKey(t.xuid) && s.n.IsAdmin(t.xuid, t.name) { // the console may; a Java name proves nothing
 		s.message("<red>%s is an admin.</red>", t.name)
 		return true
 	}
@@ -685,7 +688,7 @@ func (s *switchSession) banIP(who string, args []string) {
 		s.message("<red>That is your own address.</red>")
 		return
 	}
-	if t.xuid != "" && s.n.IsAdmin(t.xuid, t.name) {
+	if t.xuid != "" && !isJavaKey(t.xuid) && s.n.IsAdmin(t.xuid, t.name) {
 		s.message("<red>%s is an admin.</red>", t.name)
 		return
 	}

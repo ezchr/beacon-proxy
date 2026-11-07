@@ -24,7 +24,9 @@ curl 127.0.0.1:7777/listing/status
 | `/invites/friends/start`, `/invites/friends/stop`, `/invites/friends/status` | invite the hosting account's own friends |
 | `/friends/add/start?from=<server or world>`, `/friends/add/stop`, `/friends/add/status` | send friend requests to the players recorded from a server or world; the console's `friendadd` does the same |
 | `/broadcast/<name>/invites/...` | the invite routes for an extra hosting account, if it has `invites = true` |
-| `/moderation?cmd=<command>` | a moderation or `admin` command, as in the console; see below |
+| `/moderation?cmd=<command>` | a moderation or `admin` command, as in the console; see below. Add `&by=<name>` to run it for someone a Java proxy let use it: their name goes on what they do, and they can't ban or mute Beacon's admins |
+| `/moderation/java/login?uuid=&name=&ip=` | for a Java proxy: notes a Java player logging in and answers `{"banned", "message"}` |
+| `/moderation/java/state` | for a Java proxy: POST a JSON list of the Java players on, `[{"uuid", "name", "ip"}]`; answers the ones banned (`ban`, the message to remove them with) or muted (`mute`, the time left), by UUID |
 | `/packetdebug?cmd=<what>` | packet logging, like the `debug` console command; see [Debugging](debugging.md) |
 | `/debug/pprof/...` | Go's profiler, only when Beacon runs with `-debug` |
 
