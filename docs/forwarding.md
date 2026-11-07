@@ -1,13 +1,18 @@
 # Player-info forwarding
 
-In relay mode your servers run with their own Xbox check off, because the login they get is
-Beacon's, not the player's. Beacon has already checked the player, but the server can't tell
-Beacon's login from one anybody else sends it. So Beacon signs each login with a secret only it and
-your servers know, and a server that checks the signature refuses every login that did not come
-through Beacon. It is the Bedrock version of Velocity's modern forwarding.
+In relay mode your servers get Beacon's login, not the player's. Forwarding is how Beacon tells a
+server who the player really is, and proves the login came through Beacon. Each server in
+`beacon.toml` picks one of two ways with `forwarding`:
 
-Endstone servers can use Endstone's own check instead, which also gives the server the player's
-real XUID: see [Real XUIDs on Endstone](../README.md#real-xuids-on-endstone-without-xuidforward).
+| `forwarding` | What the server gets | For |
+|---|---|---|
+| left out (or `"beacon"`) | Beacon's login, signed with `forwarding.secret` (this page) | Dragonfly, Geyser, BDS with xuidforward; servers that don't check it ignore it |
+| `"endstone"` | the player's own login, re-signed with Beacon's key, which the server trusts like Microsoft's | BDS with Endstone 0.12 or newer; see [Endstone 0.12 and newer](../README.md#endstone-012-and-newer) |
+
+The rest of this page is about the first: the server runs with its own Xbox check off, and Beacon
+signs each login with a secret only it and your servers know, so a server that checks the
+signature refuses every login that did not come through Beacon. It is the Bedrock version of
+Velocity's modern forwarding.
 
 ## Do you need it?
 

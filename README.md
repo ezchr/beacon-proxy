@@ -44,7 +44,7 @@ accept Beacon's login: turn its own Xbox check off. Beacon has already checked t
 
 | Server | Setting |
 |---|---|
-| BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) ([below](#bds-in-relay-mode-needs-xuidforward)). Next to other kinds of servers, also `block-network-ids-are-hashes=false`: players can't move between servers that number blocks differently. |
+| BDS | `online-mode=false` in `server.properties` (`true` with `forwarding = "endstone"`), and see [Forwarding](#forwarding-who-the-player-is) for players' XUIDs. Next to other kinds of servers, also `block-network-ids-are-hashes=false`: players can't move between servers that number blocks differently. |
 | Dragonfly | `AuthEnabled = false` under `[Server]` |
 | Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working |
 
@@ -82,6 +82,25 @@ ufw allow from 203.0.113.5
 If you can add code to the server, also have it check Beacon's signature on each login (see
 [forwarding](docs/forwarding.md)); then even a connection that gets past the firewall is refused.
 
+### Server options
+
+A server is either just its address, or a table with more options:
+
+```toml
+[servers]
+lobby = "127.0.0.1:19133"
+survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
+```
+
+| Option | Meaning |
+|---|---|
+| `address` | where Beacon reaches the server (`host:port`); the only one you must give |
+| `forwarding` | how the server learns who the player is: leave it out for Beacon's signature, or `"endstone"`. See [Forwarding](#forwarding-who-the-player-is). |
+| `resource-packs` | `false` leaves the server's resource packs out of what players get ([below](#leaving-out-a-servers-resource-packs)) |
+| `transport` | `"nethernet"` (default) or `"raknet"`, for a server that only speaks RakNet |
+| `protocols` | the game versions (protocol numbers) the server takes, e.g. `[2193]`; leave it out for every version Beacon serves |
+| `native` | newer versions the server speaks itself; players on the other versions it takes are translated by Beacon |
+
 ### Leaving out a server's resource packs
 
 Players get every server's resource packs when they join. To leave one server's packs out (say an
@@ -95,45 +114,59 @@ old = { address = "127.0.0.1:19134", resource-packs = false }
 
 Its blocks and items still work; they are drawn by the other servers' packs.
 
-### Real XUIDs on Endstone, without xuidforward
+### Forwarding: who the player is
 
-Endstone 0.12 and newer can trust a proxy's own signing key beside Microsoft's
-(`[proxies.endgate]` in `endstone.toml`). Point Beacon at it with `forwarding = "endstone"`:
+Your server only sees Beacon's login, so Beacon also tells it who the player really is. How depends
+on the server, set per server with `forwarding`:
 
-```toml
-[servers]
-survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
-```
+| Your server | `forwarding` | Also do | Players' real XUID |
+|---|---|---|---|
+| Dragonfly, Geyser | leave it out | nothing (Dragonfly can also [check Beacon's signature](docs/forwarding.md)) | yes |
+| BDS with Endstone 0.12 or newer | `"endstone"` | [install Beacon's key](#endstone-012-and-newer) | yes |
+| BDS with an older Endstone | leave it out | install [xuidforward](#older-endstone-xuidforward) | yes |
+| BDS without Endstone | leave it out | nothing possible | no ([why](#bds-without-endstone)) |
 
-At its first use Beacon makes `endstone-forwarding.pem` in its folder. Copy it to the server as
-`keys/forwarding_key.pem`, set `online-mode=true` in its `server.properties`, and in its
-`endstone.toml`:
+#### Leaving it out: Beacon's signature
 
-```toml
-[proxies.endgate]
-enabled = true
-forwarding-key-file = "keys/forwarding_key.pem"
-```
+Beacon signs every login with the secret in `forwarding.secret`. A server that checks it (Dragonfly
+with Beacon's Go package, xuidforward) refuses any login that didn't come through Beacon; one that
+doesn't simply ignores it. Details and the format: [forwarding](docs/forwarding.md).
 
-The server then checks each login like an online one: players keep their real XUID (ops,
-permissions, allowlist and plugins work) and their own address, and it refuses any login that
-didn't come through Beacon. Keep `endstone-forwarding.key` private: it is what signs the logins.
-xuidforward isn't needed on such a server.
+#### Endstone 0.12 and newer
 
-### BDS in relay mode needs xuidforward
+Endstone 0.12 can trust a proxy's own key beside Microsoft's (`[proxies.endgate]` in
+`endstone.toml`), so the server checks each login like any online one and keeps everything that
+goes by XUID: ops, permissions, the allowlist and plugins. No plugin needed.
 
-This is only for **relay mode**. If you just want your BDS on the Friends tab, use
-[relayless mode](#without-server-switching-relayless-mode): players log in to BDS themselves and
-keep their data, with nothing to install.
+1. Set the server to `forwarding = "endstone"` in `beacon.toml` and start Beacon. It makes
+   `endstone-forwarding.pem` in its folder.
+2. Copy that file to the server as `keys/forwarding_key.pem`.
+3. In the server's `server.properties`, set `online-mode=true`.
+4. In the server's `endstone.toml`:
 
-On Endstone 0.12 and newer, use [`forwarding = "endstone"`](#real-xuids-on-endstone-without-xuidforward)
-instead.
+   ```toml
+   [proxies.endgate]
+   enabled = true
+   forwarding-key-file = "keys/forwarding_key.pem"
+   ```
 
-In relay mode, BDS throws away the Xbox ID (XUID) of Beacon's login, so without help every player
-starts with fresh, empty data each time they join. Install
-[xuidforward](https://github.com/ezchr/xuidforward), an Endstone plugin by Beacon's author, version
-1.0.5 or newer, and give it the same `forwarding.secret` (its README shows how). Dragonfly and Geyser
-keep the XUID on their own.
+The server now refuses any login that didn't come through Beacon (the message names endgate, the
+proxy Endstone wrote this for; Beacon uses the same format) and sees players' own IP addresses.
+Keep `endstone-forwarding.key`, next to Beacon, private: it is what signs the logins.
+
+#### Older Endstone: xuidforward
+
+Install [xuidforward](https://github.com/ezchr/xuidforward), an Endstone plugin by Beacon's author,
+version 1.0.5 or newer, and give it the same `forwarding.secret` (its README shows how). Keep
+`online-mode=false`.
+
+#### BDS without Endstone
+
+Plain BDS throws away the XUID of a login it didn't get from Microsoft. Beacon gives each player the
+same stand-in ID every time, so their saves stay, but anything that goes by XUID (ops and
+permissions by XUID, the allowlist) doesn't work, and a player who once joined the server directly
+has separate saves there. If you need XUIDs without Endstone and don't need `/server` switching, use
+[relayless mode](#without-server-switching-relayless-mode): players log in to BDS themselves.
 
 ## Without server switching (relayless mode)
 
@@ -179,7 +212,7 @@ All on by default unless noted; details in [Features](docs/features.md).
 | `bind` | where players join by IP, e.g. `"0.0.0.0:19132"`. Empty: Friends tab only. |
 | `motd` | the world name on the Friends tab and server list |
 | `forwarding-secret-file` | the secret Beacon signs logins to your servers with; see [forwarding](docs/forwarding.md) |
-| `[servers]` | your servers, and `try`: the order players join in. If one can't be joined, the next is tried; if a player's server stops, they're moved to another one. |
+| `[servers]` | your servers ([options](#server-options)), and `try`: the order players join in. If one can't be joined, the next is tried; if a player's server stops, they're moved to another one. |
 | `[forced-hosts]` | players who join by a given address get their own order, e.g. `"pvp.example.com" = ["pvp"]` |
 | `ping-passthrough` | what the server list takes from your first server: `"off"`, `"motd"`, `"players"` or `"all"` |
 | `login-ratelimit`, `packets-per-second`, `sessions-per-ip` | limits under `[advanced]`: least milliseconds between joins from one IP, most packets per player per second, most players online from one IP; `0` means no limit |
