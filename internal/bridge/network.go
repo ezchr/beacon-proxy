@@ -40,6 +40,9 @@ type Network struct {
 	// packGen counts the changes to the servers' resource packs: a client logged in before the
 	// last one has old packs.
 	packGen atomic.Uint64
+	// rejoinTo holds, by XUID, the server a player was moving to when sent to join again for new
+	// resource packs (switchSession.record): they land there when they are back, not on the default.
+	rejoinTo sync.Map // xuid -> rejoinTarget
 
 	// Servers in order; Default is where players join. Each needs a relay-mode door (a backend that
 	// accepts the relay's re-signed logins).
@@ -1210,4 +1213,33 @@ func withoutItemIcon(data map[string]any) map[string]any {
 	}
 	out["components"] = nc
 	return out
+}
+
+// rejoinTarget is where a player sent to join again for new packs was going, until when.
+type rejoinTarget struct {
+	server string
+	until  time.Time
+}
+
+// rejoinWindow is how long the server a player was moving to is kept for their join again.
+const rejoinWindow = 2 * time.Minute
+
+// rememberRejoin keeps server as where xuid lands on joining again within rejoinWindow.
+func (n *Network) rememberRejoin(xuid, server string) {
+	if xuid != "" && server != "" {
+		n.rejoinTo.Store(xuid, rejoinTarget{server: server, until: time.Now().Add(rejoinWindow)})
+	}
+}
+
+// takeRejoin returns, once, the server xuid was moving to when sent to join again, if still fresh.
+func (n *Network) takeRejoin(xuid string) string {
+	v, ok := n.rejoinTo.LoadAndDelete(xuid)
+	if !ok {
+		return ""
+	}
+	t := v.(rejoinTarget)
+	if time.Now().After(t.until) {
+		return ""
+	}
+	return t.server
 }

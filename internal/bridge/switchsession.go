@@ -321,6 +321,7 @@ func (s *switchSession) record(server string, id uint32, payload []byte) {
 		return
 	}
 	s.log.Info("network: server has new resource packs, the player joins again to download them", "server", server)
+	s.n.rememberRejoin(s.id.XUID, server)
 	go s.rejoin()
 }
 
@@ -373,8 +374,12 @@ func (s *switchSession) join() error {
 	}
 	s.palette = u.palette
 
-	order := s.n.withFirstServer(s.n.joinOrder(s.proto, s.cd.ServerAddress), s.cfg.FirstServer, s.proto)
-	s.log.Info("network: join order", "first", s.cfg.FirstServer, "order", serverNames(order))
+	first := s.cfg.FirstServer
+	if back := s.n.takeRejoin(s.id.XUID); back != "" {
+		first = back // joining again for new packs: back to the server they were moving to
+	}
+	order := s.n.withFirstServer(s.n.joinOrder(s.proto, s.cd.ServerAddress), first, s.proto)
+	s.log.Info("network: join order", "first", first, "order", serverNames(order))
 	if len(order) == 0 {
 		return fmt.Errorf("no server here supports %s yet", proxy.VersionName(s.proto))
 	}
