@@ -64,6 +64,7 @@ type tomlConfig struct {
 		AllowedXUIDs   []string `toml:"allowed-xuids"`
 		UpdateInterval int      `toml:"update-interval-seconds"`
 		Server         string   `toml:"server"`
+		PlayerCount    string   `toml:"player-count"`
 		Extra          []struct {
 			Name          string `toml:"name"`
 			TokenFile     string `toml:"token-file"`
@@ -149,6 +150,12 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.ListingToggle = t.Broadcast.ListingToggle
 	cfg.AllowedXUIDs = t.Broadcast.AllowedXUIDs
 	cfg.FirstServer = t.Broadcast.Server
+	switch pc := strings.ToLower(strings.TrimSpace(t.Broadcast.PlayerCount)); pc {
+	case "", "world", "network":
+		cfg.PlayerCount = pc
+	default:
+		return FileConfig{}, fmt.Errorf("[broadcast] player-count = %q: use \"world\" or \"network\"", t.Broadcast.PlayerCount)
+	}
 	if t.Broadcast.UpdateInterval > 0 {
 		cfg.UpdateIntervalSeconds = t.Broadcast.UpdateInterval
 	}
@@ -390,6 +397,7 @@ type templateValues struct {
 	AcceptFriends              bool
 	ListingToggle              bool
 	Server                     string
+	PlayerCount                string
 	Extra                      []BroadcastConfig
 	ControlPort                int
 	DisableClientEncryption    bool

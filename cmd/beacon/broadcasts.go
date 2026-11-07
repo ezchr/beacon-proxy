@@ -153,7 +153,7 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	}
 	// The relay counts the players who joined through this world; relayless players never pass
 	// through Beacon, so there the server's own count is shown.
-	if cfg.BackendTransport != bridge.TransportNetherNetNoRelay {
+	if cfg.BackendTransport != bridge.TransportNetherNetNoRelay && !countsNetwork(cfg) {
 		cfg.WorldPlayers = new(atomic.Int64)
 	}
 	if !proxy.Supported(cfg.Protocol) {

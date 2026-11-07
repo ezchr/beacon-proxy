@@ -188,6 +188,9 @@ type FileConfig struct {
 	// FirstServer is where players joining through this Friends-tab world land first (default:
 	// DefaultServer). Set per world with `server` under [broadcast] or [[broadcast.extra]].
 	FirstServer string `json:"-"`
+	// PlayerCount is what the Friends tab counts: "world" (default) the players who joined through
+	// that world, "network" every player on every server behind the relay.
+	PlayerCount string `json:"player_count,omitempty"`
 	NetworkDir  string `json:"network_dir,omitempty"`
 
 	// TLSDomain (an automatic Let's Encrypt certificate) or TLSCert and TLSKey (files) make the

@@ -59,3 +59,10 @@ func javaPlayers() int {
 func NetworkPlayers() int {
 	return int(max(onlineBedrock.Load(), 0)) + javaPlayers()
 }
+
+// javaCountKept reports whether the Java proxy keeps its count in PlayerCountDir (java.txt written
+// within the last day).
+func javaCountKept() bool {
+	st, err := os.Stat(filepath.Join(PlayerCountDir, "java.txt"))
+	return err == nil && time.Since(st.ModTime()) <= 24*time.Hour
+}

@@ -368,6 +368,7 @@ func (s *switchSession) join() error {
 	s.palette = u.palette
 
 	order := firstServerFirst(s.n.joinOrder(s.proto, s.cd.ServerAddress), s.cfg.FirstServer)
+	s.log.Info("network: join order", "first", s.cfg.FirstServer, "order", serverNames(order))
 	if len(order) == 0 {
 		return fmt.Errorf("no server here supports %s yet", proxy.VersionName(s.proto))
 	}
@@ -1222,4 +1223,13 @@ func firstServerFirst(order []ServerConfig, first string) []ServerConfig {
 		}
 	}
 	return order
+}
+
+// serverNames lists the servers' names, for the logs.
+func serverNames(servers []ServerConfig) []string {
+	out := make([]string, len(servers))
+	for i, s := range servers {
+		out[i] = s.Name
+	}
+	return out
 }

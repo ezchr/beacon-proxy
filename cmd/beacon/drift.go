@@ -150,6 +150,13 @@ func advertisesRealPlayers(cfg FileConfig) bool {
 
 // refreshRealPlayers reads the backend's player count and reports whether it changed.
 func refreshRealPlayers(ctx context.Context, cfg FileConfig) (changed bool, err error) {
+	if countsNetwork(cfg) {
+		n, err := network.PlayerCount(ctx)
+		if err != nil {
+			return false, err
+		}
+		return realPlayers.Swap(int64(n)) != int64(n), nil
+	}
 	n, err := bridge.BackendPlayers(ctx, bridge.Config{
 		BackendTransport:        cfg.BackendTransport,
 		NetherNetBackendAddress: cfg.NetherNetBackendAddress,
@@ -159,4 +166,10 @@ func refreshRealPlayers(ctx context.Context, cfg FileConfig) (changed bool, err 
 		return false, err
 	}
 	return realPlayers.Swap(int64(n)) != int64(n), nil
+}
+
+// countsNetwork reports whether the Friends tab shows every player on the network (player-count =
+// "network", with a [servers] list) instead of the players who joined through that world.
+func countsNetwork(cfg FileConfig) bool {
+	return cfg.PlayerCount == "network" && network != nil
 }
