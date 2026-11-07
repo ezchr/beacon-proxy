@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"errors"
 	"fmt"
+	"hash/fnv"
 	"log/slog"
 	"net"
 	"os"
@@ -45,6 +46,10 @@ type Network struct {
 	contentGen uint64
 	unionCache *union
 	unionKey   unionKey
+	// seen is what record last stored or found per server packet, palettes the block palettes of
+	// servers' block lists with their maps to a union palette. n.mu guards both.
+	seen     map[string]seenContent
+	palettes map[paletteKey]serverPalette
 	// rejoinTo holds, by XUID, the server a player was moving to when sent to join again for new
 	// resource packs (switchSession.record): they land there when they are back, not on the default.
 	rejoinTo sync.Map // xuid -> rejoinTarget
@@ -434,7 +439,7 @@ func (n *Network) record(server string, id uint32, payload []byte) bool {
 		return false
 	}
 	path := filepath.Join(n.Dir, server, file)
-	if old, err := os.ReadFile(path); err == nil && (bytes.Equal(old, payload) || fingerprint(id, old) == fingerprint(id, payload)) {
+	if n.unchanged(server+"/"+file, path, id, payload) {
 		return false
 	}
 	n.mu.Lock()
@@ -485,6 +490,95 @@ func (n *Network) orderedServers() []ServerConfig {
 		}
 	}
 	return out
+}
+
+// seenContent is a cached server packet: the hash of its bytes and its fingerprint.
+type seenContent struct {
+	sum   [32]byte
+	print string
+}
+
+// unchanged reports whether payload holds the content cached at path. The last content is kept in
+// memory, so a join with the same bytes costs a hash, and one with the same content in another
+// order (NBT maps) one decode.
+func (n *Network) unchanged(key, path string, id uint32, payload []byte) bool {
+	sum := sha256.Sum256(payload)
+	n.mu.Lock()
+	seen, ok := n.seen[key]
+	n.mu.Unlock()
+	if ok && seen.sum == sum {
+		return true
+	}
+	if !ok {
+		old, err := os.ReadFile(path)
+		if err != nil {
+			return false
+		}
+		seen = seenContent{sum: sha256.Sum256(old), print: fingerprint(id, old)}
+		if seen.sum == sum {
+			n.setSeen(key, seen)
+			return true
+		}
+	}
+	print := fingerprint(id, payload)
+	n.setSeen(key, seenContent{sum: sum, print: print})
+	return print == seen.print
+}
+
+func (n *Network) setSeen(key string, c seenContent) {
+	n.mu.Lock()
+	if n.seen == nil {
+		n.seen = map[string]seenContent{}
+	}
+	n.seen[key] = c
+	n.mu.Unlock()
+}
+
+// paletteKey names a server's block list and the union palette its map goes to.
+type paletteKey struct {
+	blocks uint64
+	union  *blockPalette
+}
+
+type serverPalette struct {
+	bp *blockPalette
+	bm *blockMap // nil when the palettes are the same
+}
+
+// serverPalette returns the palette of a server's StartGame block list and its map to the union
+// palette, built once for every player with the same blocks and union (both are only read).
+func (n *Network) serverPalette(blocks []protocol.BlockEntry, union *blockPalette) (*blockPalette, *blockMap, error) {
+	key := paletteKey{blocksKey(blocks), union}
+	n.mu.Lock()
+	p, ok := n.palettes[key]
+	n.mu.Unlock()
+	if ok {
+		return p.bp, p.bm, nil
+	}
+	bp, err := newBlockPalette(blocks)
+	if err != nil {
+		return nil, nil, err
+	}
+	var bm *blockMap
+	if !bp.sameAs(union) {
+		bm = newBlockMap(bp, union)
+	}
+	n.mu.Lock()
+	if n.palettes == nil || len(n.palettes) >= 32 {
+		n.palettes = map[paletteKey]serverPalette{}
+	}
+	n.palettes[key] = serverPalette{bp, bm}
+	n.mu.Unlock()
+	return bp, bm, nil
+}
+
+// blocksKey hashes a block list, names and properties (fmt prints maps sorted).
+func blocksKey(blocks []protocol.BlockEntry) uint64 {
+	h := fnv.New64a()
+	for _, b := range blocks {
+		fmt.Fprintf(h, "%s\x00%v\x00", b.Name, b.Properties)
+	}
+	return h.Sum64()
 }
 
 // unionKey is what a built union depends on.

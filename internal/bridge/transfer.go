@@ -123,6 +123,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	}
 	sg := l.startGame
 	answered := time.Since(start)
+	bp, bm, perr := s.n.serverPalette(sg.Blocks, s.palette)
 	s.mu.Lock()
 	old := s.cur
 	if old != nil {
@@ -134,17 +135,14 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 			return
 		}
 	}
-	bp, err := newBlockPalette(sg.Blocks)
-	if err != nil {
+	if perr != nil {
 		s.mu.Unlock()
 		l.close()
-		s.message("<red>Could not connect to %s: %s</red>", server.Name, err)
+		s.message("<red>Could not connect to %s: %s</red>", server.Name, perr)
 		return
 	}
 	sg.Blocks = nil // the palette has them; the next move only compares settings
-	var bm *blockMap
-	if !bp.sameAs(s.palette) {
-		bm = newBlockMap(bp, s.palette)
+	if bm != nil {
 		for _, name := range bp.custom {
 			if _, ok := s.palette.index[blockState{Name: name, Properties: encodeProperties(nil)}]; !ok && !s.paletteHas(name) {
 				s.log.Warn("network: the new server has a custom block this player's client doesn't know, it shows as air", "server", server.Name, "block", name)

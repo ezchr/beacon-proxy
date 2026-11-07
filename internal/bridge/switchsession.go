@@ -431,19 +431,14 @@ func (s *switchSession) join() error {
 	l, server := d.l, d.server
 
 	sg := *l.startGame
+	_, bm, err := s.n.serverPalette(sg.Blocks, s.palette)
+	if err != nil {
+		return err
+	}
 	s.mu.Lock()
 	s.clientRID, s.clientUID = sg.EntityRuntimeID, sg.EntityUniqueID
 	s.dimension = sg.Dimension
-	bp, err := newBlockPalette(sg.Blocks)
-	if err != nil {
-		s.mu.Unlock()
-		return err
-	}
 	l.startGame.Blocks = nil // the palette has them; moves only compare StartGame's settings
-	var bm *blockMap
-	if !bp.sameAs(s.palette) {
-		bm = newBlockMap(bp, s.palette)
-	}
 	l.rw = newRewriter(sg.EntityRuntimeID, sg.EntityUniqueID, s.clientRID, s.clientUID, bm)
 	s.itemIDs = map[string]int32{}
 	for _, it := range u.items.Items {
