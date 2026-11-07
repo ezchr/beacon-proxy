@@ -39,6 +39,14 @@ func isModerator(xuid, _ string) bool {
 	return set != nil && xuid != "" && (*set)[xuid]
 }
 
+// isStaff reports whether a target is an admin or moderator of either edition.
+func (n *Network) isStaff(xuid, name string) bool {
+	if isJavaKey(xuid) {
+		return n.moderation().javaRole(xuid) != ""
+	}
+	return n.IsAdmin(xuid, name) || isModerator(xuid, name)
+}
+
 // moderator reports whether this session acts as a moderator: a player in game who is one (and not
 // an admin), or a Java proxy's moderator (ModerateAs).
 func (s *switchSession) moderator() bool {
@@ -61,8 +69,7 @@ func (s *switchSession) moderatorRefuses(name string, args []string) (string, bo
 	}
 	switch name {
 	case "ban", "mute", "kick":
-		if t, ok := s.n.findTarget(args[0]); ok && !isJavaKey(t.xuid) &&
-			(s.n.IsAdmin(t.xuid, t.name) || isModerator(t.xuid, t.name)) {
+		if t, ok := s.n.findTarget(args[0]); ok && s.n.isStaff(t.xuid, t.name) {
 			return t.name + " is staff.", true
 		}
 	}

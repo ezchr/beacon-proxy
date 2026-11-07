@@ -293,6 +293,9 @@ func (n *Network) DefaultServer() string { return n.conf().try[0] }
 // IsAdmin reports whether a gamertag (any case) or XUID is one of the admins.
 func (n *Network) IsAdmin(xuid, name string) bool {
 	// By XUID only: a gamertag can be renamed, and taken by someone else.
+	if isJavaKey(xuid) {
+		return n.moderation().javaRole(xuid) == "admin" // a Java proxy's admin (moderation_java.go)
+	}
 	return xuid != "" && (n.conf().admins[xuid] || n.moderation().isExtraAdmin(xuid))
 }
 

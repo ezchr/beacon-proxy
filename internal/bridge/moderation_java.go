@@ -27,6 +27,9 @@ func (n *Network) JavaLogin(uuid, name, ip string) (string, bool) {
 		return "", false
 	}
 	now := time.Now()
+	if m.javaRole(javaKey(uuid)) == "admin" {
+		ip = "" // an address ban does not stop admins
+	}
 	e, ok := m.refused(javaKey(uuid), ip, now)
 	if !ok {
 		return "", false
@@ -48,6 +51,7 @@ type JavaPlayer struct {
 	UUID, Name, IP string
 	Ping           int64
 	Server         string // the proxy's name of the server they are on
+	Role           string // "admin" or "moderator" on the proxy, "" for neither
 }
 
 // JavaState returns the bans and mutes on the Java players who are on, by UUID; players with
@@ -61,8 +65,13 @@ func (n *Network) JavaState(players []JavaPlayer) map[string]JavaStatus {
 	m := n.moderation()
 	now := time.Now()
 	for _, p := range players {
+		m.setJavaRole(javaKey(p.UUID), p.Role)
+		ip := p.IP
+		if p.Role == "admin" {
+			ip = ""
+		}
 		var st JavaStatus
-		if e, ok := m.refused(javaKey(p.UUID), p.IP, now); ok {
+		if e, ok := m.refused(javaKey(p.UUID), ip, now); ok {
 			st.Ban = banMessage(e, now)
 		}
 		if e, ok := m.muted(javaKey(p.UUID), now); ok {
@@ -108,7 +117,7 @@ func (n *Network) ModerateAs(line, by string, moderator bool) []string {
 	if f := splitCommand(line); len(f) > 1 {
 		switch strings.ToLower(f[0]) {
 		case "ban", "banip", "mute", "kick":
-			if t, ok := n.findTarget(f[1]); ok && !isJavaKey(t.xuid) && n.IsAdmin(t.xuid, t.name) {
+			if t, ok := n.findTarget(f[1]); ok && n.IsAdmin(t.xuid, t.name) {
 				return []string{t.name + " is an admin."}
 			}
 		}
@@ -161,4 +170,30 @@ func (n *Network) JavaMutes() map[string]string {
 		}
 	}
 	return out
+}
+
+// javaRole is a Java player's role on the Java proxy, as last reported.
+func (m *modStore) javaRole(key string) string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	return m.JavaStaff[strings.ToLower(key)]
+}
+
+// setJavaRole keeps a Java player's reported role, saving only when it changed.
+func (m *modStore) setJavaRole(key, role string) {
+	key = strings.ToLower(key)
+	if role != "admin" && role != "moderator" {
+		role = ""
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.JavaStaff[key] == role {
+		return
+	}
+	if role == "" {
+		delete(m.JavaStaff, key)
+	} else {
+		m.JavaStaff[key] = role
+	}
+	_ = m.saveLocked()
 }

@@ -146,6 +146,7 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			IP     string `json:"ip"`
 			Ping   *int64 `json:"ping"`
 			Server string `json:"server"`
+			Role   string `json:"role"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&players); err != nil {
 			http.Error(w, "send a JSON list of {uuid, name, ip}", http.StatusBadRequest)
@@ -157,7 +158,7 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			if p.Ping != nil {
 				ping = *p.Ping
 			}
-			list = append(list, bridge.JavaPlayer{UUID: p.UUID, Name: p.Name, IP: p.IP, Ping: ping, Server: p.Server})
+			list = append(list, bridge.JavaPlayer{UUID: p.UUID, Name: p.Name, IP: p.IP, Ping: ping, Server: p.Server, Role: p.Role})
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(network.JavaState(list))

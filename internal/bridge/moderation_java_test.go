@@ -62,4 +62,18 @@ func TestJavaModeration(t *testing.T) {
 	if out := strings.Join(n.ModerateAs("ban AdminTag", "Mod", false), "\n"); !strings.Contains(out, "is an admin") {
 		t.Fatalf("a Java admin banned a Beacon admin: %q", out)
 	}
+
+	// The Java proxy's admins are Beacon's admins: not banned by others, not stopped by an address ban.
+	const javaAdmin = "77777777-2222-3333-4444-555555555555"
+	n.JavaState([]JavaPlayer{{UUID: javaAdmin, Name: "Boss", IP: "203.0.113.9", Role: "admin"}})
+	n.JavaLogin(javaAdmin, "Boss", "203.0.113.9")
+	if out := strings.Join(n.ModerateAs("ban java:Boss", "Mod", false), "\n"); !strings.Contains(out, "is an admin") {
+		t.Fatalf("a Java admin was banned: %q", out)
+	}
+	if _, banned := n.JavaLogin(javaAdmin, "Boss", "203.0.113.9"); banned {
+		t.Fatal("a Java admin was stopped by an address ban")
+	}
+	if !n.IsAdmin(javaKey(javaAdmin), "") {
+		t.Fatal("a Java admin is not an admin")
+	}
 }

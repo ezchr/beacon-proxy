@@ -87,6 +87,9 @@ type modStore struct {
 	Mutes  map[string]modEntry   `json:"mutes"`   // by XUID
 	Seen   map[string]seenPlayer `json:"seen"`    // by lower-case name
 	Admins map[string]string     `json:"admins"`  // added with the admin command: XUID to name
+	// JavaStaff are the Java proxy's admins and moderators, as it reports them: java:<uuid> to
+	// "admin" or "moderator" (moderation_java.go). Kept while they are offline.
+	JavaStaff map[string]string `json:"java_staff,omitempty"`
 }
 
 func newModStore(path string) *modStore {
@@ -108,6 +111,9 @@ func newModStore(path string) *modStore {
 	}
 	if m.Admins == nil {
 		m.Admins = map[string]string{}
+	}
+	if m.JavaStaff == nil {
+		m.JavaStaff = map[string]string{}
 	}
 	return m
 }
@@ -636,7 +642,7 @@ func (s *switchSession) punish(kind, who string, args []string) bool {
 		s.message("<yellow>Beacon doesn't know %s, so this only goes to your server. For an Xbox player who never joined, use xbox:%s.</yellow>", who, who)
 		return false
 	}
-	if s.reply == nil && !isJavaKey(t.xuid) && s.n.IsAdmin(t.xuid, t.name) { // the console may; a Java name proves nothing
+	if s.reply == nil && s.n.IsAdmin(t.xuid, t.name) { // the console may
 		s.message("<red>%s is an admin.</red>", t.name)
 		return true
 	}
@@ -740,7 +746,7 @@ func (s *switchSession) banIP(who string, args []string) {
 		s.message("<red>That is your own address.</red>")
 		return
 	}
-	if t.xuid != "" && !isJavaKey(t.xuid) && s.n.IsAdmin(t.xuid, t.name) {
+	if t.xuid != "" && s.n.IsAdmin(t.xuid, t.name) {
 		s.message("<red>%s is an admin.</red>", t.name)
 		return
 	}

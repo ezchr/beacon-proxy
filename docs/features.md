@@ -132,8 +132,9 @@ on admins or other moderators. Both lists are reloaded by `/beacon reload`:
   each Java login and every few seconds after, through the control API's `/moderation/java/...`
   routes, so the same list covers them. A Java player who logged in is then found by name like a
   Bedrock player; when a Bedrock player has the same name, `/ban java:Steve` means the Java one.
-  Java names prove nothing on an offline-mode server, so no Java player counts as an admin, and an
-  address ban stops them all. The proxy can pass its own admins' commands to `/moderation` with
+  Java names prove nothing on an offline-mode server, so a Java player is only staff when the proxy
+  reports a role for their UUID (`"role": "admin"` or `"moderator"`, e.g. from a permission): then
+  they are treated like Beacon's admins or moderators, also while offline. The proxy can pass its own admins' commands to `/moderation` with
   `&by=<name>`; those can't ban Beacon's admins.
 - **An address ban** doesn't stop admins, so one on a shared address can't lock them out.
 
