@@ -1162,6 +1162,12 @@ func (s *switchSession) requestSwitch(server ServerConfig, reason string) error 
 		return errors.New(server.versionMessage(s.proto))
 	}
 	s.mu.Lock()
+	if s.cur == nil {
+		// Still joining (on the resource pack screen): the join holds its own login to a
+		// server, and a second one is refused as a duplicate. The join itself picks the server.
+		s.mu.Unlock()
+		return errors.New("still joining")
+	}
 	if s.transfer != nil {
 		s.mu.Unlock()
 		return errors.New("already being moved to another server")
