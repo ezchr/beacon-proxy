@@ -6,7 +6,7 @@ Beacon runs in one of two modes, set with `mode` in `beacon.toml`.
 |---|---|---|
 | Where the player's connection goes | to Beacon, which connects to your server for them | straight to your server; Beacon only introduces them |
 | Servers | as many as you list | one |
-| `/server`, `/send`, `/glist` | yes | no |
+| `/server`, `/ping`, `/send`, `/glist` | yes | no |
 | Join by IP through Beacon (`bind`) | yes | no: players join your server's own address |
 | Bans, mutes, packet logs | yes | no: Beacon doesn't see the game |
 | Your server's Xbox check | off (`online-mode=false`): Beacon checks players | on (`online-mode=true`) |

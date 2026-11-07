@@ -26,7 +26,10 @@ setup.
   ```
 
   Friends-tab joins carry no address and always use `try`.
-- **Commands:** `/server` lists the servers; admins also get `/glist`, `/send` and `/broadcast`.
+- **Commands:** `/server` lists the servers and `/ping [player]` shows a ping (your own, a player's, or
+  `@a` for everyone's), for everyone; admins also get `/glist`, `/send` and `/broadcast`. Beacon
+  answers `/ping` itself, replacing a server's own; a name Beacon doesn't know (a Java player behind
+  Velocity) goes on to the server.
 
 ## Server list
 

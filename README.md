@@ -161,7 +161,8 @@ The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead o
 
 ## Commands
 
-In game, for everyone: `/server [name]`.
+In game, for everyone: `/server [name]` and `/ping [player]` (your ping, or another player's; `@a`,
+`@r`, `@s` and `@p` work too). Only the player who types `/ping` sees the answer.
 In game, for Beacon's admins: `/glist`, `/send <player|all|current> <server>`,
 `/broadcast [on|off] [world]`, `/beacon reload`, and [bans and mutes](docs/features.md#bans-and-mutes):
 
