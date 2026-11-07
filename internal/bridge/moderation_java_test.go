@@ -23,6 +23,12 @@ func TestJavaModeration(t *testing.T) {
 	if !strings.Contains(out, "Muted Steve") {
 		t.Fatalf("mute: %q", out)
 	}
+	if out := strings.Join(n.ModerateAs("mute Steve 2h", "Mod", false), "\n"); !strings.Contains(out, "already muted") {
+		t.Fatalf("a second mute: %q", out)
+	}
+	if mutes := n.JavaMutes(); mutes[steve] == "" {
+		t.Fatalf("muted Steve is not in the servers' list: %v", mutes)
+	}
 	st := n.JavaState([]JavaPlayer{{UUID: steve, Name: "Steve", IP: "203.0.113.5"}})
 	if st[steve].Mute == "" || st[steve].Ban != "" {
 		t.Fatalf("muted Steve: %+v", st)

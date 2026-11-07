@@ -642,9 +642,16 @@ func (s *switchSession) punish(kind, who string, args []string) bool {
 	}
 	m := s.n.moderation()
 	e := s.entry(t, "", args)
-	list := m.Bans
+	list, verb, undo := m.Bans, "banned", "unban"
 	if kind == "mute" {
-		list = m.Mutes
+		list, verb, undo = m.Mutes, "muted", "unmute"
+	}
+	m.mu.Lock()
+	old, already := m.active(list, t.xuid, time.Now())
+	m.mu.Unlock()
+	if already {
+		s.message("<red>%s is already %s (%s). Use /%s first to change it.</red>", t.name, verb, old.left(time.Now()), undo)
+		return true
 	}
 	if err := m.put(list, t.xuid, e); err != nil {
 		s.message("<red>Done, but it could not be saved: %s</red>", err)

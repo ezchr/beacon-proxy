@@ -144,3 +144,21 @@ func (n *Network) BroadcastWorlds() []string {
 	}
 	return n.Listing.Worlds()
 }
+
+// JavaMutes are the muted Java players, by lower-case UUID, with the time left. A Java proxy can't
+// stop a signed chat message without breaking the connection, so your servers drop a muted Java
+// player's chat and /msg themselves, from this list (control API /moderation/java/mutes).
+func (n *Network) JavaMutes() map[string]string {
+	out := map[string]string{}
+	if moderationOff.Load() {
+		return out
+	}
+	m := n.moderation()
+	now := time.Now()
+	for k, e := range m.entries(m.Mutes, now) {
+		if uuid, ok := strings.CutPrefix(k, "java:"); ok {
+			out[uuid] = e.left(now)
+		}
+	}
+	return out
+}

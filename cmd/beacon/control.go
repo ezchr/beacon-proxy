@@ -127,6 +127,14 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(map[string]any{"banned": banned, "message": msg})
 		return
+	case path == "/moderation/java/mutes":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(network.JavaMutes())
+		return
 	case path == "/moderation/java/state":
 		if network == nil {
 			http.Error(w, "needs relay mode", http.StatusNotFound)
