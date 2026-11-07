@@ -57,6 +57,7 @@ type tomlConfig struct {
 
 	Broadcast struct {
 		HostName       string   `toml:"host-name"`
+		WorldName      string   `toml:"world-name"`
 		TokenFile      string   `toml:"token-file"`
 		Admins         []string `toml:"admins"`
 		AcceptFriends  *bool    `toml:"accept-friends"`
@@ -140,6 +141,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 		cfg.WorldName = t.MOTD
 	}
 	cfg.HostName = cfg.WorldName
+	cfg.FriendsWorldName = t.Broadcast.WorldName
 	if t.Broadcast.HostName != "" {
 		cfg.HostName = t.Broadcast.HostName
 	}

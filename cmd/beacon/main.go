@@ -400,7 +400,7 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	worldInfo := func() xbl.Config {
 		return xbl.Config{
 			HostName:   cfg.HostName,
-			WorldName:  cfg.WorldName,
+			WorldName:  cmp.Or(cfg.FriendsWorldName, cfg.WorldName),
 			Players:    advertisedPlayers(cfg),
 			MaxPlayers: cfg.MaxPlayers,
 			Protocol:   cfg.Protocol,

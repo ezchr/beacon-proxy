@@ -92,6 +92,7 @@ func (b BroadcastConfig) forBroadcast(cfg FileConfig) FileConfig {
 	cfg.BroadcastName, cfg.InvitesEnabled = b.Name, b.Invites
 	cfg.NoFriendAccept = b.NoFriendAccept
 	cfg.FirstServer = b.Server
+	cfg.FriendsWorldName = "" // an extra world has its own world-name
 	if b.PlayerCount != "" {
 		cfg.PlayerCount = b.PlayerCount
 	}

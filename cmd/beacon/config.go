@@ -188,6 +188,8 @@ type FileConfig struct {
 	// FirstServer is where players joining through this Friends-tab world land first (default:
 	// DefaultServer). Set per world with `server` under [broadcast] or [[broadcast.extra]].
 	FirstServer string `json:"-"`
+	// FriendsWorldName is the main world's title on the Friends tab ([broadcast] world-name). Empty: the motd.
+	FriendsWorldName string `json:"-"`
 	// PlayerCount is what the Friends tab counts: "world" (default) the players who joined through
 	// that world, "server" the players on the world's server, "network" every player on every server
 	// behind the relay. Each extra world can set its own.

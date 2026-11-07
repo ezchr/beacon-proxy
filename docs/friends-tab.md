@@ -71,6 +71,7 @@ Under `[broadcast]` in `beacon.toml`:
 
 | Setting | Meaning |
 |---|---|
+| `world-name` | the world's title on the Friends tab; default: the `motd` (the server list keeps the `motd`) |
 | `host-name` | the name shown as the world's host; default: the `motd` |
 | `server` | the server players joining through this world land on first; default: the first in `try` |
 | `player-count` | what the world's player count shows: `world` (players who joined through it, the default), `server` (everyone on its server) or `network` (everyone on every server); each extra world can set its own. A world still holds at most 30 players who joined through it |

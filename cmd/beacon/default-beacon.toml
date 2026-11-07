@@ -42,7 +42,8 @@ try = {{list .Try}}
 # "pvp.example.com" = ["pvp"]
 
 [broadcast]
-# Host name on the Friends tab. Empty: the motd.
+# World title and host name on the Friends tab. Empty: the motd.
+world-name = ""
 host-name = {{q .HostName}}
 
 # Gamertags or XUIDs allowed to use Beacon's admin commands.
