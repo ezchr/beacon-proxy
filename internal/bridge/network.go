@@ -486,6 +486,18 @@ func (n *Network) buildUnion() (*union, error) {
 	blocklessItem := map[string]int{}
 	actorSeen := map[string]bool{}
 	var actors []any
+	// nextItemID is the first number no server uses: an item whose number another server's item
+	// already has gets one, and players' items are renumbered by name per server.
+	var nextItemID int16
+	for _, s := range n.orderedServers() {
+		if c := n.content[s.Name]; c != nil && c.Items != nil {
+			for _, it := range c.Items.Items {
+				if it.RuntimeID >= nextItemID {
+					nextItemID = it.RuntimeID + 1
+				}
+			}
+		}
+	}
 	for i, s := range n.orderedServers() {
 		c := n.content[s.Name]
 		if c == nil || c.StartGame == nil {
@@ -559,9 +571,10 @@ func (n *Network) buildUnion() (*union, error) {
 					continue
 				}
 				if other, ok := itemByID[it.RuntimeID]; ok {
-					n.Log.Warn("network: two servers number different items the same, players switching may see the wrong item",
-						"server", s.Name, "item", it.Name, "id", it.RuntimeID, "other", other)
-					continue
+					n.Log.Info("network: two servers number different items the same, this one gets a free number",
+						"server", s.Name, "item", it.Name, "id", it.RuntimeID, "other", other, "now", nextItemID)
+					it.RuntimeID = nextItemID
+					nextItemID++
 				}
 				itemByName[it.Name], itemByID[it.RuntimeID] = true, it.Name
 				if seenBlock[it.Name] && !it.ComponentBased {
