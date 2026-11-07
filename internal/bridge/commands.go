@@ -199,6 +199,10 @@ func (s *switchSession) handleCommand(line string) bool {
 	}
 	switch strings.ToLower(fields[0]) {
 	case "server":
+		if left := CombatLeft(s.id.XUID); len(fields) > 1 && left > 0 && !s.isAdmin() {
+			s.message(combatServerMessage, int(left.Seconds())+1)
+			return true
+		}
 		if len(fields) == 1 {
 			cur := s.serverName()
 			var names []string

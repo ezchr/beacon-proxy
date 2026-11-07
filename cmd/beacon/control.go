@@ -18,6 +18,7 @@ import (
 // have a port of its own.
 //
 //	/ping?xuid=...            real player latency, for the BDS ping plugin (bridge.PingHandler)
+//	/combat                   who is in a fight on a server: they can't use /server (POST; GET ?key=)
 //	/invites/...              the primary broadcast's invite controls (invitewatcher.go,
 //	/invites/friends/...        friendsinviter.go, friendadder.go)
 //	/friends/add/...
@@ -210,6 +211,25 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		_, _ = io.WriteString(w, strings.Join(lines, "\n")+"\n")
+		return
+	case path == "/combat":
+		// POST {"keys": [xuid or uuid...], "seconds": 10}: they are in a fight on a server, and
+		// can't change servers until it ends. GET ?key=: {"seconds": left}.
+		if r.Method == http.MethodPost {
+			var in struct {
+				Keys    []string `json:"keys"`
+				Seconds float64  `json:"seconds"`
+			}
+			if err := json.NewDecoder(io.LimitReader(r.Body, 1<<16)).Decode(&in); err != nil {
+				http.Error(w, `send {"keys": [...], "seconds": n}`, http.StatusBadRequest)
+				return
+			}
+			bridge.SetCombat(in.Keys, time.Duration(in.Seconds*float64(time.Second)))
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]float64{"seconds": bridge.CombatLeft(r.URL.Query().Get("key")).Seconds()})
 		return
 	case path == "/ping":
 		bridge.PingHandler().ServeHTTP(w, r)
