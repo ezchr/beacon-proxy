@@ -104,15 +104,9 @@ func (s *switchSession) pingOverloads(enum func(string, []string) uint32) []prot
 	target := protocol.CommandOverload{Parameters: []protocol.CommandParameter{
 		{Name: "player", Type: valid | protocol.CommandArgTypeTarget, Optional: true},
 	}}
-	var names []string
-	names = append(names, s.n.onlineNames()...)
-	if len(names) == 0 {
-		return []protocol.CommandOverload{target}
-	}
-	listed := protocol.CommandOverload{Parameters: []protocol.CommandParameter{
-		{Name: "player", Type: valid | protocol.CommandArgEnum | enum("BeaconPingPlayer", names)},
-	}}
-	return []protocol.CommandOverload{listed, target}
+	// The client suggests who is online for a target itself. A list of names sent here showed every
+	// name in the hint and kept the ones who had left since.
+	return []protocol.CommandOverload{target}
 }
 
 // remoteServer reports whether a server's address is on another machine: its leg then counts in

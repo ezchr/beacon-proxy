@@ -139,18 +139,16 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		added = true
 	}
 	if s.isAdmin() && !have["send"] {
-		var names []string
-		for _, p := range s.n.Players() {
-			names = append(names, p.Name)
-		}
-		who := enum("BeaconPlayer", append(names, "all", "current"))
+		groups := enum("BeaconSendGroup", []string{"all", "current"})
 		servers := enum("BeaconSendServer", s.n.ServerNames())
+		server := protocol.CommandParameter{Name: "server", Type: protocol.CommandArgValid | protocol.CommandArgEnum | servers}
 		pk.Commands = append(pk.Commands, protocol.Command{
 			Name: "send", Description: "Move players to another server", AliasesOffset: math.MaxUint32,
-			Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-				{Name: "player", Type: protocol.CommandArgValid | protocol.CommandArgEnum | who},
-				{Name: "server", Type: protocol.CommandArgValid | protocol.CommandArgEnum | servers},
-			}}},
+			Overloads: []protocol.CommandOverload{
+				// A player (the client suggests who is online), or everyone / everyone on your server.
+				{Parameters: []protocol.CommandParameter{{Name: "player", Type: protocol.CommandArgValid | protocol.CommandArgTypeTarget}, server}},
+				{Parameters: []protocol.CommandParameter{{Name: "who", Type: protocol.CommandArgValid | protocol.CommandArgEnum | groups}, server}},
+			},
 		})
 		added = true
 	}

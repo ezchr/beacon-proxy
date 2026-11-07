@@ -878,14 +878,18 @@ func (s *switchSession) injectModeration(pk *packet.AvailableCommands, enum func
 		slices.Sort(out)
 		return out
 	}
-	set("ban", "Ban a player from the whole network", target("BeaconBanPlayer", "player", online, rest...))
-	set("mute", "Mute a player on the whole network", target("BeaconMutePlayer", "player", online, rest...))
-	set("banip", "Ban a player's address from the whole network", target("BeaconBanIP", "player", online, rest...))
+	// A player argument: the client suggests who is online (a list sent here went stale), and any
+	// other name can be typed.
+	player := func(rest ...protocol.CommandParameter) []protocol.CommandOverload {
+		return []protocol.CommandOverload{{Parameters: append([]protocol.CommandParameter{{Name: "player", Type: valid | protocol.CommandArgTypeTarget}}, rest...)}}
+	}
+	set("ban", "Ban a player from the whole network", player(rest...))
+	set("mute", "Mute a player on the whole network", player(rest...))
+	set("banip", "Ban a player's address from the whole network", player(rest...))
 	set("unban", "Lift a ban", target("BeaconBanned", "player", listed(m.Bans, false)))
 	set("unmute", "Lift a mute", target("BeaconMuted", "player", listed(m.Mutes, false)))
 	set("unbanip", "Lift an address ban", target("BeaconBannedIP", "address", listed(m.IPBans, true)))
-	set("kick", "Kick a player", target("BeaconKickPlayer", "player", online,
-		protocol.CommandParameter{Name: "reason", Type: valid | protocol.CommandArgTypeRawText, Optional: true}))
+	set("kick", "Kick a player", player(protocol.CommandParameter{Name: "reason", Type: valid | protocol.CommandArgTypeRawText, Optional: true}))
 	set("banlist", "List the network's bans", []protocol.CommandOverload{{}})
 	set("mutelist", "List the network's mutes", []protocol.CommandOverload{{}})
 }
