@@ -54,6 +54,10 @@ type Network struct {
 	ForcedHosts map[string][]string
 	// ForwardingSecret, when set, signs a Beacon forwarding claim into every backend login.
 	ForwardingSecret []byte
+	// The key logins to forwarding = "endstone" servers are signed with, loaded at first use.
+	endstoneOnce sync.Once
+	endstoneK    *ecdsa.PrivateKey
+	endstoneErr  error
 	// Dir holds the per-server content cache and downloaded packs.
 	Dir string
 	// Identity mints NetherNet client identities for NetherNet servers.
@@ -114,6 +118,9 @@ type ServerConfig struct {
 	// NoPacks keeps the server's resource packs out of what players get (resource-packs = false in
 	// beacon.toml): its blocks and items still join the union, drawn by the other servers' packs.
 	NoPacks bool `json:"no_packs,omitempty"`
+	// Forwarding "endstone" (ForwardingEndstone) signs logins to the server for Endstone 0.12's
+	// [proxies.endgate], which gives it the player's real XUID and address with no plugin.
+	Forwarding string `json:"forwarding,omitempty"`
 }
 
 // backendProtocol is the version a player of protocol id logs in to the server with.
@@ -654,8 +661,18 @@ func nbtEncode(v any) ([]byte, error) {
 
 // dialServer opens a backend leg to a server and logs the player into it with the relay's re-signed
 // copy of their identity. What follows (packs, StartGame) is the link's to handle.
-func (n *Network) dialServer(ctx context.Context, s ServerConfig, protocolID int32, id login.IdentityData, cd login.ClientData, playerAddr string) (*proxy.ProxyConn, backendConn, error) {
+//
+// token is the player's own login token, which a forwarding = "endstone" server gets re-signed; ""
+// for Beacon's made-up probe players.
+func (n *Network) dialServer(ctx context.Context, s ServerConfig, protocolID int32, id login.IdentityData, cd login.ClientData, playerAddr, token string) (*proxy.ProxyConn, backendConn, error) {
 	cfg := Config{BackendTransport: s.Transport, NetherNetIdentity: n.Identity, Log: n.Log}
+	var endstone *proxy.EndstoneForwarding
+	if s.Forwarding == ForwardingEndstone {
+		var err error
+		if endstone, cfg.NetherNetIdentity, err = n.endstoneForwarding(ctx, token, playerAddr); err != nil {
+			return nil, nil, err
+		}
+	}
 	switch strings.ToLower(s.Transport) {
 	case TransportRakNet:
 		cfg.ServerAddress = s.Address
@@ -668,7 +685,9 @@ func (n *Network) dialServer(ctx context.Context, s ServerConfig, protocolID int
 		return nil, nil, err
 	}
 	c := proxy.NewProxyConn(conn, false)
-	if n.ForwardingSecret != nil {
+	if endstone != nil {
+		c.SetEndstoneForwarding(endstone)
+	} else if n.ForwardingSecret != nil {
 		c.SetForwarding(&proxy.Forwarding{Secret: n.ForwardingSecret, Server: s.Name, PlayerAddr: playerAddr})
 	}
 	done := make(chan error, 1)
@@ -844,7 +863,7 @@ func (n *Network) learn(server string) error {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
 	defer cancel()
 	id := login.IdentityData{XUID: learnerXUID, DisplayName: "beaconprobe", Identity: "6e327061-636b-3300-8000-000000000003"}
-	c, conn, err := n.dialServer(ctx, *s, s.probeProtocol(), id, ProbeClientData("beaconprobe"), "")
+	c, conn, err := n.dialServer(ctx, *s, s.probeProtocol(), id, ProbeClientData("beaconprobe"), "", "")
 	if err != nil {
 		return err
 	}
@@ -922,7 +941,7 @@ func (n *Network) downloadPacks(server string) (changed bool, err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()
 	id := login.IdentityData{XUID: packFetcherXUID, DisplayName: "beaconpacks", Identity: "6e327061-636b-3300-8000-000000000002"}
-	c, conn, err := n.dialServer(ctx, *s, s.probeProtocol(), id, ProbeClientData("beaconpacks"), "")
+	c, conn, err := n.dialServer(ctx, *s, s.probeProtocol(), id, ProbeClientData("beaconpacks"), "", "")
 	if err != nil {
 		return false, err
 	}

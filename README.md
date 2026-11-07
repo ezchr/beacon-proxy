@@ -95,11 +95,39 @@ old = { address = "127.0.0.1:19134", resource-packs = false }
 
 Its blocks and items still work; they are drawn by the other servers' packs.
 
+### Real XUIDs on Endstone, without xuidforward
+
+Endstone 0.12 and newer can trust a proxy's own signing key beside Microsoft's
+(`[proxies.endgate]` in `endstone.toml`). Point Beacon at it with `forwarding = "endstone"`:
+
+```toml
+[servers]
+survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
+```
+
+At its first use Beacon makes `endstone-forwarding.pem` in its folder. Copy it to the server as
+`keys/forwarding_key.pem`, set `online-mode=true` in its `server.properties`, and in its
+`endstone.toml`:
+
+```toml
+[proxies.endgate]
+enabled = true
+forwarding-key-file = "keys/forwarding_key.pem"
+```
+
+The server then checks each login like an online one: players keep their real XUID (ops,
+permissions, allowlist and plugins work) and their own address, and it refuses any login that
+didn't come through Beacon. Keep `endstone-forwarding.key` private: it is what signs the logins.
+xuidforward isn't needed on such a server.
+
 ### BDS in relay mode needs xuidforward
 
 This is only for **relay mode**. If you just want your BDS on the Friends tab, use
 [relayless mode](#without-server-switching-relayless-mode): players log in to BDS themselves and
 keep their data, with nothing to install.
+
+On Endstone 0.12 and newer, use [`forwarding = "endstone"`](#real-xuids-on-endstone-without-xuidforward)
+instead.
 
 In relay mode, BDS throws away the Xbox ID (XUID) of Beacon's login, so without help every player
 starts with fresh, empty data each time they join. Install

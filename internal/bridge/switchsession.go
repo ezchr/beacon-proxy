@@ -536,7 +536,7 @@ func (s *switchSession) packScreen(u *union) error {
 func (s *switchSession) openLink(server ServerConfig) (*link, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, backendDialTimeout)
 	defer cancel()
-	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String())
+	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String(), playerLoginToken(s.client.RawLoginPacket()))
 	if err != nil {
 		return nil, err
 	}

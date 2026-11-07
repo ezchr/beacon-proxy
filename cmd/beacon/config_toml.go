@@ -304,6 +304,15 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 			if rp, ok := v["resource-packs"].(bool); ok && !rp {
 				s.NoPacks = true
 			}
+			if f, ok := v["forwarding"].(string); ok {
+				switch strings.ToLower(f) {
+				case "", "beacon":
+				case bridge.ForwardingEndstone:
+					s.Forwarding = bridge.ForwardingEndstone
+				default:
+					return nil, nil, fmt.Errorf(`server %s: forwarding %q: use "endstone" (Endstone's [proxies.endgate]), or leave it out`, name, f)
+				}
+			}
 		default:
 			return nil, nil, fmt.Errorf(`server %s: give an address ("host:port") or a table with address = "host:port"`, name)
 		}

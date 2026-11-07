@@ -120,6 +120,9 @@ func (conn *ProxyConn) Login(clientData login.ClientData, session *session.Sessi
 // player's own device ID from reaching the server.
 func (c *ProxyConn) ForwardIdentity(protocolID int32, identityData login.IdentityData, clientData login.ClientData, transportKey *ecdsa.PrivateKey) error {
 	key := transportKey
+	if c.endstone != nil {
+		key = c.endstone.Key // the token's cpk: it signs the client data and the handshake
+	}
 	if key == nil {
 		var err error
 		key, err = ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
@@ -140,7 +143,12 @@ func (c *ProxyConn) ForwardIdentity(protocolID int32, identityData login.Identit
 	c.setProtocol(protocolID)
 
 	request := login.EncodeOffline(identityData, clientData, key, false)
-	if c.forwarding != nil {
+	if c.endstone != nil {
+		var err error
+		if request, err = endstoneRequest(c.endstone, identityData, request, time.Now()); err != nil {
+			return fmt.Errorf("sign the login for endstone: %w", err)
+		}
+	} else if c.forwarding != nil {
 		var err error
 		if request, err = addForwardingClaim(request, newForwardingClaim(c.forwarding, identityData, key), key); err != nil {
 			return fmt.Errorf("add forwarding claim: %w", err)

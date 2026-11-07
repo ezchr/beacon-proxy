@@ -6,6 +6,9 @@ Beacon's login from one anybody else sends it. So Beacon signs each login with a
 your servers know, and a server that checks the signature refuses every login that did not come
 through Beacon. It is the Bedrock version of Velocity's modern forwarding.
 
+Endstone servers can use Endstone's own check instead, which also gives the server the player's
+real XUID: see [Real XUIDs on Endstone](../README.md#real-xuids-on-endstone-without-xuidforward).
+
 ## Do you need it?
 
 - **Beacon on the same machine as the server:** no. Bind the server to `127.0.0.1` and nobody else

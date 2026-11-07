@@ -52,6 +52,9 @@ type ProxyConn struct {
 	// forwarding, when set, adds a signed Beacon forwarding claim to the backend login (see
 	// forwarding.go). Set with SetForwarding before ForwardIdentity.
 	forwarding *Forwarding
+	// endstone, when set, signs the backend login for Endstone's [proxies.endgate] instead (see
+	// endstone.go). Set with SetEndstoneForwarding before ForwardIdentity.
+	endstone *EndstoneForwarding
 
 	// clientEncryption makes the client-facing (nethernet) side run the Minecraft encryption
 	// handshake after login, as BDS does. See SetClientEncryption.
