@@ -29,8 +29,12 @@ func seenPath(path string) string {
 }
 
 // pruneExpired removes every player first seen more than invitequeue.Expiry ago from the player
-// file at path and from its companion file. Missing files count as empty.
+// file at path and from its companion file. Missing files count as empty. Only the list of players
+// seen on a server by address expires: players found in Friends-tab worlds are kept.
 func pruneExpired(path string, log *slog.Logger) {
+	if filepath.Base(path) != filepath.Base(serverPlayersFile) {
+		return
+	}
 	times, err := readLines(seenPath(path))
 	if err != nil {
 		log.Warn("could not read discovery times, skipping cleanup", "path", seenPath(path), "err", err)
