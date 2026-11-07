@@ -121,3 +121,6 @@ func (n *Network) onlineNames() []string {
 	slices.SortFunc(out, func(a, b string) int { return strings.Compare(strings.ToLower(a), strings.ToLower(b)) })
 	return out
 }
+
+// OnlineNames are everyone on the network, both editions, for a Java proxy's command suggestions.
+func (n *Network) OnlineNames() []string { return n.onlineNames() }

@@ -184,6 +184,13 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = io.WriteString(w, strings.Join(network.BroadcastWorlds(), "\n")+"\n")
 		return
+	case path == "/names":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, strings.Join(network.OnlineNames(), "\n")+"\n")
+		return
 	case path == "/glist":
 		if network == nil {
 			http.Error(w, "needs relay mode", http.StatusNotFound)

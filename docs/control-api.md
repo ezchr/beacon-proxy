@@ -30,6 +30,7 @@ curl 127.0.0.1:7777/listing/status
 | `/moderation/java/mutes` | the muted Java players, `{"<uuid>": "<time left>"}`: a Java proxy can't stop a signed chat message, so your servers drop a muted Java player's chat and `/msg` themselves |
 | `/ping/run?args=<name or @a/@r>` | `/ping` as Beacon answers it, for a Java proxy's own `/ping`; `404` when no player of that name is on |
 | `/broadcast/run?args=<on\|off\|status [world]>&by=<name>` | `/broadcast` as Beacon answers it, for a Java proxy's own `/broadcast`; `/broadcast/worlds` lists the world names |
+| `/names` | everyone on the network, Bedrock and reported Java players, one name a line (for a Java proxy's command suggestions) |
 | `/glist` | the players on every server, Bedrock and the Java ones a Java proxy reported, as `/glist` shows them |
 | `/packetdebug?cmd=<what>` | packet logging, like the `debug` console command; see [Debugging](debugging.md) |
 | `/debug/pprof/...` | Go's profiler, only when Beacon runs with `-debug` |
