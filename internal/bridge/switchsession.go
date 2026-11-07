@@ -217,7 +217,13 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		}
 		defer release()
 	}
-	noteBedrock(1) // the network's player count, see onlinecount.go
+	// The network's player count (onlinecount.go), and the cap (max-players, playercap.go).
+	if !takeSlot(n.IsAdmin(id.XUID, id.DisplayName)) {
+		log.Info("join refused: full", "cap", playerCap.Load())
+		_ = client.WritePacket(&packet.Disconnect{Message: fullMessage})
+		time.Sleep(time.Second)
+		return
+	}
 	defer noteBedrock(-1)
 	if cfg.WorldPlayers != nil {
 		cfg.WorldPlayers.Add(1)

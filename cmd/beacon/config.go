@@ -69,6 +69,8 @@ type FileConfig struct {
 	HostName   string `json:"host_name"`
 	WorldName  string `json:"world_name"`
 	MaxPlayers int    `json:"max_players"`
+	// PlayerCap is the most Bedrock players let on at once (beacon.toml max-players); 0 = no cap.
+	PlayerCap int `json:"-"`
 
 	// FakePlayerCount, when above zero, is shown on the Friends tab instead of the real count.
 	// Zero (with no fake_player_drift) shows the real count, never below 1: in relay mode the

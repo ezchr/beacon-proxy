@@ -18,7 +18,12 @@ forwarding-secret-file = "forwarding.secret"
 # World name on the Friends tab and server list.
 motd = {{q .MOTD}}
 
-# Max players shown. Display only.
+# Most Bedrock players allowed on at once; more are told the server is full. Admins always
+# get in. 0 means no cap.
+max-players = 0
+
+# Max players shown on the server list and on broadcast Friends-tab worlds. Only the number
+# shown: it doesn't stop anyone joining (that's max-players).
 show-max-players = {{.ShowMaxPlayers}}
 
 # What the server list copies from your first server: "off", "motd", "players" or "all".

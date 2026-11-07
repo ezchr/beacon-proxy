@@ -49,6 +49,7 @@ type tomlConfig struct {
 	TLSKey               string              `toml:"tls-key"`
 	MOTD                 string              `toml:"motd"`
 	ShowMaxPlayers       int                 `toml:"show-max-players"`
+	MaxPlayers           int                 `toml:"max-players"`
 	ForwardingSecretFile string              `toml:"forwarding-secret-file"`
 
 	// Servers holds "name = address" pairs, "name = { address = ..., transport = ... }" tables and
@@ -154,6 +155,10 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	if t.ShowMaxPlayers > 0 {
 		cfg.MaxPlayers = t.ShowMaxPlayers
 	}
+	if t.MaxPlayers < 0 {
+		return FileConfig{}, fmt.Errorf("max-players must be 0 (no cap) or more")
+	}
+	cfg.PlayerCap = t.MaxPlayers
 	cfg.Admins = t.Broadcast.Admins
 	cfg.Moderators = t.Broadcast.Moderators
 	cfg.NoFriendAccept = t.Broadcast.AcceptFriends != nil && !*t.Broadcast.AcceptFriends

@@ -30,6 +30,7 @@ func applyLive(cfg FileConfig) {
 	bridge.SetModerators(xuidsOnly("moderators", cfg.Moderators))
 	go annotateStaffNames(tomlConfigFile, "", "")
 	bridge.SetKickMode(cfg.Kick)
+	bridge.SetPlayerCap(cfg.PlayerCap)
 }
 
 // reloadConfig rereads beacon.toml (console reload, /beacon reload), applies what can change while
@@ -57,7 +58,7 @@ func reloadConfig() []string {
 		out = append(out, fmt.Sprintf("servers: %s, players join %s first", strings.Join(network.ServerNames(), ", "), network.DefaultServer()))
 	}
 	applyLive(next)
-	out = append(out, "admins, moderators, forced hosts, ping passthrough, rate limits and cross-server chat reloaded")
+	out = append(out, "admins, moderators, max-players, forced hosts, ping passthrough, rate limits and cross-server chat reloaded")
 
 	var restart []string
 	same := func(name string, equal bool) {
