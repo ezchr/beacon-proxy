@@ -6,7 +6,7 @@ Beacon runs in one of two modes, set with `mode` in `beacon.toml`.
 |---|---|---|
 | Where the player's connection goes | to Beacon, which connects to your server for them | straight to your server; Beacon only introduces them |
 | Servers | as many as you list | one |
-| `/server`, `/ping`, `/send`, `/glist` | yes | no |
+| In-game commands: `/server`, `/ping`, `/glist`, `/send`, `/kick`, `/broadcast`, `/beacon reload`, bans and mutes | yes | **none**: Beacon isn't in the game |
 | Join by IP through Beacon (`bind`) | yes | no: players join your server's own address |
 | Bans, mutes, packet logs | yes | no: Beacon doesn't see the game |
 | Your server's Xbox check | off (`online-mode=false`): Beacon checks players | on (`online-mode=true`) |
@@ -30,6 +30,8 @@ Beacon lists your server on the Friends tab as in relay mode, but when a player 
 hands the player's connection details to your server instead of carrying the connection. The player then connects to your server directly, with their
 own Xbox login, which your server checks itself. Beacon carries no game traffic.
 
-Pick it when you don't need to move players between servers: you have one server and want it on
-the Friends tab without changing anything on it. The server keeps working as it always has, a
+Pick it when you only want the Friends tab (like FriendConnect): you have one server and want it on
+the Friends tab without changing anything on it. None of Beacon's in-game commands work in this mode,
+since Beacon never sees the game: use your server's own commands, and Beacon's console or
+[control API](control-api.md) (`/listing/on`, `/listing/off`) to show or hide the world. The server keeps working as it always has, a
 Beacon restart does not kick anyone, and Beacon's machine carries no game traffic.
