@@ -44,7 +44,7 @@ accept Beacon's login: turn its own Xbox check off. Beacon has already checked t
 
 | Server | Setting |
 |---|---|
-| BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) ([below](#bds-in-relay-mode-needs-xuidforward)) |
+| BDS | `online-mode=false` in `server.properties`, plus [xuidforward](https://github.com/ezchr/xuidforward) ([below](#bds-in-relay-mode-needs-xuidforward)). Next to other kinds of servers, also `block-network-ids-are-hashes=false`: players can't move between servers that number blocks differently. |
 | Dragonfly | `AuthEnabled = false` under `[Server]` |
 | Geyser | `validate-bedrock-login: false` (under `advanced:`, `bedrock:`); Floodgate features then stop working |
 
