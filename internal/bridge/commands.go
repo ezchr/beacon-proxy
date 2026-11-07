@@ -131,7 +131,7 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		})
 	}
 	added = true
-	if s.isAdmin() && !have["glist"] {
+	if (s.isAdmin() || s.moderator()) && !have["glist"] { // moderators may see who is where
 		pk.Commands = append(pk.Commands, protocol.Command{
 			Name: "glist", Description: "List the players on every server", AliasesOffset: math.MaxUint32,
 			Overloads: []protocol.CommandOverload{{}},
@@ -227,7 +227,7 @@ func (s *switchSession) handleCommand(line string) bool {
 	case "ping":
 		return s.pingCommand(fields[1:])
 	case "glist":
-		if !s.isAdmin() {
+		if !s.isAdmin() && !s.moderator() {
 			return false // the server's own /glist, if it has one
 		}
 		for _, line := range s.n.GList() {
