@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -18,6 +19,7 @@ import (
 // have a port of its own.
 //
 //	/ping?xuid=...            real player latency, for the BDS ping plugin (bridge.PingHandler)
+//	/staffnotes?after=seq     staff commands of both editions, for the Java proxy to show its staff
 //	/combat                   who is in a fight on a server: they can't use /server (POST; GET ?key=)
 //	/invites/...              the primary broadcast's invite controls (invitewatcher.go,
 //	/invites/friends/...        friendsinviter.go, friendadder.go)
@@ -116,7 +118,18 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// by: the name of who runs it, when the Java proxy passes on an admin's command.
-		_, _ = io.WriteString(w, strings.Join(network.ModerateAs(r.URL.Query().Get("cmd"), r.URL.Query().Get("by"), r.URL.Query().Get("role") == "moderator"), "\n")+"\n")
+		q := r.URL.Query()
+		if by := q.Get("by"); by != "" {
+			network.NoteStaff(by, "/"+strings.TrimPrefix(q.Get("cmd"), "/"), true)
+		}
+		_, _ = io.WriteString(w, strings.Join(network.ModerateAs(q.Get("cmd"), q.Get("by"), q.Get("role") == "moderator"), "\n")+"\n")
+		return
+	case path == "/staffnotes":
+		// GET ?after=seq: the staff commands since, for the Java proxy to show its staff.
+		after, _ := strconv.ParseInt(r.URL.Query().Get("after"), 10, 64)
+		notes, seq := bridge.StaffNotesAfter(after)
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]any{"seq": seq, "notes": notes})
 		return
 	case path == "/moderation/java/login":
 		if network == nil {
