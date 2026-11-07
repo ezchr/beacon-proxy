@@ -80,15 +80,26 @@ func consoleCommand(fields []string, stop context.CancelFunc) []string {
 		if listing == nil {
 			return []string{"The Friends-tab listing switch is off: set listing-toggle = true under [broadcast]."}
 		}
-		if len(fields) == 2 && (fields[1] == "on" || fields[1] == "off") {
-			if err := listing.Set(fields[1] == "on"); err != nil {
+		if len(fields) >= 2 && (fields[1] == "on" || fields[1] == "off") {
+			var err error
+			if len(fields) >= 3 {
+				err = listing.SetWorld(fields[2], fields[1] == "on")
+			} else {
+				err = listing.Set(fields[1] == "on")
+			}
+			if err != nil {
 				return []string{err.Error()}
 			}
 		}
-		if listing.On() {
-			return []string{"The world is listed in the Friends tab."}
+		var out []string
+		for _, w := range listing.Worlds() {
+			state := "listed in the Friends tab"
+			if !listing.WorldOn(w) {
+				state = "not listed"
+			}
+			out = append(out, fmt.Sprintf("%s: %s", w, state))
 		}
-		return []string{"The world is not listed in the Friends tab."}
+		return out
 	case "reload":
 		return reloadConfig()
 	case "ban", "banip", "mute", "unban", "unbanip", "unmute", "banlist", "mutelist", "admin":

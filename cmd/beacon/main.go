@@ -208,8 +208,12 @@ func main() {
 	}
 
 	if cfg.ListingToggle {
-		listing = newListingGate("listing_state.json", log)
-		log.Info("friends-tab listing toggle on: /broadcast on|off in game, or the control port's /listing/on|off", "listed", listing.On())
+		worlds := []string{mainWorld}
+		for _, b := range cfg.ExtraBroadcasts {
+			worlds = append(worlds, b.Name)
+		}
+		listing = newListingGate("listing_state.json", worlds, log)
+		log.Info("friends-tab listing toggle on: /broadcast on|off [world] in game, or the control port's /listing/on|off", "listed", listing.On())
 	}
 	if network, err = setupNetwork(cfg, authSession, log); err != nil {
 		log.Error("invalid [servers] in beacon.toml", "err", err)
@@ -410,12 +414,9 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	sessionCtx, cancelSession := context.WithCancelCause(ctx)
 	defer cancelSession(nil)
 	if listing != nil {
-		off := listing.offSignal()
 		go func() {
-			select {
-			case <-off:
+			if listing.waitOff(sessionCtx, cfg.BroadcastName) == nil {
 				cancelSession(errListingOff)
-			case <-sessionCtx.Done():
 			}
 		}()
 	}

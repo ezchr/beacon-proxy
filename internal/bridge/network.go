@@ -88,6 +88,10 @@ func (n *Network) usesRequestMode(server string) bool {
 type Listing interface {
 	On() bool
 	Set(on bool) error
+	// Worlds is every world's name, the main one first; WorldOn and SetWorld are one world's.
+	Worlds() []string
+	WorldOn(name string) bool
+	SetWorld(name string, on bool) error
 }
 
 // ServerConfig is one server of a Network.

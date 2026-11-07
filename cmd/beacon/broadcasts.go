@@ -241,9 +241,9 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	var netherNetID uint64
 	for {
 		var err error
-		if listing != nil && !listing.On() {
-			log.Info("friends-tab listing is off: waiting for /broadcast on")
-			if listing.waitOn(ctx) != nil {
+		if listing != nil && !listing.WorldOn(cfg.BroadcastName) {
+			log.Info("friends-tab listing is off for this world: waiting for /broadcast on")
+			if listing.waitOn(ctx, cfg.BroadcastName) != nil {
 				return nil
 			}
 		}

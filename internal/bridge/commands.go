@@ -256,26 +256,34 @@ func (s *switchSession) handleCommand(line string) bool {
 		if len(fields) > 1 {
 			arg = strings.ToLower(fields[1])
 		}
+		world := ""
+		if len(fields) > 2 {
+			world = fields[2]
+		}
 		switch arg {
 		case "on", "off":
-			if err := s.n.Listing.Set(arg == "on"); err != nil {
+			var err error
+			if world != "" {
+				err = s.n.Listing.SetWorld(world, arg == "on")
+			} else {
+				err = s.n.Listing.Set(arg == "on")
+			}
+			if err != nil {
 				s.message("<red>Could not switch the broadcast %s: %s</red>", arg, err)
 				return true
 			}
-			s.n.Log.Info("network: broadcast switched by a player", "player", s.id.DisplayName, "on", arg == "on")
-			if arg == "on" {
-				s.message("<green>The world is now listed in the Friends tab.</green>")
-			} else {
-				s.message("<yellow>The world is no longer listed in the Friends tab. Players already in stay; direct IP still works.</yellow>")
-			}
+			s.n.Log.Info("network: broadcast switched by a player", "player", s.id.DisplayName, "on", arg == "on", "world", world)
+			fallthrough
 		case "status":
-			if s.n.Listing.On() {
-				s.message("<green>The world is listed in the Friends tab.</green> <grey>/broadcast off hides it.</grey>")
-			} else {
-				s.message("<yellow>The world is not listed in the Friends tab (direct IP only).</yellow> <grey>/broadcast on lists it.</grey>")
+			for _, w := range s.n.Listing.Worlds() {
+				if s.n.Listing.WorldOn(w) {
+					s.message("<green>%s: listed in the Friends tab.</green>", w)
+				} else {
+					s.message("<yellow>%s: not listed (players already in stay, direct IP still works).</yellow>", w)
+				}
 			}
 		default:
-			s.message("<red>Usage: /broadcast [on|off|status]</red>")
+			s.message("<red>Usage: /broadcast [on|off|status] [world]</red>")
 		}
 		return true
 	}

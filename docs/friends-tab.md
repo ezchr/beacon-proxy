@@ -75,7 +75,7 @@ Under `[broadcast]` in `beacon.toml`:
 | `server` | the server players joining through this world land on first; default: the first in `try` |
 | `admins` | gamertags or XUIDs that may use `/glist`, `/send` and `/broadcast` |
 | `accept-friends` | accept friend requests automatically |
-| `listing-toggle` | lets admins hide the world from the Friends tab with `/broadcast off`; players already in stay, and joining by IP still works |
+| `listing-toggle` | lets admins hide worlds from the Friends tab: `/broadcast off` hides every world, `/broadcast off <world>` one (`main`, or an extra world's `name`), `/broadcast` shows which are listed. Players already in stay, and joining by IP still works |
 
 ## Inviting players
 
