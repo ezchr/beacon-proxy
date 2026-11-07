@@ -74,7 +74,7 @@ func TestMigrateLegacyConfig(t *testing.T) {
 		servers               int
 	}{
 		{"network", `{"backend_transport":"nethernet","world_name":"W","host_name":"H","admins":["a"],
-			"servers":[{"name":"pvp","address":"http://127.0.0.1:19133"},{"name":"sky","address":"http://127.0.0.1:19142"}],
+			"servers":[{"name":"pvp","address":"http://127.0.0.1:19133"},{"name":"sky","address":"http://127.0.0.1:19142","forwarding":"endstone","no_packs":true}],
 			"default_server":"sky","relay_direct_ip":true,"relay_direct_ip_listen_address":"127.0.0.1:19136",
 			"fake_player_count":21,"fake_player_drift":{"min":16,"max":26,"max_step":2}}`, bridge.TransportNetherNet, 2},
 		{"norelay", `{"backend_transport":"nethernet-norelay","server_address":"127.0.0.1:19134","world_name":"W"}`,
@@ -98,6 +98,9 @@ func TestMigrateLegacyConfig(t *testing.T) {
 			case "network":
 				if cfg.DefaultServer != "sky" || cfg.HostName != "H" || cfg.FakePlayerDrift == nil || cfg.FakePlayerDrift.Max != 26 || cfg.RelayDirectIPListenAddress != "127.0.0.1:19136" {
 					t.Fatalf("network config lost settings: %+v", cfg)
+				}
+				if sky := cfg.Servers[0]; sky.Name != "sky" || sky.Forwarding != bridge.ForwardingEndstone || !sky.NoPacks {
+					t.Fatalf("a server's forwarding and resource-packs must survive the move to beacon.toml: %+v", cfg.Servers)
 				}
 			case "norelay":
 				if cfg.NetherNetBackendAddress != "http://127.0.0.1:19134" {

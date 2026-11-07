@@ -26,9 +26,10 @@ ping-passthrough = "off"
 
 [servers]
 # Your servers, as name = "host:port".
+# survival = { address = "127.0.0.1:19134", forwarding = "endstone", resource-packs = false }
 {{- range .Servers}}
-{{- if .Transport}}
-{{.Name}} = { address = {{q .Address}}, transport = {{q .Transport}} }
+{{- if or .Transport .Forwarding .NoPacks}}
+{{.Name}} = { address = {{q .Address}}{{if .Transport}}, transport = {{q .Transport}}{{end}}{{if .Forwarding}}, forwarding = {{q .Forwarding}}{{end}}{{if .NoPacks}}, resource-packs = false{{end}} }
 {{- else}}
 {{.Name}} = {{q .Address}}
 {{- end}}
