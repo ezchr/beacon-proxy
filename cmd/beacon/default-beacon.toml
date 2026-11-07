@@ -65,6 +65,10 @@ accept-friends = {{.AcceptFriends}}
 
 # Let admins hide the world from the Friends tab with /broadcast off.
 listing-toggle = {{.ListingToggle}}
+
+# With several servers: where players joining through this world land first, one of the names
+# under [servers]. Empty: the first in try. Each extra world below can have its own.
+server = {{q .Server}}
 {{- range .Extra}}
 
 # Another hosting account (30 more slots). Add one with: beacon accounts add <name>
@@ -87,6 +91,8 @@ accept-friends = false
 protocol = {{.Protocol}}
 version = {{q .Version}}
 {{- end}}
+# Where players joining through this world land first. Empty: the first in try.
+server = {{q .Server}}
 {{- end}}
 
 [advanced]

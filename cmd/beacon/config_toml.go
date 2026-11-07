@@ -389,6 +389,7 @@ type templateValues struct {
 	Admins                     []string
 	AcceptFriends              bool
 	ListingToggle              bool
+	Server                     string
 	Extra                      []BroadcastConfig
 	ControlPort                int
 	DisableClientEncryption    bool
