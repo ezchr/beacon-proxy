@@ -149,10 +149,12 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 	}
 	if !have["broadcast"] && s.n.Listing != nil && s.isAdmin() {
 		states := enum("BeaconBroadcast", []string{"on", "off", "status"})
+		worlds := enum("BeaconBroadcastWorld", s.n.Listing.Worlds())
 		pk.Commands = append(pk.Commands, protocol.Command{
-			Name: "broadcast", Description: "Show or hide the world in the Friends tab", AliasesOffset: math.MaxUint32,
+			Name: "broadcast", Description: "Show or hide worlds in the Friends tab", AliasesOffset: math.MaxUint32,
 			Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
 				{Name: "state", Type: protocol.CommandArgValid | protocol.CommandArgEnum | states, Optional: true},
+				{Name: "world", Type: protocol.CommandArgValid | protocol.CommandArgEnum | worlds, Optional: true},
 			}}},
 		})
 		added = true
