@@ -141,6 +141,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 		s.message("<red>Could not connect to %s: %s</red>", server.Name, err)
 		return
 	}
+	sg.Blocks = nil // the palette has them; the next move only compares settings
 	var bm *blockMap
 	if !bp.sameAs(s.palette) {
 		bm = newBlockMap(bp, s.palette)

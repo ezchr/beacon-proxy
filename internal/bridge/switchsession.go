@@ -439,6 +439,7 @@ func (s *switchSession) join() error {
 		s.mu.Unlock()
 		return err
 	}
+	l.startGame.Blocks = nil // the palette has them; moves only compare StartGame's settings
 	var bm *blockMap
 	if !bp.sameAs(s.palette) {
 		bm = newBlockMap(bp, s.palette)
@@ -611,6 +612,7 @@ func (s *switchSession) readLogin(l *link) {
 				if id == packet.IDItemRegistry {
 					reg := &packet.ItemRegistry{}
 					if decodeInto(reg, payload) == nil {
+						stripItemData(reg)
 						l.itemReg = reg
 					}
 				}
@@ -656,6 +658,7 @@ func (s *switchSession) readBackend(l *link, first bool) {
 				if id == packet.IDItemRegistry {
 					reg := &packet.ItemRegistry{}
 					if decodeInto(reg, payload) == nil {
+						stripItemData(reg)
 						l.itemReg = reg
 						s.setItems(l)
 					}
@@ -1214,6 +1217,14 @@ func (s *switchSession) clientBlockItems() map[int32]uint32 {
 		}
 	}
 	return out
+}
+
+// stripItemData drops a server's item NBT: only names and numbers are used (newItemMap), and the
+// data is most of the list's size, kept once per player.
+func stripItemData(reg *packet.ItemRegistry) {
+	for i := range reg.Items {
+		reg.Items[i].Data = nil
+	}
 }
 
 func (s *switchSession) setItems(l *link) {

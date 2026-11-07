@@ -40,6 +40,11 @@ type Network struct {
 	// packGen counts the changes to the servers' resource packs: a client logged in before the
 	// last one has old packs.
 	packGen atomic.Uint64
+	// contentGen counts the changes to what the union is built from (servers' content, packs).
+	// With the live config it keys unionCache, the union every join shares. n.mu guards all three.
+	contentGen uint64
+	unionCache *union
+	unionKey   unionKey
 	// rejoinTo holds, by XUID, the server a player was moving to when sent to join again for new
 	// resource packs (switchSession.record): they land there when they are back, not on the default.
 	rejoinTo sync.Map // xuid -> rejoinTarget
@@ -369,6 +374,7 @@ func (n *Network) Reload(servers []ServerConfig, try []string, forced map[string
 		_, known := n.content[s.Name]
 		if !known {
 			n.content[s.Name] = &serverContent{}
+			n.contentGen++
 		}
 		n.mu.Unlock()
 		if !known {
@@ -438,6 +444,7 @@ func (n *Network) record(server string, id uint32, payload []byte) bool {
 		n.content[server] = c
 	}
 	c.set(id, payload)
+	n.contentGen++
 	n.mu.Unlock()
 	_ = os.MkdirAll(filepath.Dir(path), 0o755)
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
@@ -480,9 +487,30 @@ func (n *Network) orderedServers() []ServerConfig {
 	return out
 }
 
+// unionKey is what a built union depends on.
+type unionKey struct {
+	gen  uint64
+	conf *liveConfig
+}
+
+// buildUnion returns the union, built again only when the servers' content, the packs or the
+// server list changed: every player shares one (it is only read).
 func (n *Network) buildUnion() (*union, error) {
 	n.mu.Lock()
 	defer n.mu.Unlock()
+	key := unionKey{n.contentGen, n.conf()}
+	if n.unionCache != nil && n.unionKey == key {
+		return n.unionCache, nil
+	}
+	u, err := n.makeUnion()
+	if err == nil {
+		n.unionCache, n.unionKey = u, key
+	}
+	return u, err
+}
+
+// makeUnion builds the union. n.mu held.
+func (n *Network) makeUnion() (*union, error) {
 	u := &union{
 		packsInfo: &packet.ResourcePacksInfo{},
 		packStack: &packet.ResourcePackStack{BaseGameVersion: "*"},
@@ -1038,6 +1066,7 @@ func (n *Network) downloadPacks(server string) (changed bool, err error) {
 				}
 				n.mu.Lock()
 				n.packs[key] = &cachedPack{data: d.data, hash: sum[:]}
+				n.contentGen++
 				n.mu.Unlock()
 				n.Log.Info("network: downloaded resource pack", "server", server, "pack", key, "bytes", len(d.data))
 				got--
