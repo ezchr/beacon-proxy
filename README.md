@@ -163,7 +163,7 @@ The environment variable `BEACON_FORWARDING_SECRET`, when set, is used instead o
 
 In game, for everyone: `/server [name]`.
 In game, for Beacon's admins: `/glist`, `/send <player|all|current> <server>`,
-`/broadcast [on|off]`, `/beacon reload`, and [bans and mutes](docs/features.md#bans-and-mutes):
+`/broadcast [on|off] [world]`, `/beacon reload`, and [bans and mutes](docs/features.md#bans-and-mutes):
 
 ```
 /ban Steve 7d griefing
@@ -181,7 +181,7 @@ In Beacon's console:
 | `end` | stop Beacon |
 | `glist` | who is on which server |
 | `send <player\|all> <server>` | move players |
-| `broadcast [on\|off]` | show or hide the world on the Friends tab |
+| `broadcast [on\|off] [world]` | show or hide worlds on the Friends tab: every world, or one by name; alone, lists them |
 | `invites start\|stop\|status` | Xbox invites to the players `beacon scrape` found |
 | `friendadd <server>\|stop\|status` | friend requests to the players seen on a server |
 | `reload` | reread `beacon.toml` without a restart, and say what still needs one |

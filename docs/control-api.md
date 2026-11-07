@@ -17,7 +17,8 @@ curl 127.0.0.1:7777/listing/status
 | Route | What it does |
 |---|---|
 | `/ping?xuid=<xuid>` | a connected player's real round trip in ms (their device to Beacon, plus Beacon to the server), for a `/ping` command on your server. `not connected` when Beacon doesn't have them. |
-| `/listing/status`, `/listing/on`, `/listing/off` | show or hide the worlds on the Friends tab, like `/broadcast on\|off`; add `?world=NAME` for one world (`main`, or an extra world's `name`). Needs `listing-toggle = true` |
+| `/listing/status`, `/listing/on`, `/listing/off` | show or hide the worlds on the Friends tab, like `/broadcast`; add `?world=NAME` for one world. Needs `listing-toggle = true` |
+| `/close?message=<text>`, `/open` | close the network: everyone but Beacon's admins is disconnected with the message, and new joins (Friends tab or address) are turned away with it until `/open`. Stays closed across restarts |
 | `/chat/send`, `/chat/poll` | chat across your servers, when `cross-server-chat = true`: a server posts its players' messages and polls for the others' |
 | `/invites/start`, `/invites/stop`, `/invites/status` | send Xbox invites to the players [`beacon scrape`](scraper.md) found (and any in `invite_queue.txt`); the console's `invites` command does the same |
 | `/invites/friends/start`, `/invites/friends/stop`, `/invites/friends/status` | invite the hosting account's own friends |

@@ -71,13 +71,28 @@ Under `[broadcast]` in `beacon.toml`:
 
 | Setting | Meaning |
 |---|---|
+| `name` | the world's name in `/broadcast` and the control API; default `main` (extra worlds use their own `name`) |
 | `world-name` | the world's title on the Friends tab; default: the `motd` (the server list keeps the `motd`) |
 | `host-name` | the name shown as the world's host; default: the `motd` |
 | `server` | the server players joining through this world land on first; default: the first in `try` |
 | `player-count` | what the world's player count shows: `world` (players who joined through it, the default), `server` (everyone on its server) or `network` (everyone on every server); each extra world can set its own. A world still holds at most 30 players who joined through it |
 | `admins` | gamertags or XUIDs that may use `/glist`, `/send` and `/broadcast` |
 | `accept-friends` | accept friend requests automatically |
-| `listing-toggle` | lets admins hide worlds from the Friends tab: `/broadcast off` hides every world, `/broadcast off <world>` one (`main`, or an extra world's `name`), `/broadcast` shows which are listed. Players already in stay, and joining by IP still works |
+| `listing-toggle` | lets admins hide worlds from the Friends tab with `/broadcast` (see below) |
+
+## Hiding worlds
+
+With `listing-toggle = true`, admins can take worlds off the Friends tab and put them back:
+
+| Command | |
+|---|---|
+| `/broadcast` | list every world and whether it is shown |
+| `/broadcast off` / `/broadcast on` | hide or show every world |
+| `/broadcast off <world>` / `/broadcast on <world>` | hide or show one world, by its `name` |
+
+Players already in a hidden world stay, and joining by IP address keeps working. The same works in
+the console (without the slash) and on the [control API](control-api.md) (`/listing/off?world=NAME`).
+Beacon remembers which worlds are hidden across restarts.
 
 ## Inviting players
 
