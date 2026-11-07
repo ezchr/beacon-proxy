@@ -849,9 +849,7 @@ func (s *switchSession) injectModeration(pk *packet.AvailableCommands, enum func
 		{Name: "reason", Type: valid | protocol.CommandArgTypeRawText, Optional: true},
 	}
 	var online []string
-	for _, p := range s.n.Players() {
-		online = append(online, p.Name)
-	}
+	online = append(online, s.n.onlineNames()...)
 	m := s.n.moderation()
 	now := time.Now()
 	listed := func(list map[string]modEntry, keys bool) []string {

@@ -103,9 +103,7 @@ func (s *switchSession) pingOverloads(enum func(string, []string) uint32) []prot
 		{Name: "player", Type: valid | protocol.CommandArgTypeTarget, Optional: true},
 	}}
 	var names []string
-	for _, p := range s.n.Players() {
-		names = append(names, p.Name)
-	}
+	names = append(names, s.n.onlineNames()...)
 	if len(names) == 0 {
 		return []protocol.CommandOverload{target}
 	}

@@ -100,3 +100,24 @@ func (n *Network) RunPing(args string) ([]string, bool) {
 	}
 	return out, true
 }
+
+// onlineNames are everyone on the network for command suggestions: Bedrock players, then the Java
+// players the Java proxy reported, sorted, each once.
+func (n *Network) onlineNames() []string {
+	seen := map[string]bool{}
+	var out []string
+	add := func(name string) {
+		if k := strings.ToLower(name); name != "" && !seen[k] {
+			seen[k] = true
+			out = append(out, name)
+		}
+	}
+	for _, p := range n.Players() {
+		add(p.Name)
+	}
+	for _, j := range javaPlayersOn() {
+		add(j.name)
+	}
+	slices.SortFunc(out, func(a, b string) int { return strings.Compare(strings.ToLower(a), strings.ToLower(b)) })
+	return out
+}

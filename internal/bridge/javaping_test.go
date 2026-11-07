@@ -31,6 +31,9 @@ func TestJavaPlayersInPingAndGList(t *testing.T) {
 	if !strings.Contains(g, "2 players online (1 Bedrock, 1 Java).") || !strings.Contains(g, "[skygen] (1): Steve") {
 		t.Fatalf("glist: %q", g)
 	}
+	if names := n.onlineNames(); len(names) != 2 || names[0] != "Me" || names[1] != "Steve" {
+		t.Fatalf("suggested names: %v", names)
+	}
 	noteJavaPings(nil)
 	if _, ok := n.RunPing("Steve"); ok {
 		t.Fatal("a Java player who left is still pinged")
