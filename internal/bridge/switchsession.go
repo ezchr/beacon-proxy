@@ -367,7 +367,7 @@ func (s *switchSession) join() error {
 	}
 	s.palette = u.palette
 
-	order := firstServerFirst(s.n.joinOrder(s.proto, s.cd.ServerAddress), s.cfg.FirstServer)
+	order := s.n.withFirstServer(s.n.joinOrder(s.proto, s.cd.ServerAddress), s.cfg.FirstServer, s.proto)
 	s.log.Info("network: join order", "first", s.cfg.FirstServer, "order", serverNames(order))
 	if len(order) == 0 {
 		return fmt.Errorf("no server here supports %s yet", proxy.VersionName(s.proto))
@@ -1212,6 +1212,24 @@ func (s *switchSession) awaitSpawnColumnLocked(pos mgl32.Vec3) chan struct{} {
 	s.awaitGround = ch
 	s.awaitCol = [2]int32{int32(math.Floor(float64(pos[0]))) >> 4, int32(math.Floor(float64(pos[2]))) >> 4}
 	return ch
+}
+
+// withFirstServer puts the server named first at the front of order: moved there when order has
+// it, added when it is one of the network's servers that order leaves out (try lists only where
+// players go by default) and takes protocol id. Unknown, or not taking id: order as it is.
+func (n *Network) withFirstServer(order []ServerConfig, first string, id int32) []ServerConfig {
+	if first == "" {
+		return order
+	}
+	for _, s := range order {
+		if strings.EqualFold(s.Name, first) {
+			return firstServerFirst(order, first)
+		}
+	}
+	if s := n.conf().server(first); s != nil && s.Accepts(id) {
+		return append([]ServerConfig{*s}, order...)
+	}
+	return order
 }
 
 // firstServerFirst moves the server named first to the front of order, if it is there.

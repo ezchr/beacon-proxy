@@ -56,3 +56,24 @@ func TestLimits(t *testing.T) {
 		t.Fatal("login limit enforced while off")
 	}
 }
+
+// A world's server that try leaves out still comes first: try = ["pvp"], world server "skygen".
+func TestWithFirstServer(t *testing.T) {
+	n := &Network{}
+	servers := []ServerConfig{{Name: "pvp"}, {Name: "skygen"}, {Name: "old", Protocols: []int32{1}}}
+	if err := n.setLive(servers, []string{"pvp"}, nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	for first, want := range map[string][]string{
+		"":       {"pvp"},
+		"skygen": {"skygen", "pvp"},
+		"SkyGen": {"skygen", "pvp"},
+		"pvp":    {"pvp"},
+		"nope":   {"pvp"},
+		"old":    {"pvp"}, // does not take this client's version
+	} {
+		if got := names(n.withFirstServer(n.joinOrder(2225, ""), first, 2225)); !slices.Equal(got, want) {
+			t.Errorf("first %q: got %v, want %v", first, got, want)
+		}
+	}
+}
