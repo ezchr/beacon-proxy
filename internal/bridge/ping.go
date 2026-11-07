@@ -3,6 +3,8 @@ package bridge
 import (
 	"fmt"
 	"math/rand/v2"
+	"net"
+	"net/url"
 	"strings"
 	"time"
 
@@ -31,7 +33,7 @@ func playerPing(xuid string) (time.Duration, bool) {
 	}
 	d := clientRoundTrip(l.client)
 	if l.backend != nil {
-		d += 2 * l.backend.Latency()
+		d += clientRoundTrip(l.backend) // the server leg, for a server on another machine
 	}
 	return d, true
 }
@@ -111,4 +113,36 @@ func (s *switchSession) pingOverloads(enum func(string, []string) uint32) []prot
 		{Name: "player", Type: valid | protocol.CommandArgEnum | enum("BeaconPingPlayer", names)},
 	}}
 	return []protocol.CommandOverload{listed, target}
+}
+
+// remoteServer reports whether a server's address is on another machine: its leg then counts in
+// /ping. On this machine it is next to nothing, and NetherNet's own reading of it is wrong.
+func remoteServer(address string) bool {
+	host := address
+	if u, err := url.Parse(address); err == nil && u.Host != "" {
+		host = u.Host
+	}
+	if h, _, err := net.SplitHostPort(host); err == nil {
+		host = h
+	}
+	host = strings.Trim(host, "[]")
+	if strings.EqualFold(host, "localhost") || host == "" {
+		return false
+	}
+	if ip := net.ParseIP(host); ip != nil {
+		return !ip.IsLoopback()
+	}
+	return true
+}
+
+// setBackendPing makes /ping count the leg to l's server if it is on another machine.
+func (s *switchSession) setBackendPing(l *link) {
+	if s.id.XUID == "" {
+		return
+	}
+	if remoteServer(l.server.Address) {
+		registerBackendPingIf(s.id.XUID, l.conn)
+		return
+	}
+	clearBackendPing(s.id.XUID)
 }

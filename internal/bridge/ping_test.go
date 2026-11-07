@@ -57,3 +57,26 @@ func TestPingCommand(t *testing.T) {
 		t.Error("a name the relay does not know was not left to the server")
 	}
 }
+
+// Only a server on another machine adds its leg to /ping.
+func TestRemoteServer(t *testing.T) {
+	for addr, want := range map[string]bool{
+		"http://127.0.0.1:19133": false, "127.0.0.1:19132": false, "localhost:19132": false,
+		"http://[::1]:19133": false, "http://10.0.0.5:19133": true, "play.example.com:19132": true,
+		"203.0.113.7:19132": true,
+	} {
+		if got := remoteServer(addr); got != want {
+			t.Errorf("remoteServer(%q) = %v, want %v", addr, got, want)
+		}
+	}
+	e := registerPing("9", fixedLatency(10*time.Millisecond))
+	defer unregisterPing("9", e)
+	registerBackendPing("9", fixedLatency(15*time.Millisecond))
+	if d, _ := playerPing("9"); d != 50*time.Millisecond {
+		t.Errorf("player + remote server: %v, want 50ms", d)
+	}
+	clearBackendPing("9")
+	if d, _ := playerPing("9"); d != 20*time.Millisecond {
+		t.Errorf("after a move to this machine: %v, want 20ms", d)
+	}
+}

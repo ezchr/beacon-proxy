@@ -171,8 +171,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 		old.close()
 	}
 	s.log.Info("network: moving player", "from", nameOf(old), "to", server.Name, "blocksRenumbered", bm != nil)
-	// No backend leg in /ping: the servers are on this machine, and the NetherNet reading of
-	// that hop is wrong (around 46 ms on loopback). ms is then the player's own link.
+	s.setBackendPing(l) // the server leg counts in /ping only for a server on another machine
 	go s.readBackend(l, false)
 	_ = l.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: s.chunkRadius, MaxChunkRadius: s.maxRadius})
 

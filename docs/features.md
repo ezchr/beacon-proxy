@@ -29,6 +29,8 @@ setup.
 - **Commands:** `/server` lists the servers and `/ping [player]` shows a ping (your own, a player's, or
   `@a` for everyone's), for everyone; admins also get `/glist`, `/send` and `/broadcast`. Beacon
   answers `/ping` itself, replacing a server's own; a name Beacon doesn't know goes on to the server.
+  The ping is the player's connection to Beacon, plus Beacon's to their server when that server is on
+  another machine (on the same machine it is next to nothing, so it is left out).
   With a Java proxy reporting its Java players (see Bans and mutes), `/ping` and `/glist` include
   them, and the proxy can give Java players the same `/ping` through the control API.
 

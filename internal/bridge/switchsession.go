@@ -462,8 +462,7 @@ func (s *switchSession) join() error {
 	}
 	s.sendClient(&sg, u.items, u.actors)
 	s.log.Info("network: joined", "server", server.Name, "blocksRenumbered", bm != nil)
-	// No backend leg in /ping: the servers are on this machine, and the NetherNet reading of
-	// that hop is wrong (around 46 ms on loopback). ms is then the player's own link.
+	s.setBackendPing(l) // the server leg counts in /ping only for a server on another machine
 	go s.readBackend(l, true)
 	return nil
 }

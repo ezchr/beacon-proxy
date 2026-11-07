@@ -59,6 +59,10 @@ func registerPing(xuid string, conn latencyReporter) *connLatencies {
 // in practice - HandleConn always calls registerPing before dialing the backend - but this must
 // not panic if it somehow does).
 func registerBackendPing(xuid string, conn latencyReporter) {
+	if conn == nil {
+		clearBackendPing(xuid)
+		return
+	}
 	pingRegistryMu.Lock()
 	defer pingRegistryMu.Unlock()
 	if l, ok := pingRegistry[xuid]; ok {
@@ -132,7 +136,7 @@ func PingHandler() http.Handler {
 			// dialBackend succeeds (or forever, if the connection fails before reaching the
 			// backend at all) - report just the client leg in that case rather than blocking or
 			// returning an error, since that's still a real, useful number on its own.
-			backendMs = l.backend.Latency().Milliseconds() * 2
+			backendMs = clientRoundTrip(l.backend).Milliseconds()
 			totalMs += backendMs
 		}
 		w.Header().Set("Content-Type", "application/json")
@@ -158,4 +162,13 @@ func ConnectedXUIDs() map[string]bool {
 		xuids[xuid] = true
 	}
 	return xuids
+}
+
+// clearBackendPing drops the server leg of xuid's ping (a move to a server on this machine).
+func clearBackendPing(xuid string) {
+	pingRegistryMu.Lock()
+	defer pingRegistryMu.Unlock()
+	if l, ok := pingRegistry[xuid]; ok {
+		l.backend = nil
+	}
 }
