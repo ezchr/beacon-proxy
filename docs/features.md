@@ -113,6 +113,7 @@ Beacon's admins have these across the whole network, in relay mode. There's noth
 | `/ban <player> [time] [reason]` | turns the player away at login, and removes them if online |
 | `/banip <player or ip> [time] [reason]` | the same for an address |
 | `/mute <player> [time] [reason]` | stops their chat and `/msg`, `/tell`, `/me` |
+| `/kick <player> [reason]` | disconnects them (they may join again at once); with `kick = "server"` in `beacon.toml`, it only takes them off their server, to another of yours |
 | `/unban`, `/unbanip`, `/unmute` | lifts one |
 | `/banlist`, `/mutelist` | lists them |
 

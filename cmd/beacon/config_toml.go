@@ -92,6 +92,7 @@ type tomlConfig struct {
 		RejoinAddress           string `toml:"rejoin-address"`
 		CrossServerChat         bool   `toml:"cross-server-chat"`
 		Moderation              *bool  `toml:"moderation"`
+		Kick                    string `toml:"kick"`
 		LoginRateLimit          int    `toml:"login-ratelimit"`
 		PacketsPerSecond        int    `toml:"packets-per-second"`
 		SessionsPerIP           int    `toml:"sessions-per-ip"`
@@ -196,6 +197,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.CrossServerChat = a.CrossServerChat
 	cfg.Moderation = a.Moderation == nil || *a.Moderation
+	cfg.Kick = a.Kick
 	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
 	case "", "off", "motd", "players", "all":

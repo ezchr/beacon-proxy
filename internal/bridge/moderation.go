@@ -533,6 +533,7 @@ func (s *switchSession) handleModeration(line string) bool {
 		"ban": "/ban <player> [time] [reason]", "unban": "/unban <player>",
 		"banip": "/banip <player|ip> [time] [reason]", "unbanip": "/unbanip <player|ip>",
 		"mute": "/mute <player> [time] [reason]", "unmute": "/unmute <player>",
+		"kick": "/kick <player> [reason]",
 	}
 	switch name {
 	case "banlist":
@@ -548,8 +549,15 @@ func (s *switchSession) handleModeration(line string) bool {
 		return false
 	}
 	if len(args) == 0 {
+		if name == "kick" {
+			s.message("<red>Use %s.</red>", u)
+			return true
+		}
 		s.message("<red>Use %s. Time is such as 30m, 12h, 7d or 4w, or perm.</red>", u)
 		return true
+	}
+	if name == "kick" {
+		return s.kick(args[0], args[1:]) // kick.go
 	}
 	if (name == "ban" || name == "banip" || name == "mute") && badModTime(args[1:]) {
 		s.message("<red>%s is not a time. Use one such as 30m, 12h, 7d or 4w, or perm.</red>", args[1])
@@ -817,6 +825,8 @@ func (s *switchSession) injectModeration(pk *packet.AvailableCommands, enum func
 	set("unban", "Lift a ban", target("BeaconBanned", "player", listed(m.Bans, false)))
 	set("unmute", "Lift a mute", target("BeaconMuted", "player", listed(m.Mutes, false)))
 	set("unbanip", "Lift an address ban", target("BeaconBannedIP", "address", listed(m.IPBans, true)))
+	set("kick", "Kick a player", target("BeaconKickPlayer", "player", online,
+		protocol.CommandParameter{Name: "reason", Type: valid | protocol.CommandArgTypeRawText, Optional: true}))
 	set("banlist", "List the network's bans", []protocol.CommandOverload{{}})
 	set("mutelist", "List the network's mutes", []protocol.CommandOverload{{}})
 }

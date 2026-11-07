@@ -37,8 +37,9 @@ func (n *Network) JavaLogin(uuid, name, ip string) (string, bool) {
 // JavaStatus is what the Java proxy enforces on a Java player who is on: Ban, the message to
 // remove them with; Mute, how long they are still muted for. Empty when there is none.
 type JavaStatus struct {
-	Ban  string `json:"ban,omitempty"`
-	Mute string `json:"mute,omitempty"`
+	Ban  string    `json:"ban,omitempty"`
+	Mute string    `json:"mute,omitempty"`
+	Kick *JavaKick `json:"kick,omitempty"` // a /kick for them (kick.go), given once
 }
 
 // JavaPlayer is a Java player who is on, as the Java proxy reports them. Ping is their round trip
@@ -66,6 +67,9 @@ func (n *Network) JavaState(players []JavaPlayer) map[string]JavaStatus {
 		}
 		if e, ok := m.muted(javaKey(p.UUID), now); ok {
 			st.Mute = e.left(now)
+		}
+		if k, ok := takeJavaKick(p.UUID); ok {
+			st.Kick = &k
 		}
 		if st != (JavaStatus{}) {
 			out[strings.ToLower(p.UUID)] = st
@@ -103,7 +107,7 @@ func (n *Network) ModerateAs(line, by string) []string {
 	// Unlike the console, they may not ban or mute one of Beacon's admins.
 	if f := splitCommand(line); len(f) > 1 {
 		switch strings.ToLower(f[0]) {
-		case "ban", "banip", "mute":
+		case "ban", "banip", "mute", "kick":
 			if t, ok := n.findTarget(f[1]); ok && !isJavaKey(t.xuid) && n.IsAdmin(t.xuid, t.name) {
 				return []string{t.name + " is an admin."}
 			}

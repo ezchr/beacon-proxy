@@ -93,8 +93,10 @@ control-port = {{.ControlPort}}
 # Let your servers share chat through the control API.
 cross-server-chat = {{.CrossServerChat}}
 
-# Beacon's /ban, /mute and related commands.
+# Beacon's /ban, /mute, /kick and related commands.
 # moderation = true
+# What /kick does: "network" disconnects, "server" sends the player to another of your servers.
+# kick = "network"
 
 # Flood limits. 0: no limit.
 login-ratelimit = 0

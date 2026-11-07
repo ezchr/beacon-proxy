@@ -11,6 +11,7 @@ import (
 // (JavaState), so /ping knows every player of the network, whichever edition.
 
 type javaOnline struct {
+	uuid   string
 	name   string
 	server string
 	ms     int64 // -1: not measured yet
@@ -33,7 +34,7 @@ func noteJavaPings(players []JavaPlayer) {
 	clear(javaPings)
 	for _, p := range players {
 		if p.Name != "" {
-			javaPings[strings.ToLower(p.Name)] = javaOnline{name: p.Name, server: p.Server, ms: p.Ping, at: now}
+			javaPings[strings.ToLower(p.Name)] = javaOnline{uuid: p.UUID, name: p.Name, server: p.Server, ms: p.Ping, at: now}
 		}
 	}
 }

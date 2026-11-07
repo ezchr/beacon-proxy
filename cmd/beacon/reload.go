@@ -26,6 +26,7 @@ func applyLive(cfg FileConfig) {
 	bridge.SetPingPassthrough(cfg.PingPassthrough)
 	chatEnabled = cfg.CrossServerChat
 	bridge.SetModeration(cfg.Moderation)
+	bridge.SetKickMode(cfg.Kick)
 }
 
 // reloadConfig rereads beacon.toml (console reload, /beacon reload), applies what can change while

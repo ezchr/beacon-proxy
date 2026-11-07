@@ -218,6 +218,8 @@ type FileConfig struct {
 	CrossServerChat bool `json:"-"`
 	// Moderation is Beacon's own bans and mutes (bridge/moderation.go); beacon.toml only.
 	Moderation bool `json:"-"`
+	// Kick is what /kick does: "network" (default) or "server" (bridge/kick.go); beacon.toml only.
+	Kick string `json:"-"`
 	// Admins (gamertags or XUIDs) may use the in-game /broadcast.
 	Admins []string `json:"admins,omitempty"`
 	// ListingToggle lets /broadcast and the control port take the world off the Friends tab and
