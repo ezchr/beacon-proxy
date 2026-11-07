@@ -31,11 +31,11 @@ func TestPingCommand(t *testing.T) {
 		return handled, strings.Join(got, "\n")
 	}
 	for _, line := range []string{"/ping", "/ping @s", "/ping @p", "/PING"} {
-		if ok, out := run(line); !ok || !strings.Contains(out, "Your ping") || !strings.Contains(out, " ms") {
+		if ok, out := run(line); !ok || !strings.Contains(out, "Your ping: 40 ms") {
 			t.Errorf("%s: handled=%v %q", line, ok, out)
 		}
 	}
-	if ok, out := run(`/ping "The Lloyd Xmas"`); !ok || !strings.Contains(out, "The Lloyd Xmas") || !strings.Contains(out, " ms") {
+	if ok, out := run(`/ping "The Lloyd Xmas"`); !ok || !strings.Contains(out, "The Lloyd Xmas's ping: 120 ms") {
 		t.Errorf("named player: handled=%v %q", ok, out)
 	}
 	if ok, out := run("/ping the lloyd xmas"); !ok || !strings.Contains(out, "The Lloyd Xmas") {

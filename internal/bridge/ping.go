@@ -37,12 +37,16 @@ func playerPing(xuid string) (time.Duration, bool) {
 	return d, true
 }
 
-// pingText is "<name> <ms> ms", in plain white.
+// pingText is "<name>'s ping: <ms> ms" ("Your ping: ..." for an empty name), in plain white.
 func pingText(name string, d time.Duration, ok bool) string {
-	if !ok {
-		return name + " (not measured yet)"
+	who := "Your ping"
+	if name != "" {
+		who = name + "'s ping"
 	}
-	return fmt.Sprintf("%s %d ms", name, d.Milliseconds())
+	if !ok {
+		return who + ": not measured yet"
+	}
+	return fmt.Sprintf("%s: %d ms", who, d.Milliseconds())
 }
 
 // pingCommand runs /ping with args and reports whether the relay answered it.
@@ -66,12 +70,10 @@ func (s *switchSession) pingCommand(args []string) bool {
 			slices.SortFunc(players, func(a, b Player) int {
 				return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 			})
-			parts := make([]string, 0, len(players))
 			for _, p := range players {
 				d, ok := playerPing(p.XUID)
-				parts = append(parts, pingText(p.Name, d, ok))
+				s.message("%s", pingText(p.Name, d, ok))
 			}
-			s.message("<yellow>Ping:</yellow> %s", strings.Join(parts, "<grey>,</grey> "))
 			return true
 		case "@r":
 			if len(players) == 0 {
@@ -80,7 +82,7 @@ func (s *switchSession) pingCommand(args []string) bool {
 			}
 			p := players[rand.IntN(len(players))]
 			d, ok := playerPing(p.XUID)
-			s.message("<yellow>Ping:</yellow> %s", pingText(p.Name, d, ok))
+			s.message("%s", pingText(p.Name, d, ok))
 			return true
 		default:
 			s.message("<red>Use @s, @p, @a, @e or @r, or a player's name.</red>")
@@ -89,7 +91,7 @@ func (s *switchSession) pingCommand(args []string) bool {
 	}
 	if arg == "" {
 		d, ok := playerPing(self.XUID)
-		s.message("<yellow>Your ping:</yellow> %s", strings.TrimPrefix(pingText("", d, ok), " "))
+		s.message("%s", pingText("", d, ok))
 		return true
 	}
 	p, ok := s.n.FindPlayer(arg)
@@ -97,7 +99,7 @@ func (s *switchSession) pingCommand(args []string) bool {
 		return false // not one of the relay's players: the server's own /ping may know them
 	}
 	d, measured := playerPing(p.XUID)
-	s.message("<yellow>Ping:</yellow> %s", pingText(p.Name, d, measured))
+	s.message("%s", pingText(p.Name, d, measured))
 	return true
 }
 
