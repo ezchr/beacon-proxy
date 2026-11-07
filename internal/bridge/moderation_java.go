@@ -41,15 +41,19 @@ type JavaStatus struct {
 	Mute string `json:"mute,omitempty"`
 }
 
-// JavaPlayer is a Java player who is on, as the Java proxy reports them.
+// JavaPlayer is a Java player who is on, as the Java proxy reports them. Ping is their round trip
+// in ms as the proxy measures it, -1 when it has none.
 type JavaPlayer struct {
 	UUID, Name, IP string
+	Ping           int64
+	Server         string // the proxy's name of the server they are on
 }
 
 // JavaState returns the bans and mutes on the Java players who are on, by UUID; players with
 // neither are left out.
 func (n *Network) JavaState(players []JavaPlayer) map[string]JavaStatus {
 	out := map[string]JavaStatus{}
+	noteJavaPings(players) // for /ping, moderation or not
 	if moderationOff.Load() {
 		return out
 	}

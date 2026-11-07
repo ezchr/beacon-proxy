@@ -133,9 +133,11 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		var players []struct {
-			UUID string `json:"uuid"`
-			Name string `json:"name"`
-			IP   string `json:"ip"`
+			UUID   string `json:"uuid"`
+			Name   string `json:"name"`
+			IP     string `json:"ip"`
+			Ping   *int64 `json:"ping"`
+			Server string `json:"server"`
 		}
 		if err := json.NewDecoder(io.LimitReader(r.Body, 1<<20)).Decode(&players); err != nil {
 			http.Error(w, "send a JSON list of {uuid, name, ip}", http.StatusBadRequest)
@@ -143,13 +145,36 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		}
 		list := make([]bridge.JavaPlayer, 0, len(players))
 		for _, p := range players {
-			list = append(list, bridge.JavaPlayer{UUID: p.UUID, Name: p.Name, IP: p.IP})
+			ping := int64(-1)
+			if p.Ping != nil {
+				ping = *p.Ping
+			}
+			list = append(list, bridge.JavaPlayer{UUID: p.UUID, Name: p.Name, IP: p.IP, Ping: ping, Server: p.Server})
 		}
 		w.Header().Set("Content-Type", "application/json")
 		_ = json.NewEncoder(w).Encode(network.JavaState(list))
 		return
 	case path == "/packetdebug":
 		_, _ = io.WriteString(w, strings.Join(bridge.DebugCommand(r.URL.Query().Get("cmd")), "\n")+"\n")
+		return
+	case path == "/glist":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, strings.Join(network.GList(), "\n")+"\n")
+		return
+	case path == "/ping/run":
+		if network == nil {
+			http.Error(w, "needs relay mode", http.StatusNotFound)
+			return
+		}
+		lines, ok := network.RunPing(r.URL.Query().Get("args"))
+		if !ok {
+			http.Error(w, "no such player", http.StatusNotFound)
+			return
+		}
+		_, _ = io.WriteString(w, strings.Join(lines, "\n")+"\n")
 		return
 	case path == "/ping":
 		bridge.PingHandler().ServeHTTP(w, r)

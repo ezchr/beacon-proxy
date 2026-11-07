@@ -3,7 +3,6 @@ package bridge
 import (
 	"fmt"
 	"math/rand/v2"
-	"slices"
 	"strings"
 	"time"
 
@@ -58,7 +57,7 @@ func (s *switchSession) pingCommand(args []string) bool {
 		if i := strings.IndexByte(sel, '['); i >= 0 {
 			sel = sel[:i] // selector arguments are not supported: @a[r=5] is @a
 		}
-		players := s.n.Players()
+		players := s.n.pingEntries() // Bedrock and Java players (javaping.go)
 		switch sel {
 		case "@s", "@p":
 			arg = ""
@@ -67,12 +66,8 @@ func (s *switchSession) pingCommand(args []string) bool {
 				s.message("<grey>Nobody is online.</grey>")
 				return true
 			}
-			slices.SortFunc(players, func(a, b Player) int {
-				return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
-			})
 			for _, p := range players {
-				d, ok := playerPing(p.XUID)
-				s.message("%s", pingText(p.Name, d, ok))
+				s.message("%s", p.text())
 			}
 			return true
 		case "@r":
@@ -80,9 +75,7 @@ func (s *switchSession) pingCommand(args []string) bool {
 				arg = ""
 				break
 			}
-			p := players[rand.IntN(len(players))]
-			d, ok := playerPing(p.XUID)
-			s.message("%s", pingText(p.Name, d, ok))
+			s.message("%s", players[rand.IntN(len(players))].text())
 			return true
 		default:
 			s.message("<red>Use @s, @p, @a, @e or @r, or a player's name.</red>")
@@ -94,12 +87,11 @@ func (s *switchSession) pingCommand(args []string) bool {
 		s.message("%s", pingText("", d, ok))
 		return true
 	}
-	p, ok := s.n.FindPlayer(arg)
+	p, ok := s.n.findPingEntry(arg)
 	if !ok {
-		return false // not one of the relay's players: the server's own /ping may know them
+		return false // no player of that name on: the server's own /ping may know them
 	}
-	d, measured := playerPing(p.XUID)
-	s.message("%s", pingText(p.Name, d, measured))
+	s.message("%s", p.text())
 	return true
 }
 

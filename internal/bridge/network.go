@@ -1055,13 +1055,31 @@ func (n *Network) GList() []string {
 	byServer := map[string][]string{}
 	players := n.Players()
 	for _, p := range players {
-		byServer[p.Server] = append(byServer[p.Server], p.Name)
+		byServer[strings.ToLower(p.Server)] = append(byServer[strings.ToLower(p.Server)], p.Name)
 	}
-	lines := []string{fmt.Sprintf("%d players online.", len(players))}
-	for _, name := range n.ServerNames() {
-		if names := byServer[name]; len(names) > 0 {
-			lines = append(lines, fmt.Sprintf("[%s] (%d): %s", name, len(names), strings.Join(names, ", ")))
+	// Java players, as the Java proxy reports them (javaping.go), on the server of the same name.
+	java := javaPlayersOn()
+	order := n.ServerNames()
+	for _, j := range java {
+		key := strings.ToLower(j.server)
+		if !slices.ContainsFunc(order, func(s string) bool { return strings.EqualFold(s, j.server) }) {
+			order = append(order, j.server) // a server only the Java proxy has
 		}
+		byServer[key] = append(byServer[key], j.name)
+	}
+	total := len(players) + len(java)
+	head := fmt.Sprintf("%d players online.", total)
+	if len(java) > 0 {
+		head = fmt.Sprintf("%d players online (%d Bedrock, %d Java).", total, len(players), len(java))
+	}
+	lines := []string{head}
+	for _, name := range order {
+		names := byServer[strings.ToLower(name)]
+		if len(names) == 0 {
+			continue
+		}
+		slices.SortFunc(names, func(a, b string) int { return strings.Compare(strings.ToLower(a), strings.ToLower(b)) })
+		lines = append(lines, fmt.Sprintf("[%s] (%d): %s", name, len(names), strings.Join(names, ", ")))
 	}
 	return lines
 }
