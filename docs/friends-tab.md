@@ -43,21 +43,23 @@ alt1` takes one out again (its sign-in is kept as `tokens/alt1.json.removed`).
 
 ## One world per server
 
-With [several servers](features.md#moving-between-servers-relay-mode), each world can lead to its own server: set `server` on it.
+With [several servers](features.md#moving-between-servers-relay-mode), each world can lead to its own
+server: set `server` on it to one of the names under `[servers]`. Without it, a world leads to the
+first server in `try`, as before.
 Players who join through that world land there first, and can still move with `/server`. Players
 who join through a friend in that world land there too, and players who join by IP address land
 on the first server in `try`.
 
 ```toml
 [broadcast]
-host-name = "My PvP"
-server = "pvp"
+host-name = "My Survival"
+server = "survival"
 
 [[broadcast.extra]]
-name = "skygen"
-token-file = "tokens/skygen.json"
-host-name = "My Skygen"
-server = "skygen"
+name = "minigames"
+token-file = "tokens/minigames.json"
+host-name = "My Minigames"
+server = "minigames"
 ```
 
 A player stays in the world they joined until they leave, wherever `/server` takes them, so their
