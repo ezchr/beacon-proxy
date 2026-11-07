@@ -185,7 +185,10 @@ type FileConfig struct {
 	// first). NetworkDir caches each server's content and packs (default "network").
 	Servers       []bridge.ServerConfig `json:"servers,omitempty"`
 	DefaultServer string                `json:"default_server,omitempty"`
-	NetworkDir    string                `json:"network_dir,omitempty"`
+	// FirstServer is where players joining through this Friends-tab world land first (default:
+	// DefaultServer). Set per world with `server` under [broadcast] or [[broadcast.extra]].
+	FirstServer string `json:"-"`
+	NetworkDir  string `json:"network_dir,omitempty"`
 
 	// TLSDomain (an automatic Let's Encrypt certificate) or TLSCert and TLSKey (files) make the
 	// direct-IP door answer HTTPS too (tlsconfig.go); beacon.toml only.
@@ -242,6 +245,9 @@ type BroadcastConfig struct {
 	// InvitePort is what Invites used to be: a port of its own. Above zero, it is read as
 	// Invites: true.
 	InvitePort int `json:"invite_port,omitempty"`
+	// Server is where players joining through this world land first. Default: the network's
+	// default server.
+	Server string `json:"server,omitempty"`
 	// NoFriendAccept: as FileConfig.NoFriendAccept, for this broadcast's account. Not inherited
 	// from the primary - each account's friends list is its own.
 	NoFriendAccept bool `json:"no_friend_accept"`

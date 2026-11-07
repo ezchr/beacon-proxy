@@ -63,6 +63,7 @@ type tomlConfig struct {
 		ListingToggle  bool     `toml:"listing-toggle"`
 		AllowedXUIDs   []string `toml:"allowed-xuids"`
 		UpdateInterval int      `toml:"update-interval-seconds"`
+		Server         string   `toml:"server"`
 		Extra          []struct {
 			Name          string `toml:"name"`
 			TokenFile     string `toml:"token-file"`
@@ -72,6 +73,7 @@ type tomlConfig struct {
 			AcceptFriends *bool  `toml:"accept-friends"`
 			Protocol      int32  `toml:"protocol"`
 			Version       string `toml:"version"`
+			Server        string `toml:"server"`
 		} `toml:"extra"`
 	} `toml:"broadcast"`
 
@@ -146,6 +148,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.NoFriendAccept = t.Broadcast.AcceptFriends != nil && !*t.Broadcast.AcceptFriends
 	cfg.ListingToggle = t.Broadcast.ListingToggle
 	cfg.AllowedXUIDs = t.Broadcast.AllowedXUIDs
+	cfg.FirstServer = t.Broadcast.Server
 	if t.Broadcast.UpdateInterval > 0 {
 		cfg.UpdateIntervalSeconds = t.Broadcast.UpdateInterval
 	}
@@ -157,7 +160,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 		cfg.ExtraBroadcasts = append(cfg.ExtraBroadcasts, BroadcastConfig{
 			Name: name, TokenFile: e.TokenFile, HostName: e.HostName, WorldName: e.WorldName,
 			Invites: e.Invites, NoFriendAccept: e.AcceptFriends != nil && !*e.AcceptFriends,
-			Protocol: e.Protocol, Version: e.Version,
+			Protocol: e.Protocol, Version: e.Version, Server: e.Server,
 		})
 	}
 

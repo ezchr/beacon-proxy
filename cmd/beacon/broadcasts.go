@@ -91,6 +91,7 @@ func (b BroadcastConfig) forBroadcast(cfg FileConfig) FileConfig {
 	cfg.HostName, cfg.WorldName = b.HostName, b.WorldName
 	cfg.BroadcastName, cfg.InvitesEnabled = b.Name, b.Invites
 	cfg.NoFriendAccept = b.NoFriendAccept
+	cfg.FirstServer = b.Server
 	if b.Protocol != 0 {
 		cfg.Protocol, cfg.Version = b.Protocol, b.Version
 		if cfg.Version == "" {

@@ -247,6 +247,15 @@ func main() {
 	backendTransport := strings.ToLower(strings.TrimSpace(cfg.BackendTransport))
 	if network != nil {
 		log.Info("network mode: players can move between servers", "servers", network.ServerNames(), "default", network.DefaultServer())
+		worlds := map[string]string{"main": cfg.FirstServer}
+		for _, b := range cfg.ExtraBroadcasts {
+			worlds[b.Name] = b.Server
+		}
+		for world, first := range worlds {
+			if first != "" && !slices.ContainsFunc(network.ServerNames(), func(n string) bool { return strings.EqualFold(n, first) }) {
+				log.Warn("a Friends-tab world's server is not in [servers]: its players join the default server", "world", world, "server", first)
+			}
+		}
 		backendTransport = "network"
 	}
 	switch backendTransport {
@@ -313,7 +322,7 @@ func main() {
 			MaxPlayers:    cfg.MaxPlayers,
 			Protocol:      cfg.Protocol,
 			Version:       cfg.Version,
-			Relay:         relayConfig(cfg, authSession, allowXUID, friendActivity, log),
+			Relay:         relayConfig(withoutFirstServer(cfg), authSession, allowXUID, friendActivity, log),
 			Extra:         directIPExtra(cfg, control),
 			Log:           log,
 		}); err != nil {
@@ -677,6 +686,7 @@ func relayConfig(cfg FileConfig, authSession *session.Session, allowXUID func(st
 		DisableClientEncryption: cfg.DisableClientEncryption,
 		ForwardingSecret:        cfg.ForwardingSecret,
 		ForwardingServer:        cfg.DefaultServer,
+		FirstServer:             cfg.FirstServer,
 		WorldPlayers:            cfg.WorldPlayers,
 		AllowXUID:               allowXUID,
 		OnJoin: func(xuid, name string) {
@@ -797,4 +807,11 @@ var backendIdentities sync.Map // *session.Session -> *bridge.IdentityCache
 func identityCacheFor(s *session.Session, log *slog.Logger) *bridge.IdentityCache {
 	c, _ := backendIdentities.LoadOrStore(s, bridge.NewIdentityCache(s, log))
 	return c.(*bridge.IdentityCache)
+}
+
+// withoutFirstServer is cfg for the direct-IP door: a Friends-tab world's own first server does not
+// apply to players who join by address.
+func withoutFirstServer(cfg FileConfig) FileConfig {
+	cfg.FirstServer = ""
+	return cfg
 }

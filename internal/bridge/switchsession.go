@@ -367,7 +367,7 @@ func (s *switchSession) join() error {
 	}
 	s.palette = u.palette
 
-	order := s.n.joinOrder(s.proto, s.cd.ServerAddress)
+	order := firstServerFirst(s.n.joinOrder(s.proto, s.cd.ServerAddress), s.cfg.FirstServer)
 	if len(order) == 0 {
 		return fmt.Errorf("no server here supports %s yet", proxy.VersionName(s.proto))
 	}
@@ -1211,4 +1211,15 @@ func (s *switchSession) awaitSpawnColumnLocked(pos mgl32.Vec3) chan struct{} {
 	s.awaitGround = ch
 	s.awaitCol = [2]int32{int32(math.Floor(float64(pos[0]))) >> 4, int32(math.Floor(float64(pos[2]))) >> 4}
 	return ch
+}
+
+// firstServerFirst moves the server named first to the front of order, if it is there.
+func firstServerFirst(order []ServerConfig, first string) []ServerConfig {
+	for i, s := range order {
+		if first != "" && strings.EqualFold(s.Name, first) {
+			out := append([]ServerConfig{s}, order[:i]...)
+			return append(out, order[i+1:]...)
+		}
+	}
+	return order
 }

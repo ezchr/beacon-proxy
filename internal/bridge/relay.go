@@ -112,6 +112,10 @@ type Config struct {
 	// without leaving (see network.go). BackendTransport and the backend addresses are then unused.
 	Network *Network
 
+	// FirstServer, with a Network, is the server players joining through this listener land on
+	// first, ahead of the network's join order. Unknown or unsuitable: the join order as usual.
+	FirstServer string
+
 	Log *slog.Logger
 }
 

@@ -41,6 +41,28 @@ beacon accounts list
 which shows each account's friend count and warns when one is nearly full. `beacon accounts remove
 alt1` takes one out again (its sign-in is kept as `tokens/alt1.json.removed`).
 
+## One world per server
+
+With [several servers](features.md#moving-between-servers-relay-mode), each world can lead to its own server: set `server` on it.
+Players who join through that world land there first, and can still move with `/server`. Players
+who join through a friend in that world land there too, and players who join by IP address land
+on the first server in `try`.
+
+```toml
+[broadcast]
+host-name = "My PvP"
+server = "pvp"
+
+[[broadcast.extra]]
+name = "skygen"
+token-file = "tokens/skygen.json"
+host-name = "My Skygen"
+server = "skygen"
+```
+
+A player stays in the world they joined until they leave, wherever `/server` takes them, so their
+friends keep seeing them there.
+
 ## Settings
 
 Under `[broadcast]` in `beacon.toml`:
@@ -48,6 +70,7 @@ Under `[broadcast]` in `beacon.toml`:
 | Setting | Meaning |
 |---|---|
 | `host-name` | the name shown as the world's host; default: the `motd` |
+| `server` | the server players joining through this world land on first; default: the first in `try` |
 | `admins` | gamertags or XUIDs that may use `/glist`, `/send` and `/broadcast` |
 | `accept-friends` | accept friend requests automatically |
 | `listing-toggle` | lets admins hide the world from the Friends tab with `/broadcast off`; players already in stay, and joining by IP still works |
