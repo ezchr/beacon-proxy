@@ -168,6 +168,12 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	log = log.With("player", id.DisplayName)
 	log.Info("player authenticated via xbox live", "xuid", id.XUID)
+	if msg, closed := Closed(); closed && !n.IsAdmin(id.XUID, id.DisplayName) {
+		log.Info("join refused: the network is closed")
+		_ = client.WritePacket(&packet.Disconnect{Message: msg})
+		time.Sleep(time.Second)
+		return
+	}
 	{
 		ip := ""
 		if _, _, addr, _ := dcVerdict(conn.RemoteAddr()); addr != nil {

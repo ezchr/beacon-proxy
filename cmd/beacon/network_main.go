@@ -267,6 +267,30 @@ func serveNetworkControl(w http.ResponseWriter, r *http.Request) bool {
 		}
 		_ = json.NewEncoder(w).Encode(map[string]any{"on": listing.On(), "worlds": worlds})
 		return true
+	case path == "/close" || path == "/open":
+		if network == nil {
+			http.Error(w, "this relay has no servers list", http.StatusNotFound)
+			return true
+		}
+		if path == "/open" {
+			if err := network.Open(); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return true
+			}
+			_ = json.NewEncoder(w).Encode(map[string]any{"closed": false})
+			return true
+		}
+		msg := strings.TrimSpace(r.URL.Query().Get("message"))
+		if msg == "" {
+			msg = "The server is closed for now. Come back soon!"
+		}
+		kicked, err := network.Close(msg)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return true
+		}
+		_ = json.NewEncoder(w).Encode(map[string]any{"closed": true, "message": msg, "disconnected": kicked})
+		return true
 	case path == "/servers":
 		if network == nil {
 			http.Error(w, "this relay has no servers list", http.StatusNotFound)

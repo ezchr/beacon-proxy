@@ -215,6 +215,7 @@ func main() {
 		listing = newListingGate("listing_state.json", worlds, log)
 		log.Info("friends-tab listing toggle on: /broadcast on|off [world] in game, or the control port's /listing/on|off", "listed", listing.On())
 	}
+	bridge.LoadClosed()
 	if network, err = setupNetwork(cfg, authSession, log); err != nil {
 		log.Error("invalid [servers] in beacon.toml", "err", err)
 		exit(1)
