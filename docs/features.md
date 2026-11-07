@@ -102,7 +102,8 @@ For Java Edition players, run Velocity (or another Java proxy) next to Beacon as
 Beacon's admins have these across the whole network, in relay mode. There's nothing to set up.
 Moderators (`moderators` in `beacon.toml`, by XUID like `admins`) have `/glist`, `/kick`, `/unmute`, `/mutelist`,
 `/banlist`, and `/ban` and `/mute` for up to 1 day; they can only lift their own bans, and can't act
-on admins or other moderators. Both lists are reloaded by `/beacon reload`:
+on admins or other moderators. `protected = ["RiftBot*"]` lists names nobody can ban, mute or kick,
+such as a server's own bots (`*` and `?` work as wildcards). The lists are reloaded by `/beacon reload`:
 
 ```
 /ban Steve 7d griefing

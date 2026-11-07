@@ -646,6 +646,10 @@ func (s *switchSession) punish(kind, who string, args []string) bool {
 		s.message("<red>%s is an admin.</red>", t.name)
 		return true
 	}
+	if isProtected(t.name) || isProtected(who) {
+		s.message(protectedMessage, t.name)
+		return true
+	}
 	m := s.n.moderation()
 	e := s.entry(t, "", args)
 	list, verb, undo := m.Bans, "banned", "unban"
@@ -748,6 +752,10 @@ func (s *switchSession) banIP(who string, args []string) {
 	}
 	if t.xuid != "" && s.n.IsAdmin(t.xuid, t.name) {
 		s.message("<red>%s is an admin.</red>", t.name)
+		return
+	}
+	if isProtected(t.name) || isProtected(who) {
+		s.message(protectedMessage, who)
 		return
 	}
 	m := s.n.moderation()

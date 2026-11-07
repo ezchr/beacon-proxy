@@ -63,6 +63,7 @@ type tomlConfig struct {
 		TokenFile      string   `toml:"token-file"`
 		Admins         []string `toml:"admins"`
 		Moderators     []string `toml:"moderators"`
+		Protected      []string `toml:"protected"`
 		AcceptFriends  *bool    `toml:"accept-friends"`
 		ListingToggle  bool     `toml:"listing-toggle"`
 		AllowedXUIDs   []string `toml:"allowed-xuids"`
@@ -161,6 +162,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.PlayerCap = t.MaxPlayers
 	cfg.Admins = t.Broadcast.Admins
 	cfg.Moderators = t.Broadcast.Moderators
+	cfg.Protected = t.Broadcast.Protected
 	cfg.NoFriendAccept = t.Broadcast.AcceptFriends != nil && !*t.Broadcast.AcceptFriends
 	cfg.ListingToggle = t.Broadcast.ListingToggle
 	cfg.AllowedXUIDs = t.Broadcast.AllowedXUIDs

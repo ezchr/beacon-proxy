@@ -28,6 +28,7 @@ func applyLive(cfg FileConfig) {
 	chatEnabled = cfg.CrossServerChat
 	bridge.SetModeration(cfg.Moderation)
 	bridge.SetModerators(xuidsOnly("moderators", cfg.Moderators))
+	bridge.SetProtected(cfg.Protected)
 	go annotateStaffNames(tomlConfigFile, "", "")
 	bridge.SetKickMode(cfg.Kick)
 	bridge.SetPlayerCap(cfg.PlayerCap)

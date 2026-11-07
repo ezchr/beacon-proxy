@@ -60,6 +60,10 @@ func takeJavaKick(uuid string) (JavaKick, bool) {
 
 // kick runs /kick. It reports false for a name that is not on, which goes on to the server.
 func (s *switchSession) kick(who string, args []string) bool {
+	if isProtected(who) {
+		s.message(protectedMessage, who)
+		return true
+	}
 	reason := strings.TrimSpace(strings.Join(args, " "))
 	toServer := kickToServer.Load()
 	if p, ok := s.n.FindPlayer(who); ok {

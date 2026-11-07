@@ -226,6 +226,8 @@ type FileConfig struct {
 	Admins []string `json:"admins,omitempty"`
 	// Moderators (XUIDs) have part of the moderation commands (bridge/moderators.go); beacon.toml only.
 	Moderators []string `json:"-"`
+	// Protected are name patterns (RiftBot*) staff can't ban, mute or kick: a server's own bots.
+	Protected []string `json:"-"`
 	// ListingToggle lets /broadcast and the control port take the world off the Friends tab and
 	// put it back (state in listing_state.json, off until first switched on).
 	ListingToggle bool `json:"listing_toggle,omitempty"`
