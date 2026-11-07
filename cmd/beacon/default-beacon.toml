@@ -1,33 +1,27 @@
 # Beacon Proxy configuration. Do not change config-version.
 config-version = "1.0"
 
-# "relay": players go through Beacon and can switch servers with /server.
-# "relayless": players connect straight to your one server (no /server).
+# "relay" (players can use /server) or "relayless" (straight to your one server).
 mode = {{q .Mode}}
 
-# Where players join by IP. Empty: Friends tab only.
+# Address players join by IP. Empty: Friends tab only.
 bind = {{q .Bind}}
 
-# HTTPS for joining by address. Put your domain here and Beacon gets a free Let's Encrypt
-# certificate for it and renews it by itself (Let's Encrypt checks the domain on port 80).
+# Your domain, for a free automatic HTTPS certificate. Or set tls-cert and tls-key instead.
 domain = ""
-
-# Or use your own certificate instead: leave domain empty and give its files here.
-# All three empty: no HTTPS.
 tls-cert = ""
 tls-key = ""
 
-# The secret Beacon signs logins to your servers with. Keep it private.
+# Secret Beacon signs logins to your servers with. Keep it private.
 forwarding-secret-file = "forwarding.secret"
 
-# The world name on the Friends tab and server list.
+# World name on the Friends tab and server list.
 motd = {{q .MOTD}}
 
-# The max players shown next to the player count, on the Friends tab and the server list.
-# Display only: it doesn't stop anyone joining.
+# Max players shown. Display only.
 show-max-players = {{.ShowMaxPlayers}}
 
-# What the server list takes from the first server's own entry: "off", "motd", "players" or "all".
+# What the server list copies from your first server: "off", "motd", "players" or "all".
 ping-passthrough = "off"
 
 [servers]
@@ -40,44 +34,34 @@ ping-passthrough = "off"
 {{- end}}
 {{- end}}
 
-# Where players join, in order: if one can't be joined, the next. If their server stops while they
-# play, they're moved to another one.
+# Where players join, in order.
 try = {{list .Try}}
 
 [forced-hosts]
-# Players who join by one of these addresses go to these servers, in order, instead of try.
-# Friends-tab joins have no address and always use try. To use one, remove the # in front:
+# Joins by these addresses go to these servers instead of try.
 # "pvp.example.com" = ["pvp"]
 
 [broadcast]
-# A world on the Friends tab holds at most 30 players at once, whatever show-max-players says.
-# That is Minecraft's own limit and can't be raised. For more, add hosting accounts
-# (beacon accounts add <name>): each lists your servers as one more world, with 30 more places.
-
-# The host name shown on the Friends tab. Empty: the motd.
+# Host name on the Friends tab. Empty: the motd.
 host-name = {{q .HostName}}
 
-# Gamertags or XUIDs that may use Beacon's admin commands.
+# Gamertags or XUIDs allowed to use Beacon's admin commands.
 admins = {{list .Admins}}
 
-# Accept Xbox friend requests automatically.
+# Accept friend requests automatically.
 accept-friends = {{.AcceptFriends}}
 
-# Let admins hide the world from the Friends tab with /broadcast off.
+# Let admins hide the world with /broadcast off.
 listing-toggle = {{.ListingToggle}}
 
-# What the Friends tab's player count shows: "world" (the players who joined through that world) or,
-# with several servers, "server" (everyone on the world's server) or "network" (everyone on every
-# server). Each extra world can set its own. Either way a world holds at most 30 players who
-# joined through it.
+# Player count shown: "world", "server" or "network".
 player-count = {{q (or .PlayerCount "world")}}
 
-# With several servers: where players joining through this world land first, one of the names
-# under [servers]. Empty: the first in try. Each extra world below can have its own.
+# Server this world's players join first. Empty: try.
 server = {{q .Server}}
 {{- range .Extra}}
 
-# Another hosting account (30 more slots). Add one with: beacon accounts add <name>
+# Another world, hosted by another account. Add one with: beacon accounts add <name>
 [[broadcast.extra]]
 name = {{q .Name}}
 token-file = {{q .TokenFile}}
@@ -97,43 +81,29 @@ accept-friends = false
 protocol = {{.Protocol}}
 version = {{q .Version}}
 {{- end}}
-# Where players joining through this world land first. Empty: the first in try.
 server = {{q .Server}}
-# This world's player count: "world", "server" or "network" (see [broadcast]). Empty: the same as
-# [broadcast].
 player-count = {{q .PlayerCount}}
 {{- end}}
 
 [advanced]
-# Local HTTP API on 127.0.0.1 (docs/control-api.md).
+# Local HTTP API on 127.0.0.1.
 control-port = {{.ControlPort}}
 
 # Let your servers share chat through the control API.
 cross-server-chat = {{.CrossServerChat}}
 
-# Beacon's own /ban, /banip, /mute and their /un commands, for Beacon's admins, across all your
-# servers. false: Beacon leaves those commands to your servers, as for a ban plugin of your own,
-# and doesn't enforce the bans and mutes it saved. They come back if you turn it on again.
+# Beacon's /ban, /mute and related commands.
 # moderation = true
 
-# Limits against floods. A good start: login-ratelimit = 500, packets-per-second = 500 and
-# sessions-per-ip = 4.
-
-# Least milliseconds between two joins from one IP address. 0: no limit.
+# Flood limits. 0: no limit.
 login-ratelimit = 0
-
-# Most packets a player may send in a second. 0: no limit.
 packets-per-second = 0
-
-# Most players online at once from one IP address. 0: no limit.
 sessions-per-ip = 0
 
-# The player count on the Friends tab. 0: the real count, the players who joined through that world
-# (relayless: everyone on your server). Above 0: this number instead.
+# Show this player count instead of the real one. 0: off.
 fake-player-count = {{.FakePlayerCount}}
 
-# Or a count that wanders between min and max, moving by at most max-step each update, and never
-# reaching show-max-players (a full world can't be joined). max = 0: off.
+# Or a count that wanders between min and max. max = 0: off.
 fake-player-drift = {{with .FakePlayerDrift}}{ min = {{.Min}}, max = {{.Max}}, max-step = {{.MaxStep}} }{{else}}{ min = 0, max = 0, max-step = 1 }{{end}}
 {{- if .DisableClientEncryption}}
 disable-client-encryption = true
