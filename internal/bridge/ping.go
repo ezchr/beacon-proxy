@@ -37,20 +37,12 @@ func playerPing(xuid string) (time.Duration, bool) {
 	return d, true
 }
 
-// pingText is "<name> <ms> ms" with the number coloured by how good it is.
+// pingText is "<name> <ms> ms", in plain white.
 func pingText(name string, d time.Duration, ok bool) string {
 	if !ok {
-		return name + " <grey>(not measured yet)</grey>"
+		return name + " (not measured yet)"
 	}
-	ms := d.Milliseconds()
-	colour := "green"
-	switch {
-	case ms >= 150:
-		colour = "red"
-	case ms >= 80:
-		colour = "yellow"
-	}
-	return fmt.Sprintf("%s <%s>%d ms</%s>", name, colour, ms, colour)
+	return fmt.Sprintf("%s %d ms", name, d.Milliseconds())
 }
 
 // pingCommand runs /ping with args and reports whether the relay answered it.
