@@ -111,6 +111,9 @@ type ServerConfig struct {
 	// server takes logs in with the relay's own and the relay translates their packets,
 	// so a server takes players of a version it does not speak.
 	Native []int32 `json:"native,omitempty"`
+	// NoPacks keeps the server's resource packs out of what players get (resource-packs = false in
+	// beacon.toml): its blocks and items still join the union, drawn by the other servers' packs.
+	NoPacks bool `json:"no_packs,omitempty"`
 }
 
 // backendProtocol is the version a player of protocol id logs in to the server with.
@@ -510,7 +513,8 @@ func (n *Network) buildUnion() (*union, error) {
 		if r := c.StartGame.PlayerMovementSettings.RewindHistorySize; r > u.rewind {
 			u.rewind = r
 		}
-		if p := c.PacksInfo; p != nil {
+		packs := !s.NoPacks
+		if p := c.PacksInfo; p != nil && packs {
 			u.packsInfo.TexturePackRequired = u.packsInfo.TexturePackRequired || p.TexturePackRequired
 			u.packsInfo.HasScripts = u.packsInfo.HasScripts || p.HasScripts
 			u.packsInfo.HasAddons = u.packsInfo.HasAddons || p.HasAddons
@@ -528,7 +532,7 @@ func (n *Network) buildUnion() (*union, error) {
 				u.packsInfo.TexturePacks = append(u.packsInfo.TexturePacks, t)
 			}
 		}
-		if c.PackStack == nil && c.PacksInfo != nil {
+		if c.PackStack == nil && c.PacksInfo != nil && packs {
 			// The stack (which downloaded packs the client applies) isn't known yet, for example
 			// after the cache was cleared: apply every pack the server lists, or the client
 			// downloads them and shows none.
@@ -540,7 +544,7 @@ func (n *Network) buildUnion() (*union, error) {
 				}
 			}
 		}
-		if st := c.PackStack; st != nil {
+		if st := c.PackStack; st != nil && packs {
 			if i == 0 && st.BaseGameVersion != "" {
 				u.packStack.BaseGameVersion = st.BaseGameVersion
 			}
@@ -911,6 +915,9 @@ func (n *Network) downloadPacks(server string) (changed bool, err error) {
 	s := n.server(server)
 	if s == nil {
 		return false, fmt.Errorf("no server %q", server)
+	}
+	if s.NoPacks {
+		return false, nil // resource-packs = false: nothing of its is served
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
 	defer cancel()

@@ -82,6 +82,19 @@ ufw allow from 203.0.113.5
 If you can add code to the server, also have it check Beacon's signature on each login (see
 [forwarding](docs/forwarding.md)); then even a connection that gets past the firewall is refused.
 
+### Leaving out a server's resource packs
+
+Players get every server's resource packs when they join. To leave one server's packs out (say an
+older copy of a server whose blocks the other servers' packs already draw), write it as a table:
+
+```toml
+[servers]
+lobby = "127.0.0.1:19133"
+old = { address = "127.0.0.1:19134", resource-packs = false }
+```
+
+Its blocks and items still work; they are drawn by the other servers' packs.
+
 ### BDS in relay mode needs xuidforward
 
 This is only for **relay mode**. If you just want your BDS on the Friends tab, use
