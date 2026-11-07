@@ -128,10 +128,7 @@ func newBlockPaletteFor(blocks []protocol.BlockEntry, proto int32) (*blockPalett
 // (strings, ints, bytes for booleans).
 func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
 	props, _ := b.Properties["properties"].([]any)
-	type prop struct {
-		name   string
-		values []any
-	}
+	type prop = blockProp
 	var ps []prop
 	for _, p := range props {
 		m, ok := p.(map[string]any)
@@ -145,6 +142,9 @@ func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
 		}
 		ps = append(ps, prop{name, values})
 	}
+	// Traits add states of their own (a BDS add-on's pillar: 6 block faces), which the client
+	// numbers like declared properties: without them every block sorted after is off.
+	ps = append(ps, traitProps(b)...)
 	if len(ps) == 0 {
 		return []blockState{{Name: b.Name, Properties: encodeProperties(nil)}}, nil
 	}
@@ -163,6 +163,41 @@ func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
 		out = append(out, blockState{Name: b.Name, Properties: encodeProperties(cur)})
 	}
 	return out, nil
+}
+
+// blockProp is one block state and its values, in the order the client lists them.
+type blockProp struct {
+	name   string
+	values []any
+}
+
+// traitStates are the states each block trait can enable, in the order the client adds them.
+var traitStates = map[string][]blockProp{
+	"minecraft:placement_position": {
+		{"minecraft:block_face", []any{"down", "up", "north", "south", "west", "east"}},
+		{"minecraft:vertical_half", []any{"bottom", "top"}},
+	},
+	"minecraft:placement_direction": {
+		{"minecraft:cardinal_direction", []any{"south", "west", "north", "east"}},
+		{"minecraft:facing_direction", []any{"down", "up", "north", "south", "west", "east"}},
+	},
+}
+
+// traitProps lists the states a custom block's traits enable ("traits" in its StartGame entry).
+func traitProps(b protocol.BlockEntry) []blockProp {
+	var out []blockProp
+	for _, t := range anySlice(b.Properties["traits"]) {
+		m, _ := t.(map[string]any)
+		name, _ := m["name"].(string)
+		enabled, _ := m["enabled_states"].(map[string]any)
+		for _, st := range traitStates[name] {
+			short := st.name[len("minecraft:"):]
+			if on, ok := enabled[short]; ok && fmt.Sprint(on) != "0" && fmt.Sprint(on) != "false" {
+				out = append(out, st)
+			}
+		}
+	}
+	return out
 }
 
 // anySlice returns the elements of any slice (an NBT list decodes to []any, []int32, []string...).

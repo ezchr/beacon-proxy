@@ -81,3 +81,17 @@ func TestCustomBlocksShiftPalette(t *testing.T) {
 		t.Fatalf("custom block maps back to %v, want air", vanilla.states[m.reverse(ruby)])
 	}
 }
+
+func TestCustomBlockTraitsAddStates(t *testing.T) {
+	pillar := protocol.BlockEntry{Name: "addon:pillar", Properties: map[string]any{
+		"traits": []any{map[string]any{"name": "minecraft:placement_position",
+			"enabled_states": map[string]any{"block_face": uint8(1), "vertical_half": uint8(0)}}},
+	}}
+	states, err := customBlockStates(pillar)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(states) != 6 {
+		t.Fatalf("a placement_position block_face trait gives 6 states, got %d", len(states))
+	}
+}
