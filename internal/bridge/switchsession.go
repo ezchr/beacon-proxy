@@ -632,6 +632,7 @@ func (s *switchSession) readBackend(l *link, first bool) {
 		l.close()
 		s.backendGone(l)
 	}()
+	var out [][]byte
 	for {
 		pks, err := l.c.ReadPackets()
 		if err != nil {
@@ -640,7 +641,7 @@ func (s *switchSession) readBackend(l *link, first bool) {
 			}
 			return
 		}
-		out := make([][]byte, 0, len(pks))
+		out = out[:0] // forward is done with it: queues copy, and writes are synchronous
 		for _, raw := range pks {
 			id, payload, err := splitPacket(raw)
 			if err != nil {
@@ -1132,8 +1133,12 @@ func (s *switchSession) track(raw []byte) {
 			}
 		}
 	case packet.IDLevelChunk:
-		var pk packet.LevelChunk
-		if decodeInto(&pk, payload) == nil {
+		// Only the head is read: the blocks are kept raw (keepColumn) and never decoded here.
+		if h, ok := readChunkHead(payload); ok {
+			pk := packet.LevelChunk{Position: h.pos, CacheEnabled: h.cache}
+			if h.requestMode {
+				pk.SubChunkLimit = protocol.Option(h.limit)
+			}
 			delete(s.placeholders, [2]int32{pk.Position[0], pk.Position[1]}) // the server's own chunk now
 			s.keepColumn(&pk, raw)
 			_, s.subChunkMode = pk.SubChunkLimit.Value()

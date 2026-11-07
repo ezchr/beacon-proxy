@@ -124,12 +124,16 @@ func joinBackend(c *proxy.ProxyConn, chunkRadius int32, timeout time.Duration) (
 
 // splitPacket returns a raw packet's id and its payload.
 func splitPacket(raw []byte) (uint32, []byte, error) {
-	buf := bytes.NewBuffer(raw)
-	var h packet.Header
-	if err := h.Read(buf); err != nil {
-		return 0, nil, fmt.Errorf("read packet header: %w", err)
+	// The header is one varuint32 holding the id in its low 10 bits (packet.Header). Read in place:
+	// this runs for every packet, and a bytes.Buffer per call was a large share of the garbage.
+	var v uint32
+	for i := 0; i < 5 && i < len(raw); i++ {
+		v |= uint32(raw[i]&0x7f) << (7 * i)
+		if raw[i]&0x80 == 0 {
+			return v & 0x3FF, raw[i+1:], nil
+		}
 	}
-	return h.PacketID, buf.Bytes(), nil
+	return 0, nil, errors.New("read packet header: bad varuint32")
 }
 
 // decodeInto decodes a packet payload, turning the decoder's panics into errors.

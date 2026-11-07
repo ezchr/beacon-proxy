@@ -110,10 +110,11 @@ func (s *switchSession) observeSettle(l *link, raw []byte) {
 		if st.l != l || st.chunks == nil || time.Now().After(st.farUntil) {
 			return
 		}
-		var pk packet.LevelChunk
-		if decodeInto(&pk, payload) != nil {
+		h, ok := readChunkHead(payload)
+		if !ok {
 			return
 		}
+		pk := struct{ Position protocol.ChunkPos }{h.pos}
 		dx, dz := pk.Position[0]-st.center[0], pk.Position[1]-st.center[1]
 		if dx < -farRadius || dx > farRadius || dz < -farRadius || dz > farRadius {
 			return

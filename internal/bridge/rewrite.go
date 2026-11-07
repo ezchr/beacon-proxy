@@ -604,6 +604,9 @@ func peekVaruint64(b []byte) (uint64, bool) {
 // rewriteLevelChunk renumbers the block palettes of a chunk's sub-chunks. Chunks sent in sub-chunk
 // request mode carry no blocks here (SubChunk packets do).
 func (r *rewriter) rewriteLevelChunk(payload, raw []byte) ([]byte, error) {
+	if h, ok := readChunkHead(payload); ok && (h.requestMode || h.cache) {
+		return raw, nil // no blocks in it: nothing to renumber, no decode
+	}
 	var pk packet.LevelChunk
 	if err := decodeInto(&pk, payload); err != nil {
 		return nil, err
