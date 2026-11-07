@@ -50,7 +50,7 @@ host-name = {{q .HostName}}
 # after it and keeps it up to date.
 admins = {{list .Admins}}
 
-# XUIDs of moderators: /kick, /mute, /unmute, /mutelist, /banlist, and /ban for up to 1 day,
+# XUIDs of moderators: /kick, /unmute, /mutelist, /banlist, and /ban and /mute for up to 1 day,
 # unbanning only their own bans.
 moderators = []
 

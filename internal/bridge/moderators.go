@@ -7,7 +7,7 @@ import (
 )
 
 // Moderators (moderators in beacon.toml, by XUID) have part of the admins' moderation
-// commands: /kick, /mute, /unmute, /mutelist, /banlist, and /ban for at most moderatorMaxBan, with
+// commands: /kick, /unmute, /mutelist, /banlist, and /ban and /mute for at most moderatorMaxBan, with
 // /unban only on the bans they made themselves. They can't act on admins or other moderators. A
 // Java proxy can give the same to Java players (moderation_java.go, role=moderator).
 
@@ -66,10 +66,10 @@ func (s *switchSession) moderatorRefuses(name string, args []string) (string, bo
 			return t.name + " is staff.", true
 		}
 	}
-	if name == "ban" {
+	if name == "ban" || name == "mute" {
 		d, _ := modArgs(args[1:])
 		if d <= 0 || d > moderatorMaxBan {
-			return "Moderators can ban for up to 1 day: /ban <player> <time, up to 1d> [reason].", true
+			return "Moderators can " + name + " for up to 1 day: /" + name + " <player> <time, up to 1d> [reason].", true
 		}
 	}
 	if name == "unban" {

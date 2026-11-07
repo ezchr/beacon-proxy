@@ -38,8 +38,11 @@ func TestModeratorLimits(t *testing.T) {
 	if out := say("banip Steve", "Mod", true); !strings.Contains(out, "can't use /banip") {
 		t.Fatalf("banip by a moderator: %q", out)
 	}
-	if out := say("mute Steve 3d spam", "Mod", true); !strings.Contains(out, "Muted Steve") {
-		t.Fatalf("a mute by a moderator: %q", out)
+	if out := say("mute Steve 3d spam", "Mod", true); !strings.Contains(out, "up to 1 day") {
+		t.Fatalf("a 3-day mute by a moderator: %q", out)
+	}
+	if out := say("mute Steve 1h spam", "Mod", true); !strings.Contains(out, "Muted Steve") {
+		t.Fatalf("a 1-hour mute by a moderator: %q", out)
 	}
 
 	SetModerators([]string{"200"})
