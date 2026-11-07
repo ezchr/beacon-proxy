@@ -75,6 +75,10 @@ func otherDimension(from, to int32) int32 {
 }
 
 // switchTo moves the player to server. reason is why their old server sent them away, if it did.
+// serverDownMessage is what a player reads when their server ended and no other one answers:
+// usually a restart.
+const serverDownMessage = "The server is restarting. Join again in a minute."
+
 func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	s.switchMu.Lock()
 	defer s.switchMu.Unlock()
@@ -109,11 +113,12 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 		s.mu.Lock()
 		gone := s.cur == nil || isClosed(s.cur)
 		s.mu.Unlock()
+		// The technical reason is in the log above; players get a plain one.
 		if gone {
-			s.disconnect(fmt.Sprintf("Could not connect to %s: %s", server.Name, errText(err)))
+			s.disconnect(serverDownMessage)
 			return
 		}
-		s.message("<red>Could not connect to %s: %s</red>", server.Name, errText(err))
+		s.message("<red>%s is not reachable right now. Try again in a minute.</red>", server.Name)
 		return
 	}
 	sg := l.startGame
