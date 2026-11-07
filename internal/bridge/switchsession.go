@@ -454,6 +454,7 @@ func (s *switchSession) join() error {
 
 	sg.Blocks = u.blocks
 	sg.Experiments = u.exps
+	sg.PlayerMovementSettings.RewindHistorySize = u.rewind
 	sg.ExperimentsPreviouslyToggled = len(u.exps) > 0
 	if len(l.pre) > 0 {
 		if err := s.writeClient(l.pre...); err != nil {

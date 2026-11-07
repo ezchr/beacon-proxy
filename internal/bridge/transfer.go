@@ -221,9 +221,8 @@ func incompatible(a, b *packet.StartGame) string {
 		return ""
 	}
 	var d []string
-	if a.PlayerMovementSettings.RewindHistorySize != b.PlayerMovementSettings.RewindHistorySize {
-		d = append(d, "rewind history size")
-	}
+	// The rewind history size is not compared: every client gets the network's largest at its
+	// first join (union.rewind).
 	if a.PlayerMovementSettings.ServerAuthoritativeBlockBreaking != b.PlayerMovementSettings.ServerAuthoritativeBlockBreaking {
 		d = append(d, "server authoritative block breaking")
 	}

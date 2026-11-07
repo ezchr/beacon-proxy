@@ -453,7 +453,10 @@ type union struct {
 	items     *packet.ItemRegistry
 	actors    *packet.AvailableActorIdentifiers
 	exps      []protocol.ExperimentData
-	missing   []string // servers with nothing cached yet
+	// rewind is the largest movement rewind history any server asks for: every client gets it at
+	// its first join, so a server needing one (BDS) works after a move from one that does not.
+	rewind  int32
+	missing []string // servers with nothing cached yet
 }
 
 func (n *Network) orderedServers() []ServerConfig {
@@ -503,6 +506,9 @@ func (n *Network) buildUnion() (*union, error) {
 		if c == nil || c.StartGame == nil {
 			u.missing = append(u.missing, s.Name)
 			continue
+		}
+		if r := c.StartGame.PlayerMovementSettings.RewindHistorySize; r > u.rewind {
+			u.rewind = r
 		}
 		if p := c.PacksInfo; p != nil {
 			u.packsInfo.TexturePackRequired = u.packsInfo.TexturePackRequired || p.TexturePackRequired
