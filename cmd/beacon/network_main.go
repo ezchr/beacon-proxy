@@ -96,7 +96,7 @@ var errListingOff = errors.New("the Friends-tab listing was switched off")
 
 // mainWorld is how players and admins name the primary broadcast in /broadcast and on the control
 // port.
-const mainWorld = "main"
+var mainWorld = "main" // [broadcast] name
 
 type listingGate struct {
 	mu     sync.Mutex
