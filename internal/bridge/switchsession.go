@@ -42,6 +42,8 @@ type switchSession struct {
 	packGen uint64
 	// reply takes messages in place of a client: the console's stand-in session (moderation.go).
 	reply func(string)
+	// limited marks a stand-in session (reply) as a moderator's (ModerateAs).
+	limited bool
 	// rejoining is set once the player is being sent to join again (record).
 	rejoining atomic.Bool
 

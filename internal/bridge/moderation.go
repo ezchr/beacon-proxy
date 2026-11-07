@@ -41,6 +41,7 @@ type modEntry struct {
 	IP     string `json:"ip,omitempty"`
 	Reason string `json:"reason,omitempty"`
 	By     string `json:"by,omitempty"`
+	ByID   string `json:"by_id,omitempty"` // who made it: an XUID, or java:<name> (moderators.go)
 	At     int64  `json:"at"`
 	Until  int64  `json:"until,omitempty"`
 }
@@ -145,6 +146,11 @@ func (m *modStore) see(xuid, name, ip string) {
 	key := strings.ToLower(name)
 	if p, ok := m.Seen[key]; ok && p.XUID == xuid && p.IP == ip && p.Name == name {
 		return
+	}
+	for k, p := range m.Seen {
+		if p.XUID == xuid && k != key {
+			delete(m.Seen, k) // renamed: the old gamertag is no longer theirs
+		}
 	}
 	m.Seen[key] = seenPlayer{XUID: xuid, Name: name, IP: ip}
 	_ = m.saveLocked()
@@ -447,11 +453,33 @@ func banMessage(e modEntry, now time.Time) string {
 	return msg
 }
 
+// StaffJoined is told when an admin or moderator joins, with their gamertag; set by the program.
+var StaffJoined func(xuid, name string)
+
+// NameOfXUID is the gamertag a player last joined under, "" if never seen.
+func (n *Network) NameOfXUID(xuid string) string {
+	m := n.moderation()
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if name, ok := m.Admins[xuid]; ok && name != "" {
+		return name
+	}
+	for _, p := range m.Seen {
+		if p.XUID == xuid {
+			return p.Name
+		}
+	}
+	return ""
+}
+
 // refuseLogin notes a joining player and returns why they may not join, if so. An address ban does
 // not stop admins, so that one on a shared address cannot lock them out.
 func (n *Network) refuseLogin(xuid, name, ip string) (string, bool) {
 	m := n.moderation()
 	m.see(xuid, name, ip)
+	if StaffJoined != nil && (n.IsAdmin(xuid, name) || isModerator(xuid, name)) {
+		go StaffJoined(xuid, name) // their gamertag next to their XUID in beacon.toml
+	}
 	if moderationOff.Load() {
 		return "", false
 	}
@@ -525,10 +553,19 @@ func (s *switchSession) mutedCommand(line string) bool {
 // handleModeration runs a moderation command of an admin and reports whether it was one.
 func (s *switchSession) handleModeration(line string) bool {
 	f := splitCommand(line)
-	if len(f) == 0 || moderationOff.Load() || (s.reply == nil && !s.isAdmin()) {
+	if len(f) == 0 || moderationOff.Load() || (s.reply == nil && !s.isAdmin() && !s.moderator()) {
 		return false
 	}
 	name, args := strings.ToLower(f[0]), f[1:]
+	if s.moderator() {
+		if _, known := map[string]bool{"ban": true, "unban": true, "banip": true, "unbanip": true, "mute": true,
+			"unmute": true, "banlist": true, "mutelist": true, "kick": true}[name]; known {
+			if why, refused := s.moderatorRefuses(name, args); refused {
+				s.message("<red>%s</red>", why)
+				return true
+			}
+		}
+	}
 	usage := map[string]string{
 		"ban": "/ban <player> [time] [reason]", "unban": "/unban <player>",
 		"banip": "/banip <player|ip> [time] [reason]", "unbanip": "/unbanip <player|ip>",
@@ -580,7 +617,7 @@ func (s *switchSession) handleModeration(line string) bool {
 func (s *switchSession) entry(t modTarget, ip string, args []string) modEntry {
 	d, reason := modArgs(args)
 	now := time.Now()
-	e := modEntry{XUID: t.xuid, Name: t.name, IP: ip, Reason: reason, By: s.id.DisplayName, At: now.Unix()}
+	e := modEntry{XUID: t.xuid, Name: t.name, IP: ip, Reason: reason, By: s.id.DisplayName, ByID: s.byID(), At: now.Unix()}
 	if d > 0 {
 		e.Until = now.Add(d).Unix()
 	}
@@ -780,6 +817,9 @@ func (s *switchSession) injectModeration(pk *packet.AvailableCommands, enum func
 	}
 	const valid = protocol.CommandArgValid
 	set := func(name, description string, overloads []protocol.CommandOverload) {
+		if s.moderator() && !moderatorCommands[name] {
+			return // not theirs
+		}
 		for i, c := range pk.Commands {
 			if c.Name == name {
 				pk.Commands[i].Description, pk.Commands[i].Overloads = description, overloads

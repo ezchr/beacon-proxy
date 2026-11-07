@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"log/slog"
 	"slices"
 	"strings"
 	"sync"
@@ -26,6 +27,8 @@ func applyLive(cfg FileConfig) {
 	bridge.SetPingPassthrough(cfg.PingPassthrough)
 	chatEnabled = cfg.CrossServerChat
 	bridge.SetModeration(cfg.Moderation)
+	bridge.SetModerators(xuidsOnly("moderators", cfg.Moderators))
+	go annotateStaffNames(tomlConfigFile, "", "")
 	bridge.SetKickMode(cfg.Kick)
 }
 
@@ -54,7 +57,7 @@ func reloadConfig() []string {
 		out = append(out, fmt.Sprintf("servers: %s, players join %s first", strings.Join(network.ServerNames(), ", "), network.DefaultServer()))
 	}
 	applyLive(next)
-	out = append(out, "admins, forced hosts, ping passthrough, rate limits and cross-server chat reloaded")
+	out = append(out, "admins, moderators, forced hosts, ping passthrough, rate limits and cross-server chat reloaded")
 
 	var restart []string
 	same := func(name string, equal bool) {
@@ -85,9 +88,27 @@ func reloadConfig() []string {
 }
 
 func adminSet(admins []string) map[string]bool {
-	m := map[string]bool{}
-	for _, a := range admins {
-		m[strings.ToLower(strings.TrimSpace(a))] = true
+	set := map[string]bool{}
+	for _, a := range xuidsOnly("admins", admins) {
+		set[a] = true
 	}
-	return m
+	return set
+}
+
+// xuidsOnly keeps the XUIDs of a list of admins or moderators: a gamertag can be renamed and taken
+// by someone else, so one is left out, with a warning.
+func xuidsOnly(list string, entries []string) []string {
+	var out []string
+	for _, e := range entries {
+		e = strings.TrimSpace(e)
+		if e == "" {
+			continue
+		}
+		if strings.Trim(e, "0123456789") != "" {
+			slog.Warn(list+" takes XUIDs only, not gamertags: left out", "entry", e)
+			continue
+		}
+		out = append(out, e)
+	}
+	return out
 }

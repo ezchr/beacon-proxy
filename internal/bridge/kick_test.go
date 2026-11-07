@@ -20,7 +20,7 @@ func TestKickJavaPlayer(t *testing.T) {
 	defer noteJavaPings(nil)
 	report()
 
-	if out := strings.Join(n.ModerateAs("kick Steve spamming", "Mod"), "\n"); !strings.Contains(out, "Kicked Steve") {
+	if out := strings.Join(n.ModerateAs("kick Steve spamming", "Mod", false), "\n"); !strings.Contains(out, "Kicked Steve") {
 		t.Fatalf("kick: %q", out)
 	}
 	st := report()[steve]
@@ -32,16 +32,16 @@ func TestKickJavaPlayer(t *testing.T) {
 	}
 
 	SetKickMode("server")
-	n.ModerateAs("kick Steve", "Mod")
+	n.ModerateAs("kick Steve", "Mod", false)
 	st = report()[steve]
 	if st.Kick == nil || !st.Kick.ToServer || st.Kick.Message != "You were kicked from pvp." {
 		t.Fatalf("server kick: %+v", st.Kick)
 	}
 
-	if out := strings.Join(n.ModerateAs("kick Nobody", "Mod"), "\n"); !strings.Contains(out, "not online") {
+	if out := strings.Join(n.ModerateAs("kick Nobody", "Mod", false), "\n"); !strings.Contains(out, "not online") {
 		t.Fatalf("kick of nobody: %q", out)
 	}
-	if out := strings.Join(n.ModerateAs("kick", "Mod"), "\n"); !strings.Contains(out, "/kick <player>") {
+	if out := strings.Join(n.ModerateAs("kick", "Mod", false), "\n"); !strings.Contains(out, "/kick <player>") {
 		t.Fatalf("kick without a name: %q", out)
 	}
 }

@@ -292,8 +292,8 @@ func (n *Network) DefaultServer() string { return n.conf().try[0] }
 
 // IsAdmin reports whether a gamertag (any case) or XUID is one of the admins.
 func (n *Network) IsAdmin(xuid, name string) bool {
-	a := n.conf().admins
-	return a[xuid] || a[strings.ToLower(name)] || n.moderation().isExtraAdmin(xuid)
+	// By XUID only: a gamertag can be renamed, and taken by someone else.
+	return xuid != "" && (n.conf().admins[xuid] || n.moderation().isExtraAdmin(xuid))
 }
 
 // configAdmins lists the admins of beacon.toml.

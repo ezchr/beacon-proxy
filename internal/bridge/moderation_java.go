@@ -92,7 +92,7 @@ func (n *Network) findJava(name string) (modTarget, bool) {
 
 // ModerateAs runs a moderation command for someone the Java proxy let use it: as the console
 // does, but with their name on what they do.
-func (n *Network) ModerateAs(line, by string) []string {
+func (n *Network) ModerateAs(line, by string, moderator bool) []string {
 	if by == "" {
 		return n.Moderate(line)
 	}
@@ -113,8 +113,9 @@ func (n *Network) ModerateAs(line, by string) []string {
 			}
 		}
 	}
-	s := &switchSession{n: n, reply: say}
+	s := &switchSession{n: n, reply: say, limited: moderator}
 	s.id.DisplayName = by
+	s.id.XUID = "java:" + strings.ToLower(by) // who made what they do (moderators.go)
 	if !s.handleModeration(line) && len(out) == 0 {
 		return modHelp
 	}

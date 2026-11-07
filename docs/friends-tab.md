@@ -76,7 +76,8 @@ Under `[broadcast]` in `beacon.toml`:
 | `host-name` | the name shown as the world's host; default: the `motd` |
 | `server` | the server players joining through this world land on first; default: the first in `try` |
 | `player-count` | what the world's player count shows: `world` (players who joined through it, the default), `server` (everyone on its server) or `network` (everyone on every server); each extra world can set its own. A world still holds at most 30 players who joined through it |
-| `admins` | gamertags or XUIDs that may use `/glist`, `/send` and `/broadcast` |
+| `admins` | XUIDs (not gamertags) of the players who may use the admin commands: `/glist`, `/send`, `/broadcast`, moderation. Beacon writes each one's gamertag after it as a comment and keeps it up to date |
+| `moderators` | XUIDs of moderators: `/kick`, `/mute`, `/unmute`, `/mutelist`, `/banlist`, and `/ban` for up to 1 day, unbanning only their own bans |
 | `accept-friends` | accept friend requests automatically |
 | `listing-toggle` | lets admins hide worlds from the Friends tab with `/broadcast` (see below) |
 

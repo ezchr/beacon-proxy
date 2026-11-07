@@ -115,7 +115,7 @@ func (c *controlServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		// by: the name of who runs it, when the Java proxy passes on an admin's command.
-		_, _ = io.WriteString(w, strings.Join(network.ModerateAs(r.URL.Query().Get("cmd"), r.URL.Query().Get("by")), "\n")+"\n")
+		_, _ = io.WriteString(w, strings.Join(network.ModerateAs(r.URL.Query().Get("cmd"), r.URL.Query().Get("by"), r.URL.Query().Get("role") == "moderator"), "\n")+"\n")
 		return
 	case path == "/moderation/java/login":
 		if network == nil {

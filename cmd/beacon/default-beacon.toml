@@ -46,8 +46,13 @@ try = {{list .Try}}
 world-name = ""
 host-name = {{q .HostName}}
 
-# Gamertags or XUIDs allowed to use Beacon's admin commands.
+# XUIDs of the players who may use Beacon's admin commands. Beacon writes each one's gamertag
+# after it and keeps it up to date.
 admins = {{list .Admins}}
+
+# XUIDs of moderators: /kick, /mute, /unmute, /mutelist, /banlist, and /ban for up to 1 day,
+# unbanning only their own bans.
+moderators = []
 
 # Accept friend requests automatically.
 accept-friends = {{.AcceptFriends}}
