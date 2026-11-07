@@ -13,6 +13,7 @@ import (
 // The relay's own commands for players on a Network, handled before their server sees them:
 //
 //	/server [name]                 list the servers, or move to one
+//	/ping [player|@a|@r|...]       your ping or other players' (anyone; see ping.go)
 //	/broadcast [on|off|status]     list the world in the Friends tab or take it off (admins only)
 //
 // They are added to the command list every server sends, so they autocomplete everywhere. A
@@ -114,6 +115,22 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 			}
 		}
 	}
+	// /ping for everyone: the relay answers it (ping.go), so its form replaces a server's own.
+	pingDone := false
+	for i, c := range pk.Commands {
+		if c.Name == "ping" {
+			pk.Commands[i].Description = "Show your ping or another player's"
+			pk.Commands[i].Overloads = s.pingOverloads(enum)
+			pingDone = true
+		}
+	}
+	if !pingDone {
+		pk.Commands = append(pk.Commands, protocol.Command{
+			Name: "ping", Description: "Show your ping or another player's", AliasesOffset: math.MaxUint32,
+			Overloads: s.pingOverloads(enum),
+		})
+	}
+	added = true
 	if s.isAdmin() && !have["glist"] {
 		pk.Commands = append(pk.Commands, protocol.Command{
 			Name: "glist", Description: "List the players on every server", AliasesOffset: math.MaxUint32,
@@ -207,6 +224,8 @@ func (s *switchSession) handleCommand(line string) bool {
 			s.message("<red>%s</red>", err)
 		}
 		return true
+	case "ping":
+		return s.pingCommand(fields[1:])
 	case "glist":
 		if !s.isAdmin() {
 			return false // the server's own /glist, if it has one
