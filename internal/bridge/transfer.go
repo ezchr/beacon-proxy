@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
+	"github.com/sandertv/gophertunnel/minecraft/text"
 )
 
 // Moving a player to another server without a reconnect, ported from WaterdogPE
@@ -91,7 +92,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	}
 	start := time.Now()
 	if reason != "" {
-		s.message("<red>%s</red>", reason)
+		s.kickReason(reason)
 	}
 	s.message("<grey>Connecting you to %s...</grey>", server.Name)
 	l, err := s.openLink(server)
@@ -667,4 +668,48 @@ func (t *transfer) inPhase2() bool {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	return t.phase == 2
+}
+
+// kickReason shows the player why their server let them go. A server's message can be just a
+// translation key, such as %disconnect.disconnected (the Dragonfly shutdown message). Clients only
+// translate keys in a translation text, so a key is sent as one instead of as raw chat.
+func (s *switchSession) kickReason(reason string) {
+	if key, ok := translationKey(reason); ok {
+		if s.reply != nil {
+			s.message("<red>%s</red>", keyFallback(key))
+			return
+		}
+		s.sendClient(&packet.Text{TextType: packet.TextTypeTranslation, NeedsTranslation: true, Message: "%" + key})
+		return
+	}
+	s.message("<red>%s</red>", reason)
+}
+
+// translationKey reports the key of a reason that is only a translation key, such as
+// "%disconnect.disconnected".
+func translationKey(reason string) (string, bool) {
+	r := strings.TrimSpace(text.Clean(reason))
+	if len(r) < 2 || r[0] != '%' {
+		return "", false
+	}
+	key := r[1:]
+	for _, c := range key {
+		if !(c == '.' || c == '_' || c >= 'a' && c <= 'z' || c >= 'A' && c <= 'Z' || c >= '0' && c <= '9') {
+			return "", false
+		}
+	}
+	return key, strings.Contains(key, ".")
+}
+
+// keyFallback is the English text of a key, where no client translates it.
+func keyFallback(key string) string {
+	switch key {
+	case "disconnect.disconnected":
+		return "Disconnected by Server"
+	case "disconnect.timeout":
+		return "Timed out"
+	case "disconnect.kicked":
+		return "You were kicked"
+	}
+	return "Disconnected"
 }
