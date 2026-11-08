@@ -568,6 +568,7 @@ func (s *switchSession) handleModeration(line string) bool {
 			"unmute": true, "banlist": true, "mutelist": true, "kick": true}[name]; known {
 			if why, refused := s.moderatorRefuses(name, args); refused {
 				s.message("<red>%s</red>", why)
+				s.refusedWhy = why
 				return true
 			}
 		}

@@ -7,8 +7,8 @@ import (
 )
 
 // Moderators (moderators in beacon.toml, by XUID) have part of the admins' moderation
-// commands: /kick, /unmute, /mutelist, /banlist, and /ban and /mute for at most moderatorMaxBan, with
-// /unban only on the bans they made themselves. They can't act on admins or other moderators. A
+// commands: /kick, /mutelist, /banlist, and /ban and /mute for at most moderatorMaxBan, with
+// /unban and /unmute only on the bans and mutes they made themselves. They can't act on admins or other moderators. A
 // Java proxy can give the same to Java players (moderation_java.go, role=moderator).
 
 // moderatorMaxBan is the longest ban a moderator may give.
@@ -77,6 +77,23 @@ func (s *switchSession) moderatorRefuses(name string, args []string) (string, bo
 		d, _ := modArgs(args[1:])
 		if d <= 0 || d > moderatorMaxBan {
 			return "Moderators can " + name + " for up to 1 day: /" + name + " <player> <time, up to 1d> [reason].", true
+		}
+	}
+	if name == "unmute" {
+		// Like /unban: only the mutes they gave. So a moderator can't lift a mute on themselves, or
+		// one an admin gave.
+		m := s.n.moderation()
+		key, ok := s.n.listedTarget(m.Mutes, args[0])
+		if ok {
+			m.mu.Lock()
+			e := m.Mutes[key]
+			m.mu.Unlock()
+			if e.XUID == s.id.XUID {
+				return "You can't unmute yourself.", true
+			}
+			if e.ByID == "" || e.ByID != s.byID() {
+				return "You can only unmute players you muted.", true
+			}
 		}
 	}
 	if name == "unban" {

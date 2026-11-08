@@ -26,15 +26,16 @@ import (
 // switchSession is one player of a Network: their connection to the relay, which outlives every
 // backend they are moved between.
 type switchSession struct {
-	n      *Network
-	cfg    Config
-	log    *slog.Logger
-	client *proxy.ProxyConn
-	conn   net.Conn
-	id     login.IdentityData
-	cd     login.ClientData
-	proto  int32
-	pool   packet.Pool
+	refusedWhy string // why a moderator's last command was refused, for the staff log
+	n          *Network
+	cfg        Config
+	log        *slog.Logger
+	client     *proxy.ProxyConn
+	conn       net.Conn
+	id         login.IdentityData
+	cd         login.ClientData
+	proto      int32
+	pool       packet.Pool
 
 	ctx    context.Context
 	cancel context.CancelCauseFunc

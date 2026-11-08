@@ -19,7 +19,12 @@ func (s *switchSession) noteStaffCommand(line string) {
 	if len(fields) == 0 || !staffCommands[strings.ToLower(fields[0])] || (!s.isAdmin() && !s.moderator()) {
 		return
 	}
-	s.n.NoteStaff(s.id.DisplayName, "/"+strings.Join(fields, " "), false)
+	line = "/" + strings.Join(fields, " ")
+	if why := s.refusedWhy; why != "" { // the staff log says it did not go through
+		s.refusedWhy = ""
+		line += " (refused: " + why + ")"
+	}
+	s.n.NoteStaff(s.id.DisplayName, line, false)
 }
 
 // StaffNote is a staff command someone ran, for the staff of both editions to see.
