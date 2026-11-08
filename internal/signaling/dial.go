@@ -9,10 +9,10 @@ import (
 	"net/url"
 	"strconv"
 
+	"github.com/coder/websocket"
 	"github.com/df-mc/go-nethernet"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/service"
-	"github.com/coder/websocket"
 )
 
 type Dialer struct {

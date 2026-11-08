@@ -72,13 +72,16 @@ of a broken join.
 - **Allow list.** `allowed-xuids` under `[broadcast]` lets only those Xbox accounts join.
 - **Rate limits** (under `[advanced]`, off by default): `login-ratelimit` is the least time in
   milliseconds between two joins from one IP address, `packets-per-second` the most packets a
-  player may send in a second; a player past either is sent away. `sessions-per-ip` is the most
+  player may send in a second, on average over `packet-window` seconds (7), so short bursts such as
+  fast mining pass; a single second over `packet-burst` (4) times it is too many anyway; a player past either is sent away. `sessions-per-ip` is the most
   players online at once from one IP address; a player joining again from it still gets in. A
   good start:
 
   ```toml
   login-ratelimit = 500
   packets-per-second = 500
+  packet-window = 7
+  packet-burst = 4
   sessions-per-ip = 4
   ```
 

@@ -12,8 +12,14 @@ import (
 type Limits struct {
 	// LoginInterval is the least time between two joins from one IP address.
 	LoginInterval time.Duration
-	// PacketsPerSecond is the most packets a player may send in a second.
+	// PacketsPerSecond is the most packets a player may send in a second, on average over
+	// PacketWindow seconds.
 	PacketsPerSecond int
+	// PacketWindow is how many seconds PacketsPerSecond is averaged over (default 7, at most 60).
+	PacketWindow int
+	// PacketBurst: a single second with more than PacketBurst times PacketsPerSecond is too many,
+	// whatever the average (default 4; 0 turns it off).
+	PacketBurst int
 	// SessionsPerIP is the most players one IP address may have online at once.
 	SessionsPerIP int
 }
@@ -92,44 +98,67 @@ func holdSession(ip, xuid string) (release func(), ok bool) {
 	}, true
 }
 
-// packetMeter counts one player's packets. The limit is an average over packetWindow, like Velocity's
-// and Paper's packet limiters: short bursts (mining with Haste, a full inventory selling at once)
-// pass, a steady flood doesn't. A single second past packetBurst times the limit is too many anyway.
-// Used by one goroutine only.
+// packetMeter counts one player's packets. The limit is an average over the packet window, like
+// Velocity's and Paper's packet limiters: short bursts (mining with Haste, a full inventory selling
+// at once) pass, a steady flood doesn't. Used by one goroutine only.
 type packetMeter struct {
-	second  int64             // the Unix second buckets[cur] counts
-	cur     int               // the bucket of second
-	buckets [packetWindow]int // packets in each of the last seconds
+	second  int64                // the Unix second buckets[cur] counts
+	cur     int                  // the bucket of second
+	buckets [maxPacketWindow]int // packets in each of the last seconds
 }
 
 const (
-	packetWindow = 7 // seconds
-	packetBurst  = 4
+	defaultPacketWindow = 7
+	maxPacketWindow     = 60
+	defaultPacketBurst  = 4
 )
+
+// window and burst are the limits' packet window and burst, defaults filled in.
+func (l Limits) window() int {
+	if l.PacketWindow <= 0 {
+		return defaultPacketWindow
+	}
+	return min(l.PacketWindow, maxPacketWindow)
+}
+
+func (l Limits) burst() int {
+	if l.PacketBurst < 0 {
+		return 0
+	}
+	if l.PacketBurst == 0 {
+		return defaultPacketBurst
+	}
+	return l.PacketBurst
+}
 
 // over adds n packets and reports whether the player is past the limit.
 func (m *packetMeter) over(n int) bool {
-	limit := currentLimits().PacketsPerSecond
+	l := currentLimits()
+	limit := l.PacketsPerSecond
 	if limit <= 0 {
 		return false
 	}
+	window := l.window()
 	now := time.Now().Unix()
 	if gap := now - m.second; gap > 0 {
-		for k := int64(0); k < min(gap, packetWindow); k++ {
-			m.cur = (m.cur + 1) % packetWindow
+		for k := int64(0); k < min(gap, int64(window)); k++ {
+			m.cur = (m.cur + 1) % window
 			m.buckets[m.cur] = 0
 		}
 		m.second = now
 	}
+	if m.cur >= window { // the window was made smaller by a reload
+		m.cur, m.buckets = 0, [maxPacketWindow]int{}
+	}
 	m.buckets[m.cur] += n
-	if m.buckets[m.cur] > limit*packetBurst {
+	if b := l.burst(); b > 0 && m.buckets[m.cur] > limit*b {
 		return true
 	}
 	total := 0
-	for _, b := range m.buckets {
-		total += b
+	for _, c := range m.buckets[:window] {
+		total += c
 	}
-	return total > limit*packetWindow
+	return total > limit*window
 }
 
 // Ping passthrough: what the server list shows from the first server's own entry instead of

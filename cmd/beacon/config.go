@@ -215,7 +215,11 @@ type FileConfig struct {
 	// (players online from one IP); 0 is off.
 	LoginRateLimit   int `json:"-"`
 	PacketsPerSecond int `json:"-"`
-	SessionsPerIP    int `json:"-"`
+	// PacketWindow is the seconds PacketsPerSecond is averaged over; PacketBurst times it is too many
+	// in any one second (-1 turns that off). 0 is the default (7 and 4).
+	PacketWindow  int `json:"-"`
+	PacketBurst   int `json:"-"`
+	SessionsPerIP int `json:"-"`
 	// CrossServerChat serves the /chat routes (chathub.go); beacon.toml only.
 	CrossServerChat bool `json:"-"`
 	// Moderation is Beacon's own bans and mutes (bridge/moderation.go); beacon.toml only.

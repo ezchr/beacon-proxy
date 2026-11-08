@@ -52,11 +52,11 @@ func TestLimits(t *testing.T) {
 	if m.over(5) { // a burst over the limit, within the average and under packetBurst times it
 		t.Fatal("a short burst was refused")
 	}
-	if !m.over(3 * packetBurst) {
+	if !m.over(3 * defaultPacketBurst) {
 		t.Fatal("a flood in one second passed")
 	}
 	avg := packetMeter{second: time.Now().Unix() + 1} // the seconds before were all busy, at the limit
-	for i := range avg.buckets {
+	for i := range defaultPacketWindow {
 		avg.buckets[i] = 3
 	}
 	avg.buckets[avg.cur] = 0

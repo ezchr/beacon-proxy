@@ -112,6 +112,10 @@ cross-server-chat = {{.CrossServerChat}}
 # Flood limits. 0: no limit.
 login-ratelimit = 0
 packets-per-second = 0
+# packets-per-second is an average over this many seconds (short bursts pass), and a single second
+# over packet-burst times it is too many anyway (-1: no burst check).
+packet-window = 7
+packet-burst = 4
 sessions-per-ip = 0
 
 # Show this player count instead of the real one. 0: off.

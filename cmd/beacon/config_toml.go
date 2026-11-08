@@ -98,6 +98,8 @@ type tomlConfig struct {
 		Kick                    string `toml:"kick"`
 		LoginRateLimit          int    `toml:"login-ratelimit"`
 		PacketsPerSecond        int    `toml:"packets-per-second"`
+		PacketWindow            int    `toml:"packet-window"`
+		PacketBurst             int    `toml:"packet-burst"`
 		SessionsPerIP           int    `toml:"sessions-per-ip"`
 		ACMEHTTPAddress         string `toml:"acme-http-address"`
 		FakePlayerCount         int    `toml:"fake-player-count"`
@@ -208,6 +210,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.Moderation = a.Moderation == nil || *a.Moderation
 	cfg.Kick = a.Kick
 	cfg.LoginRateLimit, cfg.PacketsPerSecond, cfg.SessionsPerIP = a.LoginRateLimit, a.PacketsPerSecond, a.SessionsPerIP
+	cfg.PacketWindow, cfg.PacketBurst = a.PacketWindow, a.PacketBurst
 	switch p := strings.ToLower(strings.TrimSpace(t.PingPassthrough)); p {
 	case "", "off", "motd", "players", "all":
 		cfg.PingPassthrough = p
