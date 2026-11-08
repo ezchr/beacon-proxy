@@ -92,24 +92,44 @@ func holdSession(ip, xuid string) (release func(), ok bool) {
 	}, true
 }
 
-// packetMeter counts one player's packets per second. Used by one goroutine only.
+// packetMeter counts one player's packets. The limit is an average over packetWindow, like Velocity's
+// and Paper's packet limiters: short bursts (mining with Haste, a full inventory selling at once)
+// pass, a steady flood doesn't. A single second past packetBurst times the limit is too many anyway.
+// Used by one goroutine only.
 type packetMeter struct {
-	second time.Time
-	n      int
+	second  int64             // the Unix second buckets[cur] counts
+	cur     int               // the bucket of second
+	buckets [packetWindow]int // packets in each of the last seconds
 }
 
-// over adds n packets and reports whether the player is past the limit for this second.
+const (
+	packetWindow = 7 // seconds
+	packetBurst  = 4
+)
+
+// over adds n packets and reports whether the player is past the limit.
 func (m *packetMeter) over(n int) bool {
 	limit := currentLimits().PacketsPerSecond
 	if limit <= 0 {
 		return false
 	}
-	now := time.Now()
-	if now.Sub(m.second) >= time.Second {
-		m.second, m.n = now, 0
+	now := time.Now().Unix()
+	if gap := now - m.second; gap > 0 {
+		for k := int64(0); k < min(gap, packetWindow); k++ {
+			m.cur = (m.cur + 1) % packetWindow
+			m.buckets[m.cur] = 0
+		}
+		m.second = now
 	}
-	m.n += n
-	return m.n > limit
+	m.buckets[m.cur] += n
+	if m.buckets[m.cur] > limit*packetBurst {
+		return true
+	}
+	total := 0
+	for _, b := range m.buckets {
+		total += b
+	}
+	return total > limit*packetWindow
 }
 
 // Ping passthrough: what the server list shows from the first server's own entry instead of
