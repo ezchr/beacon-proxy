@@ -4,11 +4,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"sync"
 	"time"
-
-	"github.com/sandertv/go-raknet"
 )
 
 // PlayerCount is the total of every server's own player count, as each one's server list entry or
@@ -56,8 +53,8 @@ func (n *Network) PlayerCount(ctx context.Context) (int, error) {
 
 // serverPlayers reads one server's own player count.
 func serverPlayers(ctx context.Context, s ServerConfig) (int, error) {
-	if strings.EqualFold(s.Transport, "raknet") {
-		pong, err := raknet.PingContext(ctx, s.Address)
+	if GameTransport(s.Transport) {
+		pong, err := pingGameServer(ctx, s.Transport, s.Address)
 		if err != nil {
 			return 0, err
 		}

@@ -284,7 +284,7 @@ func (p *serverListProvider) backendEntry(ctx context.Context) (*serverListEntry
 		var last error = fmt.Errorf("no nethernet server in try")
 		for _, name := range c.try {
 			s := c.server(name)
-			if s == nil || s.Transport == TransportRakNet {
+			if s == nil || GameTransport(s.Transport) {
 				continue
 			}
 			sctx, cancel := context.WithTimeout(ctx, 2*time.Second)

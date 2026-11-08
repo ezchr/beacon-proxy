@@ -20,7 +20,6 @@ import (
 
 	"github.com/df-mc/go-nethernet"
 	"github.com/ezchr/beacon-proxy/internal/proxy"
-	"github.com/sandertv/go-raknet"
 	"github.com/sandertv/gophertunnel/minecraft/nbt"
 	"github.com/sandertv/gophertunnel/minecraft/protocol"
 	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
@@ -131,6 +130,11 @@ type ServerConfig struct {
 	// Forwarding "endstone" (ForwardingEndstone) signs logins to the server for Endstone 0.12's
 	// [proxies.endgate], which gives it the player's real XUID and address with no plugin.
 	Forwarding string `json:"forwarding,omitempty"`
+	// NoEncryption and NoCompression (encryption = false, compression = false in beacon.toml) ask a
+	// server reached over TCP not to encrypt or compress the link: on one that never leaves the machine
+	// both only cost CPU on each end. Only Dragonfly's TCP listener (through gophertunnel) grants them.
+	NoEncryption  bool `json:"no_encryption,omitempty"`
+	NoCompression bool `json:"no_compression,omitempty"`
 }
 
 // backendProtocol is the version a player of protocol id logs in to the server with.
@@ -796,8 +800,10 @@ func (n *Network) dialServer(ctx context.Context, s ServerConfig, protocolID int
 		}
 	}
 	switch strings.ToLower(s.Transport) {
-	case TransportRakNet:
+	case TransportRakNet, TransportTCP:
+		cfg.BackendTransport = strings.ToLower(s.Transport)
 		cfg.ServerAddress = s.Address
+		cfg.BackendNoEncryption, cfg.BackendNoCompression = s.NoEncryption, s.NoCompression
 	default:
 		cfg.BackendTransport = TransportNetherNet
 		cfg.NetherNetBackendAddress = s.Address
@@ -938,8 +944,8 @@ func (n *Network) refreshRetrying(server string) {
 func serverUp(s ServerConfig) bool {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	if strings.EqualFold(s.Transport, TransportRakNet) {
-		_, err := raknet.PingContext(ctx, s.Address)
+	if GameTransport(s.Transport) {
+		_, err := pingGameServer(ctx, s.Transport, s.Address)
 		return err == nil
 	}
 	host := strings.TrimSuffix(strings.TrimPrefix(strings.TrimPrefix(s.Address, "http://"), "https://"), "/")

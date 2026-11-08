@@ -75,7 +75,7 @@ func normalizeServers(in []bridge.ServerConfig) ([]bridge.ServerConfig, error) {
 			return nil, fmt.Errorf("two servers are called %q", s.Name)
 		}
 		seen[strings.ToLower(s.Name)] = true
-		if !strings.EqualFold(s.Transport, bridge.TransportRakNet) {
+		if !bridge.GameTransport(s.Transport) {
 			addr, err := bridge.NormalizeNetherNetAddress(s.Address)
 			if err != nil {
 				return nil, fmt.Errorf("server %s: %w", s.Name, err)

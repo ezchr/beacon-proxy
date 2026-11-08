@@ -21,6 +21,7 @@ import (
 	"crypto/ecdsa"
 	"errors"
 	"fmt"
+	"github.com/sandertv/gophertunnel/minecraft"
 	"log/slog"
 	"net"
 	"net/url"
@@ -38,6 +39,10 @@ import (
 const (
 	TransportRakNet    = "raknet"
 	TransportNetherNet = "nethernet"
+	// TransportTCP reaches a backend on the same machine over gophertunnel's TCP network: packet
+	// batches over a TCP stream instead of RakNet, which saves the work RakNet does for lossy links.
+	// The backend must listen on it (Dragonfly: Network.Transport "tcp").
+	TransportTCP = "tcp"
 
 	// TransportNetherNetNoRelay keeps the Xbox Live session and its signaling here but takes this
 	// process out of the data path entirely: offers are forwarded to the backend's own HTTP
@@ -67,6 +72,9 @@ type Config struct {
 	// Used only when BackendTransport is RakNet. That listener MUST have encryption disabled -
 	// see the ForwardLogin doc comment in proxy/dial.go for why.
 	ServerAddress string
+	// BackendNoEncryption and BackendNoCompression ask a TCP backend for a plain link (see
+	// ServerConfig.NoEncryption).
+	BackendNoEncryption, BackendNoCompression bool
 
 	// NetherNetBackendAddress is the base URL of the backend's NetherNet HTTP signaling
 	// endpoint, e.g. "http://127.0.0.1:19134". Used only when BackendTransport is NetherNet.
@@ -300,14 +308,37 @@ func dialBackend(ctx context.Context, cfg Config, log *slog.Logger) (backendConn
 			transportKey = identity.PrivateKey
 		}
 		return conn, transportKey, nil
+	case TransportTCP:
+		dialCtx, cancel := context.WithTimeout(ctx, backendDialTimeout)
+		defer cancel()
+		c, err := minecraft.TCP{NoEncryption: cfg.BackendNoEncryption, NoCompression: cfg.BackendNoCompression}.DialContext(dialCtx, cfg.ServerAddress)
+		if err != nil {
+			return nil, nil, fmt.Errorf("dial tcp backend %s: %w", cfg.ServerAddress, err)
+		}
+		return c.(backendConn), nil, nil
 	case TransportNetherNetNoRelay:
 		// HandleConn is never reached in this mode: signalBroker hands the negotiation to the
 		// backend and no connection is ever accepted here to be relayed.
 		return nil, nil, fmt.Errorf("backend transport %q does not dial a backend leg", name)
 	default:
-		return nil, nil, fmt.Errorf("unknown backend transport %q (want %q, %q or %q)",
-			name, TransportRakNet, TransportNetherNet, TransportNetherNetNoRelay)
+		return nil, nil, fmt.Errorf("unknown backend transport %q (want %q, %q, %q or %q)",
+			name, TransportRakNet, TransportTCP, TransportNetherNet, TransportNetherNetNoRelay)
 	}
+}
+
+// GameTransport reports whether t reaches a server at a plain game address (host:port) rather than
+// through NetherNet signaling: RakNet or TCP.
+func GameTransport(t string) bool {
+	t = strings.ToLower(strings.TrimSpace(t))
+	return t == TransportRakNet || t == TransportTCP
+}
+
+// pingGameServer pings a server reached over RakNet or TCP and returns its pong data.
+func pingGameServer(ctx context.Context, transport, address string) ([]byte, error) {
+	if strings.EqualFold(transport, TransportTCP) {
+		return minecraft.TCP{}.PingContext(ctx, address)
+	}
+	return raknet.PingContext(ctx, address)
 }
 
 // NormalizeNetherNetAddress accepts either a full base URL ("http://127.0.0.1:19134") or a bare

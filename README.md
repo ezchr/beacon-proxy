@@ -97,9 +97,27 @@ survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
 | `address` | where Beacon reaches the server (`host:port`); the only one you must give |
 | `forwarding` | how the server learns who the player is: leave it out for Beacon's signature, or `"endstone"`. See [Forwarding](#forwarding-who-the-player-is). |
 | `resource-packs` | `false` leaves the server's resource packs out of what players get ([below](#leaving-out-a-servers-resource-packs)) |
-| `transport` | `"nethernet"` (default) or `"raknet"`, for a server that only speaks RakNet |
+| `transport` | `"nethernet"` (default), `"raknet"` for a server that only speaks RakNet, or `"tcp"` for a server on the same machine that listens on TCP ([below](#tcp-for-servers-on-the-same-machine)) |
+| `encryption`, `compression` | `false` asks a `"tcp"` server not to encrypt or compress the link ([below](#tcp-for-servers-on-the-same-machine)) |
 | `protocols` | the game versions (protocol numbers) the server takes, e.g. `[2193]`; leave it out for every version Beacon serves |
 | `native` | newer versions the server speaks itself; players on the other versions it takes are translated by Beacon |
+
+### TCP for servers on the same machine
+
+A server on the same machine as Beacon can be reached over TCP instead of RakNet. RakNet spends work
+on acknowledgements, resends and splitting packets that a local TCP link does not need, so Beacon
+uses less CPU (about 10-13% in our tests). Encrypting and compressing a link that never leaves the
+machine only costs CPU on both ends too, so you can turn both off:
+
+```toml
+[servers]
+lobby = { address = "127.0.0.1:19133", transport = "tcp", encryption = false, compression = false }
+```
+
+The server must listen on TCP: Dragonfly with gophertunnel's TCP network (`Network.Transport`
+including `"tcp"`), on an address only Beacon can reach, such as `127.0.0.1`. `encryption` and
+`compression` only work with `transport = "tcp"`. Players' own connections to Beacon are always
+encrypted.
 
 ### Leaving out a server's resource packs
 

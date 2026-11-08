@@ -266,8 +266,8 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	case modeRelayless:
 		// Players connect straight to the backend, so there is one server and nothing to forward.
 		s := serverNamed(servers, def)
-		if strings.EqualFold(s.Transport, bridge.TransportRakNet) {
-			return FileConfig{}, fmt.Errorf("server %s: relayless mode needs a NetherNet backend (its players connect to it over NetherNet); this one is set to RakNet", s.Name)
+		if bridge.GameTransport(s.Transport) {
+			return FileConfig{}, fmt.Errorf("server %s: relayless mode needs a NetherNet backend (its players connect to it over NetherNet); this one is set to %s", s.Name, s.Transport)
 		}
 		cfg.BackendTransport = bridge.TransportNetherNetNoRelay
 		cfg.ServerAddress = s.Address
@@ -314,6 +314,12 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 			if rp, ok := v["resource-packs"].(bool); ok && !rp {
 				s.NoPacks = true
 			}
+			if e, ok := v["encryption"].(bool); ok && !e {
+				s.NoEncryption = true
+			}
+			if c, ok := v["compression"].(bool); ok && !c {
+				s.NoCompression = true
+			}
 			if f, ok := v["forwarding"].(string); ok {
 				switch strings.ToLower(f) {
 				case "", "beacon":
@@ -334,8 +340,13 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 			s.Transport = ""
 		case bridge.TransportRakNet:
 			s.Transport = bridge.TransportRakNet
+		case bridge.TransportTCP:
+			s.Transport = bridge.TransportTCP
 		default:
-			return nil, nil, fmt.Errorf("server %s: transport %q: use \"nethernet\" (default) or \"raknet\"", name, s.Transport)
+			return nil, nil, fmt.Errorf("server %s: transport %q: use \"nethernet\" (default), \"raknet\" or \"tcp\"", name, s.Transport)
+		}
+		if (s.NoEncryption || s.NoCompression) && s.Transport != bridge.TransportTCP {
+			return nil, nil, fmt.Errorf("server %s: encryption = false and compression = false need transport = \"tcp\"", name)
 		}
 		byName[name] = s
 	}
