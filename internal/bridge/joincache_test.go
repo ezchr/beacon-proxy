@@ -16,15 +16,15 @@ func TestServerPaletteIsShared(t *testing.T) {
 		t.Fatal(err)
 	}
 	blocks := []protocol.BlockEntry{{Name: "addon:ruby", Properties: map[string]any{}}}
-	a, am, err := n.serverPalette(blocks, union)
+	a, am, err := n.serverPalette(blocks, union, false)
 	if err != nil {
 		t.Fatal(err)
 	}
-	b, bm, _ := n.serverPalette([]protocol.BlockEntry{{Name: "addon:ruby", Properties: map[string]any{}}}, union)
+	b, bm, _ := n.serverPalette([]protocol.BlockEntry{{Name: "addon:ruby", Properties: map[string]any{}}}, union, false)
 	if a != b || am != bm {
 		t.Fatal("the same block list must get the same palette and map")
 	}
-	if c, _, _ := n.serverPalette([]protocol.BlockEntry{{Name: "addon:jade", Properties: map[string]any{}}}, union); c == a {
+	if c, _, _ := n.serverPalette([]protocol.BlockEntry{{Name: "addon:jade", Properties: map[string]any{}}}, union, false); c == a {
 		t.Fatal("another block list must get its own palette")
 	}
 	if am == nil {

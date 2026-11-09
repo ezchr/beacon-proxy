@@ -35,6 +35,25 @@ type blockState struct {
 // vanillaStates is the decoded vanillaBlockStates, and vanillaNames the set of names in it.
 var vanillaStates, vanillaNames = decodeBlockStates(vanillaBlockStates)
 
+// vanillaHashes is the network block hash of every vanilla state: what a server with block network
+// id hashes on (a world hosted by a Bedrock client) numbers blocks by.
+var vanillaHashes = func() map[blockState]uint32 {
+	m := make(map[blockState]uint32, len(vanillaStates))
+	dec := nbt.NewDecoder(bytes.NewBuffer(vanillaBlockStates))
+	for {
+		var s struct {
+			Name       string         `nbt:"name"`
+			Properties map[string]any `nbt:"states"`
+			Version    int32          `nbt:"version"`
+		}
+		if err := dec.Decode(&s); err != nil {
+			break
+		}
+		m[blockState{Name: s.Name, Properties: encodeProperties(s.Properties)}] = networkBlockHash(s.Name, s.Properties)
+	}
+	return m
+}()
+
 // vanillaFor returns the vanilla states and names a client of protocol proto numbers blocks by.
 func vanillaFor(proto int32) ([]blockState, map[string]bool) {
 	return vanillaStates, vanillaNames
@@ -81,6 +100,9 @@ type blockPalette struct {
 	custom []string
 	// vanilla is the number of vanilla states, which differs between protocol versions.
 	vanilla int
+	// hashes, for a server with block network id hashes on, is the network hash of each state: its
+	// id on that server. Custom states have none (0xffffffff) and come out as air.
+	hashes []uint32
 
 	namesOnce sync.Once
 	names     map[string][]uint32
@@ -120,6 +142,94 @@ func newBlockPaletteFor(blocks []protocol.BlockEntry, proto int32) (*blockPalett
 		p.index[s] = uint32(i)
 	}
 	return p, nil
+}
+
+// newHashedBlockPalette is newBlockPalette for a server with block network id hashes on: the same
+// states, numbered by their network hashes.
+func newHashedBlockPalette(blocks []protocol.BlockEntry) (*blockPalette, error) {
+	p, err := newBlockPalette(blocks)
+	if err != nil {
+		return nil, err
+	}
+	p.hashes = make([]uint32, len(p.states))
+	for i, s := range p.states {
+		h, ok := vanillaHashes[s]
+		if !ok {
+			h = 0xffffffff
+		}
+		p.hashes[i] = h
+	}
+	return p, nil
+}
+
+// networkBlockHash is the client's network block hash of a state: FNV-1a (32 bit) of the state as
+// little-endian NBT with its properties sorted, as Dragonfly's world.networkBlockHash.
+func networkBlockHash(name string, properties map[string]any) uint32 {
+	if name == "minecraft:unknown" {
+		return 0xfffffffe
+	}
+	keys := make([]string, 0, len(properties))
+	for k := range properties {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	var data []byte
+	str := func(s string) {
+		data = append(data, byte(len(s)), byte(len(s)>>8))
+		data = append(data, s...)
+	}
+	data = append(data, 10, 0, 0, 8)
+	str("name")
+	str(name)
+	data = append(data, 10)
+	str("states")
+	for _, k := range keys {
+		switch v := properties[k].(type) {
+		case string:
+			data = append(data, 8)
+			str(k)
+			str(v)
+		case uint8:
+			data = append(data, 1)
+			str(k)
+			data = append(data, v)
+		case int8:
+			data = append(data, 1)
+			str(k)
+			data = append(data, byte(v))
+		case bool:
+			data = append(data, 1)
+			str(k)
+			if v {
+				data = append(data, 1)
+			} else {
+				data = append(data, 0)
+			}
+		case int16:
+			data = append(data, 2)
+			str(k)
+			data = append(data, byte(v), byte(v>>8))
+		case uint16:
+			data = append(data, 2)
+			str(k)
+			data = append(data, byte(v), byte(v>>8))
+		case int32:
+			data = append(data, 3)
+			str(k)
+			data = append(data, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+		case uint32:
+			data = append(data, 3)
+			str(k)
+			data = append(data, byte(v), byte(v>>8), byte(v>>16), byte(v>>24))
+		}
+	}
+	data = append(data, 0, 0)
+	h := uint32(2166136261)
+	for _, b := range data {
+		h ^= uint32(b)
+		h *= 16777619
+	}
+	return h
 }
 
 // customBlockStates lists a custom block's states in the order the client registers them: every
@@ -231,10 +341,12 @@ func (p *blockPalette) sameAs(o *blockPalette) bool {
 // blockMap renumbers runtime ids of one palette to another. A state missing from the target maps to
 // its air id.
 type blockMap struct {
-	to      []uint32 // from id -> to id
-	back    []uint32 // to id -> from id
-	fromAir uint32   // air in the from palette
-	toAir   uint32   // air in the to palette
+	to   []uint32 // from id -> to id
+	back []uint32 // to id -> from id
+	// hashTo replaces to for a server numbering by network hashes: hash -> to id.
+	hashTo  map[uint32]uint32
+	fromAir uint32 // air in the from palette
+	toAir   uint32 // air in the to palette
 }
 
 // isAir reports whether id is air: in the target palette if to, else in the source one.
@@ -292,6 +404,20 @@ func newBlockMap(from, to *blockPalette) *blockMap {
 			m.back[id] = i
 		}
 	}
+	if from.hashes != nil {
+		// The server numbers by network hashes: key the forward map by hash and give hashes back.
+		m.hashTo = make(map[uint32]uint32, len(from.hashes))
+		for i, h := range from.hashes {
+			if h != 0xffffffff {
+				m.hashTo[h] = m.to[i]
+			}
+		}
+		for id, i := range m.back {
+			m.back[id] = from.hashes[i]
+		}
+		m.fromAir = from.hashes[m.fromAir]
+		m.to = nil
+	}
 	return m
 }
 
@@ -340,6 +466,12 @@ func (p *blockPalette) byName() map[string][]uint32 {
 
 // forward renumbers a backend id for the client; reverse a client id for the backend.
 func (m *blockMap) forward(id uint32) uint32 {
+	if m.hashTo != nil {
+		if to, ok := m.hashTo[id]; ok {
+			return to
+		}
+		return m.toAir
+	}
 	if int(id) < len(m.to) {
 		return m.to[id]
 	}

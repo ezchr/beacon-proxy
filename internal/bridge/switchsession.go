@@ -438,7 +438,7 @@ func (s *switchSession) join() error {
 	l, server := d.l, d.server
 
 	sg := *l.startGame
-	_, bm, err := s.n.serverPalette(sg.Blocks, s.palette)
+	_, bm, err := s.n.serverPalette(sg.Blocks, s.palette, sg.UseBlockNetworkIDHashes)
 	if err != nil {
 		return err
 	}
@@ -456,6 +456,9 @@ func (s *switchSession) join() error {
 	s.mu.Unlock()
 
 	sg.Blocks = u.blocks
+	// The client always numbers blocks by the union's palette: a server numbering by network hashes
+	// (block network id hashes on, as a world a Bedrock client hosts) is renumbered like any other.
+	sg.UseBlockNetworkIDHashes = false
 	sg.Experiments = u.exps
 	sg.PlayerMovementSettings.RewindHistorySize = u.rewind
 	sg.ExperimentsPreviouslyToggled = len(u.exps) > 0

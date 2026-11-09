@@ -124,7 +124,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	}
 	sg := l.startGame
 	answered := time.Since(start)
-	bp, bm, perr := s.n.serverPalette(sg.Blocks, s.palette)
+	bp, bm, perr := s.n.serverPalette(sg.Blocks, s.palette, sg.UseBlockNetworkIDHashes)
 	s.mu.Lock()
 	old := s.cur
 	if old != nil {
@@ -229,9 +229,7 @@ func incompatible(a, b *packet.StartGame) string {
 	if a.ServerAuthoritativeInventory != b.ServerAuthoritativeInventory {
 		d = append(d, "server authoritative inventory")
 	}
-	if a.UseBlockNetworkIDHashes != b.UseBlockNetworkIDHashes {
-		d = append(d, "block network id hashes")
-	}
+	// Block network id hashes are not compared: the relay renumbers a server that uses them.
 	return strings.Join(d, ", ")
 }
 

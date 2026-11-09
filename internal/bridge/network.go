@@ -461,6 +461,11 @@ func (n *Network) record(server string, id uint32, payload []byte) bool {
 	} else {
 		n.Log.Debug("network: server content changed, cached for the next joins", "server", server, "file", file)
 	}
+	// A server whose packs players never get (resource-packs = false) changes nothing a client has:
+	// no rejoin to download them, and no download.
+	if sc := n.server(server); sc != nil && sc.NoPacks {
+		return true
+	}
 	if id == packet.IDResourcePacksInfo || id == packet.IDResourcePackStack {
 		n.packGen.Add(1)
 	}
@@ -542,6 +547,7 @@ func (n *Network) setSeen(key string, c seenContent) {
 type paletteKey struct {
 	blocks uint64
 	union  *blockPalette
+	hashed bool
 }
 
 type serverPalette struct {
@@ -551,20 +557,24 @@ type serverPalette struct {
 
 // serverPalette returns the palette of a server's StartGame block list and its map to the union
 // palette, built once for every player with the same blocks and union (both are only read).
-func (n *Network) serverPalette(blocks []protocol.BlockEntry, union *blockPalette) (*blockPalette, *blockMap, error) {
-	key := paletteKey{blocksKey(blocks), union}
+func (n *Network) serverPalette(blocks []protocol.BlockEntry, union *blockPalette, hashed bool) (*blockPalette, *blockMap, error) {
+	key := paletteKey{blocksKey(blocks), union, hashed}
 	n.mu.Lock()
 	p, ok := n.palettes[key]
 	n.mu.Unlock()
 	if ok {
 		return p.bp, p.bm, nil
 	}
-	bp, err := newBlockPalette(blocks)
+	newPalette := newBlockPalette
+	if hashed {
+		newPalette = newHashedBlockPalette
+	}
+	bp, err := newPalette(blocks)
 	if err != nil {
 		return nil, nil, err
 	}
 	var bm *blockMap
-	if !bp.sameAs(union) {
+	if hashed || !bp.sameAs(union) {
 		bm = newBlockMap(bp, union)
 	}
 	n.mu.Lock()
