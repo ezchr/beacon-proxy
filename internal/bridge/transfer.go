@@ -465,27 +465,37 @@ func (t *transfer) inPhase1() bool {
 func (t *transfer) phase1Done(s *switchSession) {
 	s.sendClient(s.flags(map[uint32]bool{protocol.EntityDataFlagNoAI: true, protocol.EntityDataFlagBreathing: true, protocol.EntityDataFlagHasGravity: true}))
 	s.sendClient(&packet.UpdateClientInputLocks{Locks: inputLockCamera | inputLockMovement})
+	// Everything the client's answers to the second dimension change depend on is set up before
+	// that change is sent. The client asks for the placeholder sub-chunks within milliseconds;
+	// before, the placeholders were only marked after the send, so those requests could reach the
+	// new server, which hasn't put the player in its world yet and never answers them: the client
+	// sat on the loading screen with no chunk under it. The ground channel likewise has to exist
+	// before the client can acknowledge the change, or phase2Done unfroze over a hole.
+	requestMode := s.n.usesRequestMode(t.l.server.Name)
 	s.mu.Lock()
 	cur := s.dimension
+	s.placeholders = nil
+	if cur != t.target && requestMode {
+		s.markPlaceholders(t.spawn) // see placeholders.go
+	}
+	if requestMode {
+		t.mu.Lock()
+		t.ground = s.awaitSpawnColumnLocked(t.spawn) // see phase2Done
+		t.mu.Unlock()
+	}
+	s.subChunkMode = requestMode
+	dim := cur
+	if cur != t.target {
+		s.dimension = otherDimension(cur, t.target)
+		dim = s.dimension
+	}
 	s.mu.Unlock()
 	if cur != t.target {
 		fake := t.spawn.Add(mgl32.Vec3{-2000, 0, -2000})
 		s.sendClient(s.position(fake, t.rot))
-		s.mu.Lock()
-		s.dimension = otherDimension(cur, t.target)
-		dim := s.dimension
-		s.mu.Unlock()
-		s.sendClient(s.dimensionChange(dim, t.spawn, true, s.n.usesRequestMode(t.l.server.Name))...)
+		s.sendClient(s.dimensionChange(dim, t.spawn, true, requestMode)...)
 	}
 	s.mu.Lock()
-	s.placeholders = nil
-	if cur != t.target && s.n.usesRequestMode(t.l.server.Name) {
-		s.markPlaceholders(t.spawn) // see placeholders.go
-	}
-	if s.n.usesRequestMode(t.l.server.Name) {
-		t.ground = s.awaitSpawnColumnLocked(t.spawn) // see phase2Done
-	}
-	s.subChunkMode = s.n.usesRequestMode(t.l.server.Name)
 	t.mu.Lock()
 	q := t.queue
 	t.queue, t.queueing, t.wired = nil, false, true
@@ -519,14 +529,17 @@ func (t *transfer) phase2Done(s *switchSession) {
 		s.sendClient(s.flags(map[uint32]bool{protocol.EntityDataFlagBreathing: true, protocol.EntityDataFlagHasGravity: true}))
 		s.sendClient(&packet.UpdateClientInputLocks{})
 	}
-	if t.ground == nil {
+	t.mu.Lock()
+	ground := t.ground
+	t.mu.Unlock()
+	if ground == nil {
 		unfreeze()
 	} else {
 		go func() {
 			start := time.Now()
 			timedOut := false
 			select {
-			case <-t.ground:
+			case <-ground:
 			case <-time.After(spawnGroundWait):
 				timedOut = true
 			case <-s.ctx.Done():
@@ -604,8 +617,10 @@ func (t *transfer) fail(s *switchSession, reason string) {
 		return
 	}
 	t.finalized = true
+	phase, ps := t.phase, t.playStatus
 	t.mu.Unlock()
-	s.log.Warn("network: move failed midway", "server", t.l.server.Name, "reason", reason)
+	s.log.Warn("network: move failed midway", "server", t.l.server.Name, "reason", reason,
+		"phase", phase, "serverSpawned", ps, "after", time.Since(t.start).Round(time.Millisecond))
 	t.l.close()
 	s.disconnect(fmt.Sprintf("Could not move you to %s: %s", t.l.server.Name, reason))
 }
