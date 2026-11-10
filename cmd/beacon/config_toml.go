@@ -311,6 +311,9 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 			s.Transport, _ = v["transport"].(string)
 			s.Protocols = int32List(v["protocols"])
 			s.Native = int32List(v["native"])
+			if err := parseHold(&s, v); err != nil {
+				return nil, nil, fmt.Errorf("server %s: %w", name, err)
+			}
 			if rp, ok := v["resource-packs"].(bool); ok && !rp {
 				s.NoPacks = true
 			}

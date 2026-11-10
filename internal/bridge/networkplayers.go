@@ -38,6 +38,10 @@ func (n *Network) PlayerCount(ctx context.Context) (int, error) {
 			mu.Lock()
 			defer mu.Unlock()
 			if err != nil {
+				if held := heldOn(n, s.Name); held > 0 {
+					total += held // down, but its players wait for it on Beacon (hold.go)
+					return
+				}
 				errs = append(errs, fmt.Errorf("%s: %w", s.Name, err))
 				return
 			}

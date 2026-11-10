@@ -40,6 +40,11 @@ type transfer struct {
 	spawn    mgl32.Vec3
 	rot      mgl32.Vec2
 
+	// reattach marks putting a held player back on their server (hold.go): no dimension change.
+	// held is how long they waited for it.
+	reattach bool
+	held     time.Duration
+
 	mu         sync.Mutex
 	phase      int // 1: waiting for the first dimension change, 2: for the second, 0: done
 	queueing   bool
@@ -112,7 +117,8 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	if err != nil {
 		s.log.Warn("network: move failed", "server", server.Name, "err", err)
 		s.mu.Lock()
-		gone := s.cur == nil || isClosed(s.cur)
+		// A held player (hold.go) still has their own server to wait for.
+		gone := (s.cur == nil || isClosed(s.cur)) && s.hold == nil
 		s.mu.Unlock()
 		// The technical reason is in the log above; players get a plain one.
 		if gone {
@@ -122,8 +128,14 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 		s.message("<red>%s is not reachable right now. Try again in a minute.</red>", server.Name)
 		return
 	}
+	s.moveWithLink(l, server, start, time.Since(start))
+}
+
+// moveWithLink moves the player onto l, a link to server that just sent its StartGame, through the
+// dimension changes. It reports false when the client can't be moved there (l is closed then).
+// s.switchMu held.
+func (s *switchSession) moveWithLink(l *link, server ServerConfig, start time.Time, answered time.Duration) bool {
 	sg := l.startGame
-	answered := time.Since(start)
 	bp, bm, perr := s.n.serverPalette(sg.Blocks, s.palette, sg.UseBlockNetworkIDHashes)
 	s.mu.Lock()
 	old := s.cur
@@ -133,15 +145,17 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 			l.close()
 			s.log.Warn("network: move refused, the servers' StartGame settings differ", "server", server.Name, "differences", bad)
 			s.message("<red>Can't move you to %s: its settings are incompatible.</red>", server.Name)
-			return
+			return false
 		}
 	}
 	if perr != nil {
 		s.mu.Unlock()
 		l.close()
 		s.message("<red>Could not connect to %s: %s</red>", server.Name, perr)
-		return
+		return false
 	}
+	// The player was waiting for their server (hold.go): this move takes over.
+	held := s.endHoldLocked()
 	sg.Blocks = nil // the palette has them; the next move only compares settings
 	if bm != nil {
 		for _, name := range bp.custom {
@@ -170,6 +184,9 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	if old != nil {
 		old.close()
 	}
+	if held {
+		s.sendClient(holdTitleClear()...)
+	}
 	s.log.Info("network: moving player", "from", nameOf(old), "to", server.Name, "blocksRenumbered", bm != nil)
 	s.setBackendPing(l) // the server leg counts in /ping only for a server on another machine
 	go s.readBackend(l, false)
@@ -187,6 +204,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 		s.sendClient(s.dimensionChange(newDim, sg.PlayerPosition, false, false)...)
 		t.dimChangeDone(s)
 	}
+	return true
 }
 
 func nameOf(l *link) string {
@@ -242,6 +260,15 @@ func (s *switchSession) resetClientLocked(sg *packet.StartGame) []packet.Packet 
 		s.proxyRespawn = true
 		out = append(out, &packet.Respawn{Position: sg.PlayerPosition, State: packet.RespawnStateReadyToSpawn, EntityRuntimeID: s.clientRID})
 	}
+	out = append(out, s.clearClientLocked()...)
+	return append(out, startGameSettings(sg)...)
+}
+
+// clearClientLocked undoes what the player's server gave the client: its entities, players, boss
+// bars, waypoints, scoreboards, fog, input locks, hidden HUD, open windows, effects and weather.
+// s.mu held.
+func (s *switchSession) clearClientLocked() []packet.Packet {
+	var out []packet.Packet
 	for ridden, rider := range s.links {
 		out = append(out, &packet.SetActorLink{EntityLink: protocol.EntityLink{RiddenEntityUniqueID: ridden, RiderEntityUniqueID: rider, Type: protocol.EntityLinkRemove}})
 	}
@@ -317,6 +344,12 @@ func (s *switchSession) resetClientLocked(sg *packet.StartGame) []packet.Packet 
 		&packet.LevelEvent{EventType: packet.LevelEventStopThunderstorm},
 		&packet.LevelEvent{EventType: packet.LevelEventStopRaining, EventData: 10000},
 	)
+	return out
+}
+
+// startGameSettings applies a server's StartGame settings to a client that joined another server.
+func startGameSettings(sg *packet.StartGame) []packet.Packet {
+	var out []packet.Packet
 	mode := sg.PlayerGameMode
 	if mode == packet.GameTypeDefault {
 		mode = sg.WorldGameMode
@@ -525,6 +558,17 @@ const spawnGroundWait = 8 * time.Second
 func (t *transfer) phase2Done(s *switchSession) {
 	s.sendClient(&packet.StopSound{StopAll: true})
 	s.sendClient(s.position(t.spawn, t.rot))
+	t.releaseAtSpawn(s)
+	t.replayChunks(s)
+	s.mu.Lock()
+	s.armSettle(t.l, t.spawn) // and again once the client settled: see dimreplay.go
+	s.mu.Unlock()
+	t.tryFinalize(s)
+}
+
+// releaseAtSpawn unfreezes the player at the spawn: at once, or once the ground there arrived (see
+// phase2Done).
+func (t *transfer) releaseAtSpawn(s *switchSession) {
 	unfreeze := func() {
 		s.sendClient(s.flags(map[uint32]bool{protocol.EntityDataFlagBreathing: true, protocol.EntityDataFlagHasGravity: true}))
 		s.sendClient(&packet.UpdateClientInputLocks{})
@@ -534,35 +578,30 @@ func (t *transfer) phase2Done(s *switchSession) {
 	t.mu.Unlock()
 	if ground == nil {
 		unfreeze()
-	} else {
-		go func() {
-			start := time.Now()
-			timedOut := false
-			select {
-			case <-ground:
-			case <-time.After(spawnGroundWait):
-				timedOut = true
-			case <-s.ctx.Done():
-				return
-			}
-			s.mu.Lock()
-			still := s.cur == t.l
-			s.mu.Unlock()
-			if !still {
-				return // moved on to another server meanwhile: that move unfreezes
-			}
-			if waited := time.Since(start); timedOut || waited > time.Second {
-				s.log.Info("network: waited for the ground at the spawn", "server", t.l.server.Name, "waited", waited.Round(time.Millisecond), "timedOut", timedOut)
-			}
-			s.sendClient(s.position(t.spawn, t.rot))
-			unfreeze()
-		}()
+		return
 	}
-	t.replayChunks(s)
-	s.mu.Lock()
-	s.armSettle(t.l, t.spawn) // and again once the client settled: see dimreplay.go
-	s.mu.Unlock()
-	t.tryFinalize(s)
+	go func() {
+		start := time.Now()
+		timedOut := false
+		select {
+		case <-ground:
+		case <-time.After(spawnGroundWait):
+			timedOut = true
+		case <-s.ctx.Done():
+			return
+		}
+		s.mu.Lock()
+		still := s.cur == t.l && s.hold == nil
+		s.mu.Unlock()
+		if !still {
+			return // moved on to another server meanwhile (that move unfreezes), or held again
+		}
+		if waited := time.Since(start); timedOut || waited > time.Second {
+			s.log.Info("network: waited for the ground at the spawn", "server", t.l.server.Name, "waited", waited.Round(time.Millisecond), "timedOut", timedOut)
+		}
+		s.sendClient(s.position(t.spawn, t.rot))
+		unfreeze()
+	}()
 }
 
 func (t *transfer) onPlayStatus(s *switchSession) {
@@ -593,6 +632,9 @@ func (t *transfer) tryFinalize(s *switchSession) {
 	if s.transfer == t {
 		s.transfer = nil
 	}
+	if t.reattach && strings.EqualFold(s.lastHold.server, t.l.server.Name) {
+		s.lastHold.settled = true // see holdDeadline
+	}
 	s.mu.Unlock()
 	time.AfterFunc(5*time.Second, func() {
 		s.mu.Lock()
@@ -603,6 +645,11 @@ func (t *transfer) tryFinalize(s *switchSession) {
 			s.log.Info("network: sub-chunk requests answered from the server's whole columns", "server", t.l.server.Name, "requests", n, "columnsKept", kept)
 		}
 	})
+	if t.reattach {
+		s.log.Info("network: held player back on their server", "server", t.l.server.Name, "serverAnswered", t.answered.Round(time.Millisecond),
+			"held", t.held.Round(time.Millisecond), "total", time.Since(t.start).Round(time.Millisecond))
+		return
+	}
 	s.log.Info("network: move finished", "server", t.l.server.Name, "serverAnswered", t.answered.Round(time.Millisecond),
 		"leftOldWorld", t.phase1.Round(time.Millisecond), "inNewWorld", t.phase2.Round(time.Millisecond),
 		"total", time.Since(t.start).Round(time.Millisecond))
@@ -621,6 +668,10 @@ func (t *transfer) fail(s *switchSession, reason string) {
 	t.mu.Unlock()
 	s.log.Warn("network: move failed midway", "server", t.l.server.Name, "reason", reason,
 		"phase", phase, "serverSpawned", ps, "after", time.Since(t.start).Round(time.Millisecond))
+	if t.reattach {
+		t.l.close() // backendGone holds the player again with the time left, or moves them on
+		return
+	}
 	t.l.close()
 	s.disconnect(fmt.Sprintf("Could not move you to %s: %s", t.l.server.Name, reason))
 }

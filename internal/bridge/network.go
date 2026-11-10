@@ -124,6 +124,15 @@ type ServerConfig struct {
 	// server takes logs in with the relay's own and the relay translates their packets,
 	// so a server takes players of a version it does not speak.
 	Native []int32 `json:"native,omitempty"`
+	// Hold (hold in beacon.toml) keeps the server's players on Beacon for up to this long when the
+	// server goes down (a restart or a crash) and puts them back on it once it is up again, with no
+	// move to another server (hold.go). 0: they are moved to another server at once.
+	Hold time.Duration `json:"hold,omitempty"`
+	// HoldMessage (hold-message) is the title held players see; empty: defaultHoldMessage.
+	HoldMessage string `json:"hold_message,omitempty"`
+	// HoldReasons (hold-reasons) are more kick messages (parts of them, any case) that mean the
+	// server is going down, besides holdRestartWords.
+	HoldReasons []string `json:"hold_reasons,omitempty"`
 	// NoPacks keeps the server's resource packs out of what players get (resource-packs = false in
 	// beacon.toml): its blocks and items still join the union, drawn by the other servers' packs.
 	NoPacks bool `json:"no_packs,omitempty"`

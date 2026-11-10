@@ -108,6 +108,11 @@ type switchSession struct {
 	hiddenHud    map[int32]bool
 	dead         bool
 	proxyRespawn bool
+
+	// hold is set while the player waits on Beacon for their server to come back (hold.go);
+	// lastHold is the last hold that ended with them back on it.
+	hold     *holdState
+	lastHold endedHold
 }
 
 // link is the relay's connection to one backend for one player.
@@ -761,8 +766,11 @@ func (s *switchSession) backendGone(l *link) {
 	cur := s.cur
 	s.mu.Unlock()
 	if t != nil && t.l == l {
-		t.fail(s, "the server closed the connection: "+errText(l.err))
-		return
+		if !t.reattach {
+			t.fail(s, "the server closed the connection: "+errText(l.err))
+			return
+		}
+		t.abandon(s) // a held player's server fell over again while they were put back on it
 	}
 	if cur != l || s.ctx.Err() != nil {
 		return
@@ -772,13 +780,21 @@ func (s *switchSession) backendGone(l *link) {
 	if errors.As(l.err, &kick) {
 		reason = kick.msg
 	}
-	// Like Velocity's server list: the player goes to the first other server (the default one
-	// first), for example while their server restarts. Only with none left are they disconnected.
+	if s.startHold(l, reason) {
+		return // a server with a hold that went down: the player waits for it (hold.go)
+	}
+	s.moveAway(l.server.Name, reason)
+}
+
+// moveAway sends a player whose server let them go for reason to another one. Like Velocity's
+// server list: the player goes to the first other server (the default one first), for example
+// while their server restarts. Only with none left are they disconnected.
+func (s *switchSession) moveAway(from, reason string) {
 	for _, other := range s.n.orderedServers() {
-		if strings.EqualFold(other.Name, l.server.Name) {
+		if strings.EqualFold(other.Name, from) {
 			continue
 		}
-		s.log.Info("network: server ended the connection, moving the player to another server", "server", l.server.Name, "to", other.Name, "reason", reason)
+		s.log.Info("network: server ended the connection, moving the player to another server", "server", from, "to", other.Name, "reason", reason)
 		if err := s.requestSwitch(other, reason); err == nil {
 			return
 		}
@@ -810,7 +826,7 @@ func (s *switchSession) readClient() {
 			return
 		}
 		s.mu.Lock()
-		cur, t := s.cur, s.transfer
+		cur, t, held := s.cur, s.transfer, s.hold != nil
 		s.mu.Unlock()
 		out := make([][]byte, 0, len(pks))
 		for _, raw := range pks {
@@ -925,8 +941,8 @@ func (s *switchSession) readClient() {
 					raw = encodePacket(&pk)
 				}
 			}
-			if cur == nil || (t != nil && t.l != cur) {
-				continue // mid-move: nothing to send to yet
+			if cur == nil || (t != nil && t.l != cur) || held {
+				continue // mid-move, or held while the server is down (hold.go): nothing to send to yet
 			}
 			rw, err := cur.rw.rewrite(raw, false, s.pool)
 			if err != nil {

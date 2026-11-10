@@ -101,6 +101,8 @@ survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
 | `encryption`, `compression` | `false` asks a `"tcp"` server not to encrypt or compress the link ([below](#tcp-for-servers-on-the-same-machine)) |
 | `protocols` | the game versions (protocol numbers) the server takes, e.g. `[2193]`; leave it out for every version Beacon serves |
 | `native` | newer versions the server speaks itself; players on the other versions it takes are translated by Beacon |
+| `hold` | how long to keep the server's players on Beacon while it restarts, e.g. `"90s"` ([below](#holding-players-while-a-server-restarts)); leave it out to move them to another server at once |
+| `hold-message`, `hold-reasons` | the title held players see, and more kick messages that mean the server is restarting ([below](#holding-players-while-a-server-restarts)) |
 
 ### TCP for servers on the same machine
 
@@ -118,6 +120,30 @@ The server must listen on TCP: Dragonfly with gophertunnel's TCP network (`Netwo
 including `"tcp"`), on an address only Beacon can reach, such as `127.0.0.1`. `encryption` and
 `compression` only work with `transport = "tcp"`. Players' own connections to Beacon are always
 encrypted.
+
+### Holding players while a server restarts
+
+When a server goes down, Beacon normally moves its players to another server. With `hold`, they
+stay on Beacon instead, in the world they were in, frozen in place with a title saying the server
+is restarting, and are put back on the same server as soon as it is up again: no loading screen and
+no trip through another server.
+
+```toml
+[servers]
+kits = { address = "127.0.0.1:19135", transport = "tcp", hold = "90s" }
+```
+
+- A server that is not back within the hold time (at most `"10m"`) sends its players on as before.
+- Only a server going down holds its players: the connection closing or breaking, or a kick
+  message that says so ("restart", "server closed", "shutting down", Dragonfly's default). A server
+  kicking or banning one player shows them the kick as before. If your server says something else
+  when it stops, add it with `hold-reasons = ["see you soon"]` (parts of the message, any case).
+- `hold-message = "Back in a moment..."` changes the title (default "Server restarting, hold on...").
+- Held players still count as on that server (`/glist`, the Friends tab), and can use `/server` to
+  go elsewhere while they wait.
+- Players come back four at a time, so a full server does not log in all at once.
+- If the server comes back with the player in another dimension than before, they are moved there
+  with a normal dimension change.
 
 ### Leaving out a server's resource packs
 

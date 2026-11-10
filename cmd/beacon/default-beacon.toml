@@ -32,6 +32,7 @@ ping-passthrough = "off"
 [servers]
 # Your servers, as name = "host:port".
 # survival = { address = "127.0.0.1:19134", forwarding = "endstone", resource-packs = false }
+# Add hold = "90s" to keep a server's players on Beacon while it restarts, instead of moving them.
 {{- range .Servers}}
 {{- if or .Transport .Forwarding .NoPacks}}
 {{.Name}} = { address = {{q .Address}}{{if .Transport}}, transport = {{q .Transport}}{{end}}{{if .Forwarding}}, forwarding = {{q .Forwarding}}{{end}}{{if .NoPacks}}, resource-packs = false{{end}} }
