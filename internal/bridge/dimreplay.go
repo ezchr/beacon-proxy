@@ -47,6 +47,8 @@ const (
 	farRadius    = 16               // chunks around the spawn kept for wiped columns
 	farKeep      = 30 * time.Second // how long after arming those are kept
 	wipedDelay   = 300 * time.Millisecond
+	// maxAfter caps the block changes kept per chunk. They only matter inside the settle window.
+	maxAfter = 512
 )
 
 // settleResends are when, after arming, the kept chunks are sent again.
@@ -56,11 +58,14 @@ var settleResends = []time.Duration{time.Second, 2500 * time.Millisecond}
 func (s *switchSession) armSettle(l *link, pos mgl32.Vec3) {
 	c := [2]int32{int32(math.Floor(float64(pos[0]))) >> 4, int32(math.Floor(float64(pos[2]))) >> 4}
 	st := &s.settle
-	if st.l != l || st.center != c || st.chunks == nil {
-		st.chunks = map[[2]int32]*keptChunk{}
-		st.far = map[[2]int32]*keptChunk{}
+	// Start over at every arm. Keeping the old maps when a player respawned at the same spawn chunk
+	// (every death on a one-spawn server) kept every later block change around that spawn for the
+	// whole connection: gigabytes on a busy PvP arena next to the spawn.
+	if st.l != l || st.center != c {
 		st.wipedReports = 0
 	}
+	st.chunks = map[[2]int32]*keptChunk{}
+	st.far = map[[2]int32]*keptChunk{}
 	st.l, st.center, st.until = l, c, time.Now().Add(settleKeep)
 	st.farUntil = time.Now().Add(farKeep)
 	st.gen++
@@ -88,6 +93,12 @@ func (s *switchSession) observeSettle(l *link, raw []byte) {
 		if decodeInto(&pk, payload) == nil && pk.State == packet.RespawnStateReadyToSpawn {
 			s.armSettle(l, pk.Position)
 		}
+	case packet.IDUpdateBlock, packet.IDUpdateSubChunkBlocks, packet.IDBlockActorData, packet.IDLevelChunk:
+		if s.settle.expire() {
+			return
+		}
+	}
+	switch id {
 	case packet.IDUpdateBlock:
 		var pk packet.UpdateBlock
 		if decodeInto(&pk, payload) == nil {
@@ -128,9 +139,26 @@ func (s *switchSession) observeSettle(l *link, raw []byte) {
 	}
 }
 
-// changed keeps a block change raw the server sent for a kept chunk, to send again after it.
+// expire drops the kept chunks once the far window is over and reports whether nothing is kept
+// (then there is nothing to record either).
+func (st *chunkSettle) expire() bool {
+	if st.chunks == nil && st.far == nil {
+		return true
+	}
+	if time.Now().After(st.farUntil) {
+		st.chunks, st.far = nil, nil
+		return true
+	}
+	return false
+}
+
+// changed keeps a block change raw the server sent for a kept chunk, to send again after it. Only
+// inside the settle window: the kept chunks are sent again only then.
 func (st *chunkSettle) changed(pos protocol.BlockPos, raw []byte) {
-	if k, ok := st.chunks[[2]int32{pos[0] >> 4, pos[2] >> 4}]; ok {
+	if time.Now().After(st.until) {
+		return
+	}
+	if k, ok := st.chunks[[2]int32{pos[0] >> 4, pos[2] >> 4}]; ok && len(k.after) < maxAfter {
 		for _, a := range k.after {
 			if string(a) == string(raw) {
 				return // one packet can change several blocks of the chunk
