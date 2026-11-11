@@ -33,6 +33,12 @@ setup.
   another machine (on the same machine it is next to nothing, so it is left out).
   With a Java proxy reporting its Java players (see Bans and mutes), `/ping` and `/glist` include
   them, and the proxy can give Java players the same `/ping` through the control API.
+- **Split-screen.** Guests playing split-screen on a console join as players of their own: Beacon
+  logs each one in on the host's server, and they follow the host on every move. A guest without an
+  Xbox account of its own plays under the host's name with `_1`, `_2`, ... added. To let some
+  servers handle guests themselves instead (Beacon then passes their packets through), list them in
+  the environment variable `BEACON_SUBCLIENT_PASSTHROUGH` (`kits,lobby`, or `*` for all); those
+  guests still count towards the player count and `/glist`.
 
 ## Server list
 

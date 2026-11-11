@@ -243,6 +243,8 @@ All on by default unless noted; details in [Features](docs/features.md).
   players.
 - **HTTPS certificates (opt-in)** for joining by address: a free one from Let's Encrypt (`domain`)
   or your own (`tls-cert`, `tls-key`).
+- **Split-screen:** a console player's split-screen guests join as players of their own and follow
+  their host between servers.
 - **Network-wide player count** in the server list.
 - **Cross-server chat (opt-in):** your servers can share chat through the [control API](docs/control-api.md).
 
