@@ -12,7 +12,7 @@ import (
 
 // consoleHandler writes log lines the way server consoles do:
 //
-//	[08:28:23 INFO] network mode: players can move between servers servers=[pvp skygen]
+//	[2026-11-10 08:28:23 INFO] network mode: players can move between servers servers=[pvp skygen]
 type consoleHandler struct {
 	mu    *sync.Mutex
 	w     io.Writer
@@ -37,7 +37,7 @@ func (h *consoleHandler) Handle(_ context.Context, r slog.Record) error {
 	if r.Level == slog.LevelWarn {
 		level = "WARN"
 	}
-	fmt.Fprintf(&b, "[%s %s] %s", t.Format("15:04:05"), level, r.Message)
+	fmt.Fprintf(&b, "[%s %s] %s", t.Format("2006-01-02 15:04:05"), level, r.Message)
 	b.WriteString(h.attrs)
 	r.Attrs(func(a slog.Attr) bool {
 		writeAttr(&b, h.group, a)
