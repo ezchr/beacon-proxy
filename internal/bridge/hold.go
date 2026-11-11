@@ -445,6 +445,7 @@ func (s *switchSession) endHoldLocked() bool {
 // holdExpired moves on a player whose server did not come back within the hold time (or came back
 // in a state the client can't be put back into): as without a hold.
 func (s *switchSession) holdExpired(h *holdState) {
+	defer s.recoverSession("holdExpired")
 	s.mu.Lock()
 	if s.hold != h {
 		s.mu.Unlock()
@@ -553,7 +554,10 @@ func (s *switchSession) reattach(h *holdState) holdResult {
 	s.sendClient(injects...)
 	s.sendClient(s.holdFreeze()...) // the reset woke it (sleeping): frozen until releaseAtSpawn
 	s.sendClient(&packet.StopSound{StopAll: true}, s.position(t.spawn, t.rot))
-	t.timer = time.AfterFunc(transferTimeout, func() { t.fail(s, "timed out") })
+	t.timer = time.AfterFunc(transferTimeout, func() {
+		defer s.recoverSession("hold timeout")
+		t.fail(s, "timed out")
+	})
 	s.setBackendPing(l)
 	go s.readBackend(l, false)
 	_ = l.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: s.chunkRadius, MaxChunkRadius: s.maxRadius})

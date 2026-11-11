@@ -171,6 +171,7 @@ func (st *chunkSettle) changed(pos protocol.BlockPos, raw []byte) {
 // resendSettled sends the kept chunks again, if the player is still on l, not moving, and nothing
 // armed again since (that arming has its own resends).
 func (s *switchSession) resendSettled(l *link, gen int) {
+	defer s.recoverSession("resendSettled")
 	s.mu.Lock()
 	st := &s.settle
 	if st.gen != gen || st.l != l || s.cur != l || s.transfer != nil || len(st.chunks) == 0 {
@@ -214,6 +215,7 @@ func (s *switchSession) noteWiped(l *link, req *packet.SubChunkRequest) {
 // resendWiped only reports the wiped columns for now (diagnosis): sending the server's chunk again
 // made the client ask for the same sub-chunks again, in a loop.
 func (s *switchSession) resendWiped(l *link) {
+	defer s.recoverSession("resendWiped")
 	s.mu.Lock()
 	st := &s.settle
 	st.wipedPending = false

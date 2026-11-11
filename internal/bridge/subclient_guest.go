@@ -141,6 +141,7 @@ func (s *switchSession) guest(sub byte) *switchSession {
 // startGuest logs in the split-screen player sub of a host session, as handleNetwork does a player,
 // and runs them until they leave or the host's connection ends.
 func (s *switchSession) startGuest(sub byte, request []byte) {
+	defer s.recoverSession("startGuest")
 	refuse := func(msg string) {
 		_ = s.writeClient(subClientHeader(encodePacket(&packet.Disconnect{Message: msg}), sub))
 	}
@@ -351,6 +352,7 @@ func (s *switchSession) followHost(from string, server ServerConfig) {
 			continue // moved elsewhere on their own
 		}
 		go func(g *switchSession) {
+			defer g.recoverSession("follow host")
 			time.Sleep(500 * time.Millisecond)
 			if err := g.requestSwitch(server, ""); err != nil {
 				g.log.Info("network: split-screen player did not follow the host", "server", server.Name, "err", err)

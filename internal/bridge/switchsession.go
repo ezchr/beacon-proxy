@@ -366,6 +366,7 @@ func (s *switchSession) record(server string, id uint32, payload []byte) {
 // rejoin transfers the client to the network again (Network.RejoinAddress), or asks the player to
 // join again when there is no address or the client stays.
 func (s *switchSession) rejoin() {
+	defer s.recoverSession("rejoin")
 	select {
 	case <-time.After(3 * time.Second): // a transfer while the client still loads is lost
 	case <-s.ctx.Done():
@@ -435,6 +436,7 @@ func (s *switchSession) join() error {
 	}
 	dialCh := make(chan dialed, 1)
 	go func() {
+		defer s.recoverSession("join dial")
 		var last error
 		for _, server := range order {
 			l, err := s.openLink(server)
@@ -588,6 +590,7 @@ func (s *switchSession) openLink(server ServerConfig) (*link, error) {
 // readLogin plays the client's side of a backend's join up to StartGame, then hands over to
 // readBackend (for a switch) or leaves it to join (for the first server).
 func (s *switchSession) readLogin(l *link) {
+	defer s.recoverSession("readLogin")
 	for {
 		pks, err := l.c.ReadPackets()
 		if err != nil {
@@ -666,6 +669,7 @@ func (s *switchSession) readLogin(l *link) {
 // one they are moving to). first is the link of the first join, whose registry packets were already
 // replaced by the union's.
 func (s *switchSession) readBackend(l *link, first bool) {
+	defer s.recoverSession("readBackend")
 	defer func() {
 		l.close()
 		s.backendGone(l)
@@ -853,6 +857,7 @@ func errText(err error) string {
 
 // readClient pumps the client's packets to its server.
 func (s *switchSession) readClient() {
+	defer s.recoverSession("readClient")
 	for {
 		pks, err := s.readPackets()
 		if err != nil {

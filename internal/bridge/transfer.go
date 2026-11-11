@@ -86,6 +86,7 @@ func otherDimension(from, to int32) int32 {
 const serverDownMessage = "The server is restarting. Join again in a minute."
 
 func (s *switchSession) switchTo(server ServerConfig, reason string) {
+	defer s.recoverSession("switchTo")
 	s.switchMu.Lock()
 	defer s.switchMu.Unlock()
 	s.mu.Lock()
@@ -195,7 +196,10 @@ func (s *switchSession) moveWithLink(l *link, server ServerConfig, start time.Ti
 	go s.readBackend(l, false)
 	_ = l.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: s.chunkRadius, MaxChunkRadius: s.maxRadius})
 
-	t.timer = time.AfterFunc(transferTimeout, func() { t.fail(s, "timed out") })
+	t.timer = time.AfterFunc(transferTimeout, func() {
+		defer s.recoverSession("move timeout")
+		t.fail(s, "timed out")
+	})
 	s.sendClient(injects...)
 	if newDim != sg.Dimension {
 		fake := sg.PlayerPosition.Add(mgl32.Vec3{2000, 0, 2000})
@@ -584,6 +588,7 @@ func (t *transfer) releaseAtSpawn(s *switchSession) {
 		return
 	}
 	go func() {
+		defer s.recoverSession("spawn wait")
 		start := time.Now()
 		timedOut := false
 		select {
@@ -640,6 +645,7 @@ func (t *transfer) tryFinalize(s *switchSession) {
 	}
 	s.mu.Unlock()
 	time.AfterFunc(5*time.Second, func() {
+		defer s.recoverSession("sub-chunk log")
 		s.mu.Lock()
 		n, kept := s.subServed, len(s.columns)
 		s.subServed = 0
