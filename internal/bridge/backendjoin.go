@@ -136,6 +136,19 @@ func splitPacket(raw []byte) (uint32, []byte, error) {
 	return 0, nil, errors.New("read packet header: bad varuint32")
 }
 
+// subClientOf returns the sender sub-client id in a raw packet's header (0: the main player; 1-3:
+// split-screen players on the same console).
+func subClientOf(raw []byte) byte {
+	var v uint32
+	for i := 0; i < 5 && i < len(raw); i++ {
+		v |= uint32(raw[i]&0x7f) << (7 * i)
+		if raw[i]&0x80 == 0 {
+			return byte((v >> 10) & 0x3)
+		}
+	}
+	return 0
+}
+
 // decodeInto decodes a packet payload, turning the decoder's panics into errors.
 func decodeInto(pk packet.Packet, payload []byte) (err error) {
 	defer func() {

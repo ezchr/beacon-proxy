@@ -113,6 +113,16 @@ type switchSession struct {
 	// lastHold is the last hold that ended with them back on it.
 	hold     *holdState
 	lastHold endedHold
+
+	// Split-screen (subclient_guest.go). guests are a host's split-screen players by sub-client id;
+	// a guest has its host, its sub-client id, inbox (its packets from the host's reader), guestLogin
+	// (a Login made from its SubClientLogin) and derivedID (it plays as an identity made from the host's).
+	guests     map[byte]*switchSession
+	host       *switchSession
+	sub        byte
+	derivedID  bool
+	inbox      chan []byte
+	guestLogin []byte
 }
 
 // link is the relay's connection to one backend for one player.
@@ -309,6 +319,13 @@ func (s *switchSession) serverName() string {
 }
 
 func (s *switchSession) writeClient(pks ...[]byte) error {
+	if s.host != nil { // a split-screen player: the host's connection, addressed to their sub-client
+		out := make([][]byte, len(pks))
+		for i, raw := range pks {
+			out[i] = subClientHeader(raw, s.sub)
+		}
+		return s.host.writeClient(out...)
+	}
 	s.wmu.Lock()
 	defer s.wmu.Unlock()
 	return s.client.WritePackets(pks)
@@ -433,7 +450,10 @@ func (s *switchSession) join() error {
 		dialCh <- dialed{err: last}
 	}()
 
-	if err := s.packScreen(u); err != nil {
+	if s.host != nil {
+		// A split-screen player: the console has the packs already, and no handshake (as BDS).
+		s.sendClient(&packet.PlayStatus{Status: packet.PlayStatusLoginSuccess})
+	} else if err := s.packScreen(u); err != nil {
 		return fmt.Errorf("resource packs: %w", err)
 	}
 	d := <-dialCh
@@ -547,7 +567,7 @@ func (s *switchSession) packScreen(u *union) error {
 func (s *switchSession) openLink(server ServerConfig) (*link, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, backendDialTimeout)
 	defer cancel()
-	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String(), playerLoginToken(s.client.RawLoginPacket()))
+	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String(), playerLoginToken(s.loginPacket()))
 	if err != nil {
 		return nil, err
 	}
@@ -815,10 +835,13 @@ func errText(err error) string {
 // readClient pumps the client's packets to its server.
 func (s *switchSession) readClient() {
 	for {
-		pks, err := s.client.ReadPackets()
+		pks, err := s.readPackets()
 		if err != nil {
 			s.cancel(fmt.Errorf("client: %w", err))
 			return
+		}
+		if s.host == nil {
+			pks = s.routeSubClients(pks) // split-screen players' packets go to their own sessions
 		}
 		if s.packets.over(len(pks)) {
 			s.log.Warn("player disconnected: packet rate limit", "packets", len(pks))
@@ -926,7 +949,7 @@ func (s *switchSession) readClient() {
 				}
 			case packet.IDText:
 				var pk packet.Text
-				if decodeInto(&pk, payload) == nil && pk.TextType == packet.TextTypeChat && s.mutedNow() {
+				if decodeInto(&pk, payload) == nil && pk.TextType == packet.TextTypeChat && (s.mutedNow() || s.derivedID && s.host.mutedNow()) {
 					continue
 				}
 			case packet.IDCommandRequest:

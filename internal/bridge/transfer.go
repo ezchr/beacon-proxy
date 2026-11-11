@@ -188,6 +188,9 @@ func (s *switchSession) moveWithLink(l *link, server ServerConfig, start time.Ti
 		s.sendClient(holdTitleClear()...)
 	}
 	s.log.Info("network: moving player", "from", nameOf(old), "to", server.Name, "blocksRenumbered", bm != nil)
+	if s.host == nil {
+		s.followHost(nameOf(old), server) // split-screen players on the same server come along
+	}
 	s.setBackendPing(l) // the server leg counts in /ping only for a server on another machine
 	go s.readBackend(l, false)
 	_ = l.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: s.chunkRadius, MaxChunkRadius: s.maxRadius})
