@@ -64,8 +64,9 @@ func guestIdentity(host login.IdentityData, sub byte, id login.IdentityData, aut
 	h := fnv.New64a()
 	_, _ = h.Write([]byte("beacon-guest:" + key))
 	out := login.IdentityData{
-		// 19 digits starting 9: never a real XUID (those are 16 digits, 2535...).
-		XUID:        "9" + fmt.Sprintf("%018d", h.Sum64()%1_000_000_000_000_000_000),
+		// 19 digits from 9000000000000000000 up, within int64 (Floodgate reads it as a long):
+		// never a real XUID (those are 16 digits, 2535...).
+		XUID:        strconv.FormatUint(9_000_000_000_000_000_000+h.Sum64()%223_372_036_854_775_807, 10),
 		Identity:    uuid.NewSHA1(uuid.NameSpaceOID, []byte("beacon-guest:"+key)).String(),
 		DisplayName: guestName(host.DisplayName, sub),
 		TitleID:     id.TitleID,
@@ -92,7 +93,7 @@ func guestName(host string, sub byte) string {
 func (s *switchSession) routeSubClients(pks [][]byte) [][]byte {
 	own := pks[:0]
 	for _, raw := range pks {
-		sub := subClientOf(raw)
+		sub := clientSubClient(raw)
 		if sub == 0 {
 			own = append(own, raw)
 			continue
@@ -141,6 +142,11 @@ func (s *switchSession) guest(sub byte) *switchSession {
 // startGuest logs in the split-screen player sub of a host session, as handleNetwork does a player,
 // and runs them until they leave or the host's connection ends.
 func (s *switchSession) startGuest(sub byte, request []byte) {
+	s.startGuestServer(sub, request, "")
+}
+
+// startGuestServer is startGuest for a guest that joins server, or the host's server if empty.
+func (s *switchSession) startGuestServer(sub byte, request []byte, server string) {
 	defer s.recoverSession("startGuest")
 	refuse := func(msg string) {
 		_ = s.writeClient(subClientHeader(encodePacket(&packet.Disconnect{Message: msg}), sub))
@@ -170,6 +176,12 @@ func (s *switchSession) startGuest(sub byte, request []byte) {
 		s.mu.Unlock()
 	}
 	g, cleanup, err := s.newGuest(sub, request)
+	if err == nil {
+		g.startServer = server
+		if g.startServer == "" {
+			g.startServer = s.serverName() // a guest plays where its host is
+		}
+	}
 	if err != nil {
 		release()
 		s.log.Info("network: split-screen login refused", "sub", sub, "reason", err)
@@ -201,6 +213,12 @@ func (s *switchSession) newGuest(sub byte, request []byte) (*switchSession, func
 	}
 	id, cd, auth, err := s.client.ParseLoginRequest(request)
 	if err != nil {
+		s.log.Info("network: split-screen login could not be read", "sub", sub, "err", err)
+		return fail("Could not read your login.")
+	}
+	if auth.Guest && id.XUID != s.id.XUID {
+		// A guest login is signed with the main player's token: any other is not this console's.
+		s.log.Info("network: split-screen guest login not signed by the host", "sub", sub)
 		return fail("Could not read your login.")
 	}
 	gid, derived := guestIdentity(s.id, sub, id, auth.XBOXLiveAuthenticated)
@@ -266,6 +284,7 @@ func (s *switchSession) newGuest(sub byte, request []byte) (*switchSession, func
 		containers: map[byte]byte{}, hiddenHud: map[int32]bool{},
 		host: s, sub: sub, derivedID: derived, inbox: make(chan []byte, 4096),
 		guestLogin: encodePacket(&packet.Login{ClientProtocol: s.proto, ConnectionRequest: request}),
+		subRequest: request,
 	}
 	g.scrub = !g.isAdmin()
 	undo = append(undo, func() { cancel(nil) })
@@ -337,28 +356,130 @@ func (s *switchSession) loginPacket() []byte {
 	return s.client.RawLoginPacket()
 }
 
-// followHost moves the host's split-screen players that were on from with the host to server.
+// followHost brings the host's split-screen players to server, the host's new one, wherever they
+// are (one that moved on its own comes back too). On a server that handles guests itself
+// (subclient_passthrough.go) a guest logs in there again with its saved SubClientLogin; on any other
+// it is one of Beacon's own guests and moves like a player. A guest goes from one way to the other
+// as the host's servers need.
 func (s *switchSession) followHost(from string, server ServerConfig) {
 	s.mu.Lock()
-	var gs []*switchSession
+	l := s.cur
+	var own []*switchSession
 	for _, g := range s.guests {
 		if g != nil && g.host == s {
-			gs = append(gs, g)
+			own = append(own, g)
 		}
 	}
+	pt := map[byte][]byte{}
+	for sub := range s.ptGuests {
+		pt[sub] = s.ptLogins[sub]
+	}
 	s.mu.Unlock()
-	for _, g := range gs {
-		if cur := g.serverName(); cur != "" && !strings.EqualFold(cur, from) {
-			continue // moved elsewhere on their own
+	if l == nil {
+		return
+	}
+	pass := passthroughServer(server.Name)
+	for sub, raw := range pt {
+		if pass {
+			// Still counted: it logs in on the host's new link with its saved login.
+			s.mu.Lock()
+			s.ptGuests[sub] = l
+			delete(s.ptItems, sub)
+			s.mu.Unlock()
+			_ = ptWriteServer(l, [][]byte{raw})
+			s.log.Info("network: split-screen player follows the host", "sub", sub, "server", server.Name, "mode", "server")
+			continue
+		}
+		s.mu.Lock()
+		s.ptForgetLocked(sub)
+		s.mu.Unlock()
+		if req := subClientLoginRequest(raw); req != nil {
+			s.log.Info("network: split-screen player follows the host", "sub", sub, "server", server.Name, "mode", "beacon")
+			go ptStartGuest(s, sub, req, server.Name)
+		}
+	}
+	for _, g := range own {
+		if g.sub == 0 || g.subRequest == nil {
+			continue // a slot reserved while a login is checked
+		}
+		if pass {
+			go ptToPassthrough(s, g, server)
+			continue
+		}
+		if cur := g.serverName(); strings.EqualFold(cur, server.Name) {
+			continue
 		}
 		go func(g *switchSession) {
 			defer g.recoverSession("follow host")
 			time.Sleep(500 * time.Millisecond)
 			if err := g.requestSwitch(server, ""); err != nil {
 				g.log.Info("network: split-screen player did not follow the host", "server", server.Name, "err", err)
+				_ = s.writeClient(subClientHeader(encodePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "Could not follow to " + server.Name + ": " + err.Error()}), g.sub))
 			}
 		}(g)
 	}
+}
+
+// guestToPassthrough ends Beacon's own session of a guest without telling the client, and logs the
+// guest in on the host's server (which handles guests itself) with its saved login.
+func (s *switchSession) guestToPassthrough(g *switchSession, server ServerConfig) {
+	defer s.recoverSession("guest to passthrough")
+	sub, req := g.sub, g.subRequest
+	g.cancel(errFollowHost)
+	for i := 0; i < 50; i++ {
+		s.mu.Lock()
+		_, still := s.guests[sub]
+		s.mu.Unlock()
+		if !still {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+	s.mu.Lock()
+	l := s.cur
+	s.mu.Unlock()
+	if l == nil || !strings.EqualFold(l.server.Name, server.Name) {
+		return // the host moved on again meanwhile
+	}
+	raw := withHeaderBits(encodePacket(&packet.SubClientLogin{ConnectionRequest: req}), uint32(sub)<<12)
+	if out := s.passGuestToServer(l, raw, packet.IDSubClientLogin); out != nil {
+		_ = ptWriteServer(l, [][]byte{out})
+		s.log.Info("network: split-screen player follows the host", "sub", sub, "server", server.Name, "mode", "server")
+	}
+}
+
+// errFollowHost ends Beacon's own session of a guest that goes on as one the server handles itself.
+var errFollowHost = errors.New("followed the host to a server that handles split-screen players itself")
+
+// subClientLoginRequest returns the login request of a raw SubClientLogin packet, or nil.
+func subClientLoginRequest(raw []byte) []byte {
+	id, payload, err := splitPacket(raw)
+	if err != nil || id != packet.IDSubClientLogin {
+		return nil
+	}
+	var pk packet.SubClientLogin
+	if decodeInto(&pk, payload) != nil {
+		return nil
+	}
+	return pk.ConnectionRequest
+}
+
+// ptWriteServer, ptStartGuest and ptToPassthrough are how followHost moves guests; tests replace them.
+var (
+	ptWriteServer   func(l *link, pks [][]byte) error
+	ptStartGuest    func(s *switchSession, sub byte, request []byte, server string)
+	ptToPassthrough func(s *switchSession, g *switchSession, server ServerConfig)
+)
+
+func init() {
+	ptWriteServer = func(l *link, pks [][]byte) error { return l.c.WritePackets(pks) }
+	ptStartGuest = (*switchSession).startGuestOn
+	ptToPassthrough = (*switchSession).guestToPassthrough
+}
+
+// startGuestOn logs a guest in as one of Beacon's own on server, the host's.
+func (s *switchSession) startGuestOn(sub byte, request []byte, server string) {
+	s.startGuestServer(sub, request, server)
 }
 
 // guestPacket puts the guest's own identity in the packets that carry the player's: the console fills
@@ -388,4 +509,13 @@ func (g *switchSession) guestPacket(raw []byte) []byte {
 		}
 	}
 	return raw
+}
+
+// backendLoginToken is the Xbox token passed on to a backend with the login. A guest playing as an
+// identity derived from the host has none: its login carries the host's token.
+func (s *switchSession) backendLoginToken() string {
+	if s.derivedID {
+		return ""
+	}
+	return playerLoginToken(s.loginPacket())
 }

@@ -562,6 +562,9 @@ func (s *switchSession) reattach(h *holdState) holdResult {
 	go s.readBackend(l, false)
 	_ = l.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: s.chunkRadius, MaxChunkRadius: s.maxRadius})
 	t.releaseAtSpawn(s)
+	if s.host == nil {
+		s.followHost(h.server, *server) // split-screen players come back on with the host
+	}
 	return holdDone
 }
 

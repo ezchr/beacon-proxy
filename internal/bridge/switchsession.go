@@ -121,14 +121,19 @@ type switchSession struct {
 	guests map[byte]*switchSession
 	// In passthrough mode (subclient_passthrough.go): ptGuests is the link each guest logged in on,
 	// ptItems the guests that got their item list, ptUnion the union the client joined with.
-	ptGuests   map[byte]*link
-	ptItems    map[byte]bool
-	ptUnion    *union
-	host       *switchSession
-	sub        byte
-	derivedID  bool
-	inbox      chan []byte
-	guestLogin []byte
+	ptGuests map[byte]*link
+	ptItems  map[byte]bool
+	ptIDs    map[byte]login.IdentityData
+	ptLogins map[byte][]byte // each passed-through guest's SubClientLogin, to log in again after a move
+	// subRequest is a guest's login request (its SubClientLogin), startServer the server it joins.
+	subRequest  []byte
+	startServer string
+	ptUnion     *union
+	host        *switchSession
+	sub         byte
+	derivedID   bool
+	inbox       chan []byte
+	guestLogin  []byte
 }
 
 // link is the relay's connection to one backend for one player.
@@ -313,6 +318,7 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	if cur != nil {
 		cur.close()
 	}
+	s.ptForgetAll()
 }
 
 func (s *switchSession) serverName() string {
@@ -420,6 +426,9 @@ func (s *switchSession) join() error {
 	s.ptUnion = u
 
 	first := s.cfg.FirstServer
+	if s.startServer != "" {
+		first = s.startServer // a split-screen player joins its host's server
+	}
 	if back := s.n.takeRejoin(s.id.XUID); back != "" {
 		first = back // joining again for new packs: back to the server they were moving to
 	}
@@ -579,7 +588,7 @@ func (s *switchSession) packScreen(u *union) error {
 func (s *switchSession) openLink(server ServerConfig) (*link, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, backendDialTimeout)
 	defer cancel()
-	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String(), playerLoginToken(s.loginPacket()))
+	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String(), s.backendLoginToken())
 	if err != nil {
 		return nil, err
 	}
@@ -692,7 +701,7 @@ func (s *switchSession) readBackend(l *link, first bool) {
 				return
 			}
 			sub := subClientOf(raw)
-			s.debugPacket("server", sub, id, payload)
+			s.debugPacket("server", headerValue(raw), id, payload)
 			if sub != 0 && s.host == nil { // a passed-through guest's packet
 				if rw := s.passGuestToClient(l, raw, id, payload); rw != nil {
 					out = append(out, rw)
@@ -883,8 +892,8 @@ func (s *switchSession) readClient() {
 				s.cancel(err)
 				return
 			}
-			sub := subClientOf(raw)
-			s.debugPacket("client", sub, id, payload)
+			sub := clientSubClient(raw)
+			s.debugPacket("client", headerValue(raw), id, payload)
 			if sub != 0 && s.host == nil { // only passed-through guests' packets are left here
 				if held || (t != nil && t.l != cur) {
 					continue

@@ -15,8 +15,14 @@ func withPassthrough(t *testing.T, v string) {
 	t.Cleanup(func() { SubClientPassthrough = old })
 }
 
+// subPacket is a server packet for sub-client sub (bits 10-11).
 func subPacket(pk packet.Packet, sub byte) []byte {
 	return subClientHeader(encodePacket(pk), sub)
+}
+
+// guestPacket is a client packet from sub-client sub, as a console writes it (bits 12-13).
+func guestPacket(pk packet.Packet, sub byte) []byte {
+	return withHeaderBits(encodePacket(pk), uint32(sub)<<12)
 }
 
 func ptTestSession(server string) (*switchSession, *link) {
@@ -42,7 +48,7 @@ func TestPassthroughServers(t *testing.T) {
 
 func TestPassthroughOnlyOnListedServers(t *testing.T) {
 	withPassthrough(t, "minigames")
-	login := subPacket(&packet.SubClientLogin{ConnectionRequest: []byte{1}}, 1)
+	login := guestPacket(&packet.SubClientLogin{ConnectionRequest: []byte{1}}, 1)
 
 	s, _ := ptTestSession("skygen")
 	if s.isPassthroughGuest(1, packet.IDSubClientLogin) {
@@ -54,51 +60,19 @@ func TestPassthroughOnlyOnListedServers(t *testing.T) {
 		t.Fatalf("SubClientLogin on a passthrough server not kept for the backend: %d", len(own))
 	}
 	out := s.passGuestToServer(l, login, packet.IDSubClientLogin)
-	if out == nil || subClientOf(out) != 1 || !bytes.Equal(out, login) {
+	if out == nil || clientSubClient(out) != 1 || !bytes.Equal(out, login) {
 		t.Fatal("SubClientLogin not passed on raw with its sub-client id")
 	}
-	move := subPacket(&packet.Text{TextType: packet.TextTypeChat, Message: "hi"}, 1)
+	move := guestPacket(&packet.Text{TextType: packet.TextTypeChat, Message: "hi"}, 1)
 	if own := s.routeSubClients([][]byte{move}); len(own) != 1 {
 		t.Fatal("passed-through guest's packet routed to Beacon's guests")
 	}
-	if out := s.passGuestToServer(l, move, packet.IDText); subClientOf(out) != 1 {
+	if out := s.passGuestToServer(l, move, packet.IDText); headerValue(out)>>12&3 != 1 || headerValue(out)>>10&3 != 0 {
 		t.Fatal("guest packet lost its sub-client id")
 	}
 	// A sub-client that never logged in is dropped.
-	if out := s.passGuestToServer(l, subPacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "y"}, 2), packet.IDText); out != nil {
+	if out := s.passGuestToServer(l, guestPacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "y"}, 2), packet.IDText); out != nil {
 		t.Fatal("packet of an unknown sub-client passed on")
-	}
-}
-
-func TestPassthroughGuestDisconnectedOnHostMove(t *testing.T) {
-	withPassthrough(t, "minigames,lobby")
-	var sent [][]byte
-	old := ptWriteClient
-	ptWriteClient = func(_ *switchSession, raw []byte) error { sent = append(sent, raw); return nil }
-	t.Cleanup(func() { ptWriteClient = old })
-
-	s, l := ptTestSession("minigames")
-	s.passGuestToServer(l, subPacket(&packet.SubClientLogin{}, 1), packet.IDSubClientLogin)
-
-	// The host moves on, to another passthrough server: the guest's login was on the old one.
-	s.cur = &link{server: ServerConfig{Name: "lobby"}, rw: newRewriter(1, 1, 1, 1, nil)}
-	if out := s.passGuestToServer(s.cur, subPacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "y"}, 1), packet.IDText); out != nil {
-		t.Fatal("guest packet sent to a server the guest never logged in to")
-	}
-	if len(sent) != 1 || subClientOf(sent[0]) != 1 {
-		t.Fatalf("guest not told it left: %d packets", len(sent))
-	}
-	if id, _, _ := splitPacket(sent[0]); id != packet.IDDisconnect {
-		t.Fatalf("sent packet %d, want Disconnect", id)
-	}
-	// It can log in again on the new server, in its mode.
-	if !s.isPassthroughGuest(1, packet.IDSubClientLogin) {
-		t.Fatal("guest cannot log in again on the passthrough server")
-	}
-	// On a server that is not listed, its next login goes to Beacon's own handling.
-	s.cur = &link{server: ServerConfig{Name: "skygen"}, rw: newRewriter(1, 1, 1, 1, nil)}
-	if s.isPassthroughGuest(1, packet.IDSubClientLogin) {
-		t.Fatal("guest login on skygen passed through")
 	}
 }
 
@@ -150,5 +124,52 @@ func TestWithSub(t *testing.T) {
 	host := encodePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "a"})
 	if !bytes.Equal(withSub(host, host), host) {
 		t.Fatal("host packet changed")
+	}
+}
+
+func TestClientSubClientBits(t *testing.T) {
+	// A console writes the guest in bits 12-13 and 0 in bits 10-11.
+	raw := guestPacket(&packet.SubClientLogin{ConnectionRequest: []byte{1}}, 2)
+	if clientSubClient(raw) != 2 || subClientOf(raw) != 0 {
+		t.Fatalf("client sub %d, bits 10-11 %d", clientSubClient(raw), subClientOf(raw))
+	}
+	if id, _, _ := splitPacket(raw); id != packet.IDSubClientLogin {
+		t.Fatalf("id %d", id)
+	}
+	// Older senders with the guest in bits 10-11 are still read.
+	if clientSubClient(subPacket(&packet.SubClientLogin{}, 3)) != 3 {
+		t.Fatal("bits 10-11 not read as fallback")
+	}
+	// withSub keeps bits 12-13 through a rewrite.
+	out := withSub(raw, encodePacket(&packet.SubClientLogin{ConnectionRequest: []byte{9}}))
+	if headerValue(out)&^0x3FF != 2<<12 {
+		t.Fatalf("bits after rewrite %#x", headerValue(out))
+	}
+}
+
+// After a move the host link swaps the host's server and client IDs. A guest whose server ID is one of
+// them gets the swapped one in its StartGame, as its later packets are swapped.
+func TestPassthroughGuestStartGameSwapsIDs(t *testing.T) {
+	withPassthrough(t, "minigames")
+	s, _ := ptTestSession("minigames")
+	l := &link{server: ServerConfig{Name: "minigames"}, rw: newRewriter(1, 1, 3, 3, nil)}
+	s.ptUnion = &union{items: &packet.ItemRegistry{}, actors: &packet.AvailableActorIdentifiers{}}
+	raw := subPacket(&packet.StartGame{EntityRuntimeID: 3, EntityUniqueID: 3}, 1)
+	id, payload, _ := splitPacket(raw)
+	out := s.passGuestToClient(l, raw, id, payload)
+	var sg packet.StartGame
+	_, p, _ := splitPacket(out)
+	if err := decodeInto(&sg, p); err != nil || sg.EntityRuntimeID != 1 || sg.EntityUniqueID != 1 {
+		t.Fatalf("guest StartGame IDs %d/%d, want 1/1 (err %v)", sg.EntityRuntimeID, sg.EntityUniqueID, err)
+	}
+	// And its SetLocalPlayerAsInitialised with the client ID goes back as the server one.
+	back := s.passGuestToServer(l, guestPacket(&packet.SubClientLogin{}, 1), packet.IDSubClientLogin)
+	_ = back
+	init := guestPacket(&packet.SetLocalPlayerAsInitialised{EntityRuntimeID: 1}, 1)
+	got := s.passGuestToServer(l, init, packet.IDSetLocalPlayerAsInitialised)
+	var pk packet.SetLocalPlayerAsInitialised
+	_, p, _ = splitPacket(got)
+	if err := decodeInto(&pk, p); err != nil || pk.EntityRuntimeID != 3 {
+		t.Fatalf("SetLocalPlayerAsInitialised to server %d (err %v), want 3", pk.EntityRuntimeID, err)
 	}
 }

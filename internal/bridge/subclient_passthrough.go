@@ -4,6 +4,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
+
 	"github.com/sandertv/gophertunnel/minecraft/protocol/packet"
 )
 
@@ -54,41 +56,55 @@ func (s *switchSession) isPassthroughGuest(sub byte, id uint32) bool {
 	return !beaconGuest
 }
 
-// withSub gives out the sub-client id of orig when rewriting it lost the id.
+// withSub gives out the sub-client bits (10-13) of orig when rewriting it lost them.
 func withSub(orig, out []byte) []byte {
-	sub := subClientOf(orig)
-	if sub == 0 || len(out) == 0 || subClientOf(out) == sub {
+	bits := headerValue(orig) &^ 0x3FF
+	if bits == 0 || len(out) == 0 || headerValue(out)&^0x3FF == bits {
 		return out
 	}
-	return subClientHeader(out, sub)
+	return withHeaderBits(out, bits)
 }
 
 // passGuestToServer handles a guest's packet from the client in passthrough mode. It returns the
 // packet to send to the server, or nil to send nothing.
 func (s *switchSession) passGuestToServer(cur *link, raw []byte, id uint32) []byte {
-	sub := subClientOf(raw)
+	sub := clientSubClient(raw)
+	if id == packet.IDSubClientLogin && cur != nil {
+		s.mu.Lock()
+		_, already := s.ptGuests[sub]
+		s.mu.Unlock()
+		if !already {
+			gid, msg, ok := s.admitPassthroughGuest(sub, raw)
+			if !ok {
+				_ = ptWriteClient(s, subClientHeader(encodePacket(&packet.Disconnect{Message: msg}), sub))
+				return nil
+			}
+			s.mu.Lock()
+			if s.ptGuests == nil {
+				s.ptGuests, s.ptIDs, s.ptLogins = map[byte]*link{}, map[byte]login.IdentityData{}, map[byte][]byte{}
+			}
+			s.ptGuests[sub], s.ptIDs[sub], s.ptLogins[sub] = cur, gid, append([]byte(nil), raw...)
+			s.mu.Unlock()
+		}
+	}
 	s.mu.Lock()
-	if s.ptGuests == nil {
-		s.ptGuests = map[byte]*link{}
-	}
-	if id == packet.IDSubClientLogin {
-		s.ptGuests[sub] = cur
-	}
 	on, known := s.ptGuests[sub]
 	if id == packet.IDDisconnect {
-		delete(s.ptGuests, sub)
+		s.ptForgetLocked(sub)
 	}
 	s.mu.Unlock()
 	if !known || cur == nil {
 		return nil
 	}
 	if on != cur {
-		// The host moved: the guest's login was on the old server.
-		s.mu.Lock()
-		delete(s.ptGuests, sub)
-		s.mu.Unlock()
-		_ = ptWriteClient(s, subClientHeader(encodePacket(&packet.Disconnect{Message: "Split-screen players stay behind when the host changes servers. Join again."}), sub))
+		// The host is moving: the guest follows it (followHost) and is not on this link yet.
 		return nil
+	}
+	if id == packet.IDCommandRequest {
+		if target, ok := s.guestServerCommand(raw); ok {
+			s.guestMovesAlone(sub, target)
+			return nil
+		}
 	}
 	rw, err := cur.rw.rewrite(raw, false, s.pool)
 	if err != nil {
@@ -111,6 +127,10 @@ func (s *switchSession) passGuestToClient(l *link, raw []byte, id uint32, payloa
 		if decodeInto(&sg, payload) != nil {
 			return nil
 		}
+		// The guest's own entity IDs go through the host link's swap like every other entity ID: the
+		// host's IDs differ between client and server after a move, and the console has one ID space.
+		sg.EntityRuntimeID = l.rw.swapRID(sg.EntityRuntimeID)
+		sg.EntityUniqueID = l.rw.swapUID(sg.EntityUniqueID)
 		sg.Blocks = u.blocks
 		sg.UseBlockNetworkIDHashes = false
 		sg.Experiments = u.exps
@@ -141,8 +161,7 @@ func (s *switchSession) passGuestToClient(l *link, raw []byte, id uint32, payloa
 		}
 	case packet.IDDisconnect:
 		s.mu.Lock()
-		delete(s.ptGuests, sub)
-		delete(s.ptItems, sub)
+		s.ptForgetLocked(sub)
 		s.mu.Unlock()
 	}
 	rw, err := l.rw.rewrite(raw, true, s.pool)
@@ -155,3 +174,148 @@ func (s *switchSession) passGuestToClient(l *link, raw []byte, id uint32, payloa
 
 // ptWriteClient writes a packet to the client; tests replace it.
 var ptWriteClient = func(s *switchSession, raw []byte) error { return s.writeClient(raw) }
+
+// withHeaderBits returns raw with its header's bits above the packet id (10-13) set to bits.
+func withHeaderBits(raw []byte, bits uint32) []byte {
+	v := headerValue(raw)
+	n := 0
+	for n < len(raw) && n < 5 {
+		n++
+		if raw[n-1]&0x80 == 0 {
+			break
+		}
+	}
+	v = v&0x3FF | bits
+	out := make([]byte, 0, len(raw)-n+3)
+	for v >= 0x80 {
+		out = append(out, byte(v)|0x80)
+		v >>= 7
+	}
+	out = append(out, byte(v))
+	return append(out, raw[n:]...)
+}
+
+// admitPassthroughGuest checks a passed-through guest in as Beacon's own guests are: it reads its
+// login for the identity it plays as (derived from the host's without an account of its own), refuses
+// banned players and counts it towards the player limit, the online count and its Friends-tab world.
+func (s *switchSession) admitPassthroughGuest(sub byte, raw []byte) (login.IdentityData, string, bool) {
+	gid := login.IdentityData{}
+	if _, payload, err := splitPacket(raw); err == nil {
+		var pk packet.SubClientLogin
+		if decodeInto(&pk, payload) == nil && s.client != nil {
+			if id, _, auth, err := s.client.ParseLoginRequest(pk.ConnectionRequest); err == nil {
+				gid, _ = guestIdentity(s.id, sub, id, auth.XBOXLiveAuthenticated)
+			}
+		}
+	}
+	if gid.DisplayName == "" {
+		// Not readable here: the server checks the login itself; it is listed as the host's guest.
+		gid, _ = guestIdentity(s.id, sub, login.IdentityData{}, false)
+	}
+	if s.n != nil {
+		if msg, banned := s.n.refuseLogin(gid.XUID, gid.DisplayName, ""); banned {
+			return gid, msg, false
+		}
+	}
+	admin := s.n != nil && s.n.IsAdmin(gid.XUID, gid.DisplayName)
+	if !takeSlot(admin) {
+		return gid, fullMessage, false
+	}
+	if s.cfg.WorldPlayers != nil {
+		s.cfg.WorldPlayers.Add(1)
+	}
+	if s.log != nil {
+		s.log.Info("network: split-screen player passed through", "player", gid.DisplayName, "sub", sub, "xuid", gid.XUID)
+	}
+	return gid, "", true
+}
+
+// ptForgetLocked ends a passed-through guest: it is no longer routed or counted. s.mu must be held.
+func (s *switchSession) ptForgetLocked(sub byte) {
+	if _, ok := s.ptGuests[sub]; !ok {
+		return
+	}
+	delete(s.ptGuests, sub)
+	delete(s.ptItems, sub)
+	delete(s.ptIDs, sub)
+	delete(s.ptLogins, sub)
+	noteBedrock(-1)
+	if s.cfg.WorldPlayers != nil {
+		s.cfg.WorldPlayers.Add(-1)
+	}
+}
+
+// ptForgetAll ends every passed-through guest, as the host leaves.
+func (s *switchSession) ptForgetAll() {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for sub := range s.ptGuests {
+		s.ptForgetLocked(sub)
+	}
+}
+
+// ptPlayers returns the identities of the passed-through guests.
+func (s *switchSession) ptPlayers() []login.IdentityData {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	out := make([]login.IdentityData, 0, len(s.ptIDs))
+	for _, id := range s.ptIDs {
+		out = append(out, id)
+	}
+	return out
+}
+
+// guestServerCommand reports the server a passed-through guest's /server command names, if it is one
+// of the network's.
+func (s *switchSession) guestServerCommand(raw []byte) (ServerConfig, bool) {
+	_, payload, err := splitPacket(raw)
+	if err != nil || s.n == nil {
+		return ServerConfig{}, false
+	}
+	var pk packet.CommandRequest
+	if decodeInto(&pk, payload) != nil {
+		return ServerConfig{}, false
+	}
+	f := strings.Fields(pk.CommandLine)
+	if len(f) != 2 || !strings.EqualFold(f[0], "/server") {
+		return ServerConfig{}, false
+	}
+	target := s.n.server(f[1])
+	if target == nil {
+		return ServerConfig{}, false
+	}
+	return *target, true
+}
+
+// guestMovesAlone moves a passed-through guest to target on its own, as one of Beacon's own guests: it
+// stays there until the host's next move brings it back. A guest can only be passed through on the
+// host's own server, so a target that handles guests itself is refused.
+func (s *switchSession) guestMovesAlone(sub byte, target ServerConfig) {
+	s.mu.Lock()
+	raw := s.ptLogins[sub]
+	host := ""
+	if s.cur != nil {
+		host = s.cur.server.Name
+	}
+	s.mu.Unlock()
+	if strings.EqualFold(target.Name, host) {
+		return
+	}
+	if passthroughServer(target.Name) {
+		_ = ptWriteClient(s, subClientHeader(encodePacket(&packet.Text{TextType: packet.TextTypeRaw, Message: "A split-screen player can only go to " + target.Name + " with the first player."}), sub))
+		return
+	}
+	req := subClientLoginRequest(raw)
+	if req == nil {
+		return
+	}
+	// Leave the server the guest is on, then join target through Beacon.
+	s.mu.Lock()
+	l := s.ptGuests[sub]
+	s.ptForgetLocked(sub)
+	s.mu.Unlock()
+	if l != nil {
+		_ = ptWriteServer(l, [][]byte{withHeaderBits(encodePacket(&packet.Disconnect{HideDisconnectionScreen: true}), uint32(sub)<<12)})
+	}
+	go ptStartGuest(s, sub, req, target.Name)
+}

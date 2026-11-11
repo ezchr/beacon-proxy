@@ -1267,6 +1267,9 @@ func (n *Network) Players() []Player {
 	n.sessions.Range(func(k, v any) bool {
 		s := v.(*switchSession)
 		out = append(out, Player{XUID: k.(string), Name: s.id.DisplayName, Server: s.serverName()})
+		for _, g := range s.ptPlayers() { // split-screen players the server logs in itself
+			out = append(out, Player{XUID: g.XUID, Name: g.DisplayName, Server: s.serverName()})
+		}
 		return true
 	})
 	slices.SortFunc(out, func(a, b Player) int {

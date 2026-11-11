@@ -138,8 +138,8 @@ type debugRun struct {
 var debugActive atomic.Pointer[debugRun]
 
 // debugPacket logs a packet if packet logging takes it. dir is who sent it.
-// sub is the packet's header sub-client id (0: the main player, 1-3: split-screen guests).
-func (s *switchSession) debugPacket(dir string, sub byte, id uint32, payload []byte) {
+// hdr is the packet's whole header varuint: the line shows it and its sub-client bits 10-11 and 12-13.
+func (s *switchSession) debugPacket(dir string, hdr uint32, id uint32, payload []byte) {
 	d := debugActive.Load()
 	if d == nil || (d.player != "" && d.player != strings.ToLower(s.id.DisplayName)) {
 		return
@@ -169,7 +169,7 @@ func (s *switchSession) debugPacket(dir string, sub byte, id uint32, payload []b
 		d.write(s.debugLogin(), false)
 		d.write(s.debugSkin(d), false)
 	}
-	line := fmt.Sprintf("%s  %-16s %-8s %-6s sub%d %-28s %6d B", time.Now().Format("15:04:05.000"), s.id.DisplayName, server, dir, sub, name, len(payload))
+	line := fmt.Sprintf("%s  %-16s %-8s %-6s hdr=%#05x b10=%d b12=%d %-28s %6d B", time.Now().Format("15:04:05.000"), s.id.DisplayName, server, dir, hdr, (hdr>>10)&3, (hdr>>12)&3, name, len(payload))
 	if contents != "" {
 		line += "  " + contents
 	}

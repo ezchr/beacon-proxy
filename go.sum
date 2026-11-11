@@ -18,8 +18,8 @@ github.com/df-mc/go-xsapi/v2 v2.0.3 h1:fQLw4k15OinFhagWjbSj0BwQXeDUmY8a1J8yquEod
 github.com/df-mc/go-xsapi/v2 v2.0.3/go.mod h1:Gi/zQG2DFMJOMt4DIjuBuINTnU4YnZINe+RyFyza8oo=
 github.com/df-mc/jsonc v1.0.5 h1:O7oh07kbS5AYY+l2Fji6l4h0iHcdjKbxCtK5VlZlLMU=
 github.com/df-mc/jsonc v1.0.5/go.mod h1:+Q++JuCE9IKiP8v7sWImdf/RjQX0nfXyfX6PdfTTmc4=
-github.com/ezchr/gophertunnel v1.63.1-0.20261108230317-da465786b3b3 h1:1IllUWgE/4kSMrFHcfdlMp5pXdUooVEeonZ8rfjod24=
-github.com/ezchr/gophertunnel v1.63.1-0.20261108230317-da465786b3b3/go.mod h1:PgzEatazUIOj25T5SlIh1P8yMb1+Y7JsodstKLJJdNw=
+github.com/ezchr/gophertunnel v1.63.1-0.20261111042423-55f12fdf1173 h1:fwyhV1Di+KnU0/kD/CD/CAqXRDAPoOz3kV5MaCQMMcs=
+github.com/ezchr/gophertunnel v1.63.1-0.20261111042423-55f12fdf1173/go.mod h1:PgzEatazUIOj25T5SlIh1P8yMb1+Y7JsodstKLJJdNw=
 github.com/fortytw2/leaktest v1.3.0 h1:u8491cBMTQ8ft8aeV+adlcytMZylmA5nnwwkRZjI8vw=
 github.com/fortytw2/leaktest v1.3.0/go.mod h1:jDsjWgpAGjm2CA7WthBh/CdZYEPF31XHquHwclZch5g=
 github.com/go-gl/mathgl v1.2.0 h1:v2eOj/y1B2afDxF6URV1qCYmo1KW08lAMtTbOn3KXCY=

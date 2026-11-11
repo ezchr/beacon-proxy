@@ -137,7 +137,32 @@ func splitPacket(raw []byte) (uint32, []byte, error) {
 	return 0, nil, errors.New("read packet header: bad varuint32")
 }
 
-// subClientOf returns the sender sub-client id in a raw packet's header (0: the main player; 1-3:
+// headerValue returns the whole header varuint of a raw packet (id, bits 10-11 and bits 12-13).
+func headerValue(raw []byte) uint32 {
+	var v uint32
+	for i := 0; i < 5 && i < len(raw); i++ {
+		v |= uint32(raw[i]&0x7f) << (7 * i)
+		if raw[i]&0x80 == 0 {
+			return v
+		}
+	}
+	return 0
+}
+
+// clientSubClient returns the split-screen player a client packet is from. The game writes the
+// sending sub-client in bits 12-13 (BDS NetworkSystem passes them to Packet::readNoHeader as the
+// packet's sub-client) and the receiving one, 0 for the server, in bits 10-11. Bits 10-11 are read
+// when bits 12-13 are 0.
+func clientSubClient(raw []byte) byte {
+	v := headerValue(raw)
+	if sub := byte((v >> 12) & 3); sub != 0 {
+		return sub
+	}
+	return byte((v >> 10) & 3)
+}
+
+// subClientOf returns the addressed sub-client in bits 10-11 of a raw packet's header, where a server
+// writes the split-screen player a packet is for (Packet::writeWithHeader) (0: the main player; 1-3:
 // split-screen players on the same console).
 func subClientOf(raw []byte) byte {
 	var v uint32
