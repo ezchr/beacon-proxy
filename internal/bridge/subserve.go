@@ -18,15 +18,23 @@ import (
 // all of them with air, which wiped the new server's column: the lobby was invisible. A server
 // that sends whole columns can't be asked either (it kicks the client), so the relay answers from
 // the columns that server sent, which it keeps for this.
+//
+// Only the columns around the player are kept: the server's chunk publisher centre and radius
+// (NetworkChunkPublisherUpdate), or the client's view distance around the newest column before
+// the server sent one. A column the client can't see any more is dropped; the client asks for a
+// column only after the server sent it, and that server sends it again when the player comes back.
 
 const (
-	servedColumnsMax = 4096            // columns kept per player; beyond it the store starts over
-	subPendingWait   = 3 * time.Second // how long a request waits for its column before it gets air
+	subPendingWait     = 3 * time.Second // how long a request waits for its column before it gets air
+	subPendingColsMax  = 1024            // columns with waiting requests per player; more get air
+	subPendingPerCol   = 64              // waiting requests per column; more get air
+	subRequestOffsets  = 1024            // offsets read from one request; more get air
+	servedColumnsSlack = 2               // columns kept beyond the radius, each side
 )
 
 // servedColumn is a column as the player's server sent it, and what its sub-chunks are once asked.
 type servedColumn struct {
-	raw    []byte // the LevelChunk packet
+	raw    []byte // the LevelChunk packet; dropped once parsed
 	parsed bool
 	ok     bool
 	subs   map[int32][]byte // by sub-chunk Y, in SubChunk packet form; only ones with blocks
@@ -41,6 +49,17 @@ type pendingSub struct {
 	base protocol.SubChunkPos
 	off  protocol.SubChunkOffset
 	dim  int32
+	due  time.Time // when it gets air
+}
+
+// subWatch is the rest of the served columns' state: the server's chunk publisher area and the
+// one timer that answers waiting requests with air.
+type subWatch struct {
+	center    [2]int32
+	radius    int32 // in chunks; 0 until the server sent one
+	timer     *time.Timer
+	timerDue  time.Time
+	timerDone func() // test hook: called after the timer ran
 }
 
 // keepColumn keeps a LevelChunk the player's server sent, and answers what waited for it. Call it
@@ -49,12 +68,13 @@ func (s *switchSession) keepColumn(pk *packet.LevelChunk, raw []byte) {
 	if _, requestMode := pk.SubChunkLimit.Value(); requestMode || pk.CacheEnabled {
 		return
 	}
-	if s.columns == nil || len(s.columns) >= servedColumnsMax {
+	if s.columns == nil {
 		s.columns = map[[2]int32]*servedColumn{}
 	}
 	col := [2]int32{pk.Position[0], pk.Position[1]}
 	c := &servedColumn{raw: append([]byte(nil), raw...)}
 	s.columns[col] = c
+	s.pruneColumnsLocked(col, false)
 	waiting := s.subPending[col]
 	if len(waiting) == 0 {
 		return
@@ -64,28 +84,101 @@ func (s *switchSession) keepColumn(pk *packet.LevelChunk, raw []byte) {
 	go s.sendClient(pks...)
 }
 
+// keptRadius is how far around the centre columns are kept, in chunks.
+func (s *switchSession) keptRadius() int32 {
+	r := s.subw.radius
+	if r <= 0 {
+		r = s.chunkRadius
+	}
+	return min(max(r, 4), 96) + servedColumnsSlack
+}
+
+// pruneColumnsLocked drops the kept columns outside the kept radius. newest is the column just
+// kept, the centre while the server has not sent one. Without force it only runs once there are
+// more columns than the radius holds. s.mu held.
+func (s *switchSession) pruneColumnsLocked(newest [2]int32, force bool) {
+	r := s.keptRadius()
+	side := 2*r + 1
+	if !force && len(s.columns) <= int(side*side) {
+		return
+	}
+	center := newest
+	if s.subw.radius > 0 {
+		center = s.subw.center
+	}
+	for col := range s.columns {
+		if col[0] < center[0]-r || col[0] > center[0]+r || col[1] < center[1]-r || col[1] > center[1]+r {
+			delete(s.columns, col)
+		}
+	}
+}
+
+// notePublisher reads the server's NetworkChunkPublisherUpdate: the area the client loads, and
+// so the columns worth keeping. s.mu held.
+func (s *switchSession) notePublisher(payload []byte) {
+	var pk packet.NetworkChunkPublisherUpdate
+	if decodeInto(&pk, payload) != nil {
+		return
+	}
+	s.subw.center = [2]int32{pk.Position[0] >> 4, pk.Position[2] >> 4}
+	s.subw.radius = int32(min(pk.Radius>>4, 1<<20))
+	if s.subw.radius == 0 {
+		s.subw.radius = 1
+	}
+	s.pruneColumnsLocked(s.subw.center, true)
+}
+
 // forgetColumns drops the kept columns and waiting requests: the player changed server or
 // dimension. Call it with s.mu held.
 func (s *switchSession) forgetColumns() {
 	s.columns, s.subPending = nil, nil
+	s.subw.center, s.subw.radius = [2]int32{}, 0
+	if s.subw.timer != nil {
+		s.subw.timer.Stop()
+		s.subw.timer = nil
+	}
 }
 
 // serveSubChunks answers a sub-chunk request from the columns the player's server sent. A request
 // for a column not sent yet waits for it, and gets air if it never comes.
 func (s *switchSession) serveSubChunks(req *packet.SubChunkRequest) {
+	s.mu.Lock()
+	out := s.serveLocked(req, time.Now())
+	s.mu.Unlock()
+	if len(out) > 0 {
+		s.sendClient(out...)
+	}
+}
+
+// serveLocked is serveSubChunks with s.mu held: it returns the answers ready now and leaves the
+// rest waiting.
+func (s *switchSession) serveLocked(req *packet.SubChunkRequest, now time.Time) []packet.Packet {
 	offsets := req.Offsets
 	if len(offsets) == 0 {
 		offsets = []protocol.SubChunkOffset{{0, 0, 0}}
 	}
-	s.mu.Lock()
+	s.subServed += len(offsets)
+	var air []pendingSub
+	if len(offsets) > subRequestOffsets {
+		for _, o := range offsets[subRequestOffsets:] {
+			air = append(air, pendingSub{base: req.Position, off: o, dim: req.Dimension})
+		}
+		offsets = offsets[:subRequestOffsets]
+	}
 	var out []packet.Packet
 	byColumn := map[[2]int32][]pendingSub{}
+	var order [][2]int32
+	due := now.Add(subPendingWait)
 	for _, o := range offsets {
 		col := [2]int32{req.Position[0] + int32(o[0]), req.Position[2] + int32(o[2])}
-		byColumn[col] = append(byColumn[col], pendingSub{base: req.Position, off: o, dim: req.Dimension})
+		if _, ok := byColumn[col]; !ok {
+			order = append(order, col)
+		}
+		byColumn[col] = append(byColumn[col], pendingSub{base: req.Position, off: o, dim: req.Dimension, due: due})
 	}
-	var late [][2]int32
-	for col, subs := range byColumn {
+	waits := false
+	for _, col := range order {
+		subs := byColumn[col]
 		if c, ok := s.columns[col]; ok {
 			out = append(out, s.answerLocked(c, subs)...)
 			continue
@@ -93,34 +186,80 @@ func (s *switchSession) serveSubChunks(req *packet.SubChunkRequest) {
 		if s.subPending == nil {
 			s.subPending = map[[2]int32][]pendingSub{}
 		}
-		if len(s.subPending[col]) == 0 {
-			late = append(late, col)
+		have, known := s.subPending[col]
+		if !known && len(s.subPending) >= subPendingColsMax {
+			air = append(air, subs...)
+			continue
 		}
-		s.subPending[col] = append(s.subPending[col], subs...)
+		if room := subPendingPerCol - len(have); len(subs) > room {
+			air = append(air, subs[max(room, 0):]...)
+			subs = subs[:max(room, 0)]
+		}
+		if len(subs) > 0 {
+			s.subPending[col] = append(have, subs...)
+			waits = true
+		}
 	}
-	s.subServed += len(offsets)
-	s.mu.Unlock()
-	if len(out) > 0 {
-		s.sendClient(out...)
+	if len(air) > 0 {
+		out = append(out, s.answerLocked(&servedColumn{parsed: true}, air)...)
 	}
-	for _, col := range late {
-		time.AfterFunc(subPendingWait, func() { s.airPending(col) })
+	if waits {
+		s.armPendingLocked(due)
 	}
+	return out
 }
 
-// airPending answers what still waits for col with air.
-func (s *switchSession) airPending(col [2]int32) {
-	s.mu.Lock()
-	waiting := s.subPending[col]
-	delete(s.subPending, col)
-	var pks []packet.Packet
-	if len(waiting) > 0 {
-		pks = s.answerLocked(&servedColumn{parsed: true}, waiting)
+// armPendingLocked makes sure the timer runs by due at the latest. s.mu held.
+func (s *switchSession) armPendingLocked(due time.Time) {
+	if s.subw.timer != nil && !s.subw.timerDue.After(due) {
+		return
 	}
+	if s.subw.timer != nil {
+		s.subw.timer.Stop()
+	}
+	s.subw.timerDue = due
+	s.subw.timer = time.AfterFunc(max(time.Until(due), 0), s.airPending)
+}
+
+// airPending answers what waited too long with air, and runs the timer again for the rest.
+func (s *switchSession) airPending() {
+	defer s.recoverSession("sub-chunk timer")
+	s.mu.Lock()
+	s.subw.timer = nil
+	pks := s.expireLocked(time.Now())
+	done := s.subw.timerDone
 	s.mu.Unlock()
 	if len(pks) > 0 {
 		s.sendClient(pks...)
 	}
+	if done != nil {
+		done()
+	}
+}
+
+// expireLocked returns air for the requests due by now and arms the timer for the next. s.mu held.
+func (s *switchSession) expireLocked(now time.Time) []packet.Packet {
+	var pks []packet.Packet
+	var next time.Time
+	air := &servedColumn{parsed: true}
+	for col, waiting := range s.subPending {
+		if len(waiting) == 0 {
+			delete(s.subPending, col)
+			continue
+		}
+		if d := waiting[0].due; d.After(now) {
+			if next.IsZero() || d.Before(next) {
+				next = d
+			}
+			continue
+		}
+		delete(s.subPending, col)
+		pks = append(pks, s.answerLocked(air, waiting)...)
+	}
+	if !next.IsZero() {
+		s.armPendingLocked(next)
+	}
+	return pks
 }
 
 // answerLocked builds the SubChunk packets answering reqs, all for column c. s.mu held.
@@ -131,6 +270,7 @@ func (s *switchSession) answerLocked(c *servedColumn, reqs []pendingSub) []packe
 		if err := c.parse(air); err != nil {
 			s.log.Warn("network: a server's column could not be split into sub-chunks, the client gets air for it", "err", err)
 		}
+		c.raw = nil // the sub-chunks are all that is answered from now on
 	}
 	type key struct {
 		base protocol.SubChunkPos

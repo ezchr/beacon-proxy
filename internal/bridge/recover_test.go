@@ -42,3 +42,14 @@ func TestRecoverSessionEndsOnlyThatSession(t *testing.T) {
 		t.Error("a goroutine that returned normally ended its session")
 	}
 }
+
+// The sub-chunk timer recovers too: a session without a client panics on its write and ends.
+func TestAirPendingPanicEndsSession(t *testing.T) {
+	ctx, cancel := context.WithCancelCause(context.Background())
+	s := &switchSession{ctx: ctx, cancel: cancel, log: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	s.subPending = map[[2]int32][]pendingSub{{0, 0}: {{due: time.Now().Add(-time.Second)}}}
+	s.airPending() // sendClient on a nil client panics
+	if ctx.Err() == nil {
+		t.Fatal("session still running after its timer panicked")
+	}
+}

@@ -81,6 +81,7 @@ type switchSession struct {
 	columns     map[[2]int32]*servedColumn
 	subPending  map[[2]int32][]pendingSub
 	subServed   int
+	subw        subWatch
 	chunkRadius int32
 	maxRadius   uint8
 	// unchecked: left out of the build's player checks (checks.go). radiusSeen: the client has asked
@@ -1188,6 +1189,8 @@ func (s *switchSession) track(raw []byte) {
 				}
 			}
 		}
+	case packet.IDNetworkChunkPublisherUpdate:
+		s.notePublisher(payload)
 	case packet.IDChangeDimension:
 		var pk packet.ChangeDimension
 		if decodeInto(&pk, payload) == nil {
