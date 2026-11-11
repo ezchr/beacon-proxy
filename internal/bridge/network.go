@@ -973,6 +973,7 @@ func (n *Network) watchServers() {
 	up := map[string]bool{}
 	lastRefresh := time.Now()
 	for range time.Tick(serverWatchInterval) {
+		n.pruneRejoins(time.Now())
 		periodic := time.Since(lastRefresh) >= serverRefreshInterval
 		if periodic {
 			lastRefresh = time.Now()
@@ -1518,6 +1519,16 @@ func (n *Network) rememberRejoin(xuid, server string) {
 	if xuid != "" && server != "" {
 		n.rejoinTo.Store(xuid, rejoinTarget{server: server, until: time.Now().Add(rejoinWindow)})
 	}
+}
+
+// pruneRejoins drops the rejoin targets past their window.
+func (n *Network) pruneRejoins(now time.Time) {
+	n.rejoinTo.Range(func(k, v any) bool {
+		if now.After(v.(rejoinTarget).until) {
+			n.rejoinTo.CompareAndDelete(k, v)
+		}
+		return true
+	})
 }
 
 // takeRejoin returns, once, the server xuid was moving to when sent to join again, if still fresh.

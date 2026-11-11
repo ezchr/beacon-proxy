@@ -56,14 +56,25 @@ func loginTooSoon(ip string) bool {
 		return true
 	}
 	if !loaded {
-		// Forget addresses once they can join again, so the map doesn't grow without end.
-		time.AfterFunc(interval, func() {
-			if t, ok := lastLogin.Load(ip); ok && time.Since(t.(time.Time)) >= interval {
-				lastLogin.CompareAndDelete(ip, t)
-			}
-		})
+		forgetLoginLater(ip, interval, interval)
 	}
 	return false
+}
+
+// forgetLoginLater drops ip from lastLogin once it can join again, so the map doesn't grow
+// without end. An address that joined again meanwhile is checked again later.
+func forgetLoginLater(ip string, interval, after time.Duration) {
+	time.AfterFunc(after, func() {
+		v, ok := lastLogin.Load(ip)
+		if !ok {
+			return
+		}
+		if left := interval - time.Since(v.(time.Time)); left > 0 {
+			forgetLoginLater(ip, interval, left)
+			return
+		}
+		lastLogin.CompareAndDelete(ip, v)
+	})
 }
 
 var (
