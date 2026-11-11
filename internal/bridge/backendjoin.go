@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/ezchr/beacon-proxy/internal/proxy"
@@ -149,6 +150,10 @@ func subClientOf(raw []byte) byte {
 	return 0
 }
 
+// MultiPlayerOff sends the start game with MultiPlayerGame false (env BEACON_MULTIPLAYER_OFF=1): on
+// Switch the game then lets a split-screen guest join without Nintendo Switch Online (a test).
+var MultiPlayerOff = os.Getenv("BEACON_MULTIPLAYER_OFF") == "1"
+
 // decodeInto decodes a packet payload, turning the decoder's panics into errors.
 func decodeInto(pk packet.Packet, payload []byte) (err error) {
 	defer func() {
@@ -161,6 +166,26 @@ func decodeInto(pk packet.Packet, payload []byte) (err error) {
 }
 
 // encodePacket encodes a packet with its header, as the pumps pass packets on.
+// decodeIntoShield is decodeInto for a payload whose item stacks use shieldID as the shield's id.
+func decodeIntoShield(pk packet.Packet, payload []byte, shieldID int32) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("decode %T: %v", pk, r)
+		}
+	}()
+	pk.Marshal(protocol.NewReader(bytes.NewBuffer(payload), shieldID, false))
+	return nil
+}
+
+// encodePacketShield is encodePacket for a receiver whose shield item id is shieldID.
+func encodePacketShield(pk packet.Packet, shieldID int32) []byte {
+	b := bytes.NewBuffer(nil)
+	h := packet.Header{PacketID: pk.ID()}
+	_ = h.Write(b)
+	pk.Marshal(protocol.NewWriter(b, shieldID))
+	return b.Bytes()
+}
+
 func encodePacket(pk packet.Packet) []byte {
 	b := bytes.NewBuffer(nil)
 	h := packet.Header{PacketID: pk.ID()}

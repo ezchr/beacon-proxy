@@ -101,6 +101,10 @@ func (s *switchSession) routeSubClients(pks [][]byte) [][]byte {
 		if err != nil {
 			continue
 		}
+		if s.isPassthroughGuest(sub, id) {
+			own = append(own, raw) // the server handles this guest (subclient_passthrough.go)
+			continue
+		}
 		switch id {
 		case packet.IDSubClientLogin:
 			var pk packet.SubClientLogin

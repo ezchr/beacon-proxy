@@ -117,7 +117,12 @@ type switchSession struct {
 	// Split-screen (subclient_guest.go). guests are a host's split-screen players by sub-client id;
 	// a guest has its host, its sub-client id, inbox (its packets from the host's reader), guestLogin
 	// (a Login made from its SubClientLogin) and derivedID (it plays as an identity made from the host's).
-	guests     map[byte]*switchSession
+	guests map[byte]*switchSession
+	// In passthrough mode (subclient_passthrough.go): ptGuests is the link each guest logged in on,
+	// ptItems the guests that got their item list, ptUnion the union the client joined with.
+	ptGuests   map[byte]*link
+	ptItems    map[byte]bool
+	ptUnion    *union
 	host       *switchSession
 	sub        byte
 	derivedID  bool
@@ -410,6 +415,7 @@ func (s *switchSession) join() error {
 		s.log.Warn("network: some servers were never joined, their content is missing for this player", "servers", u.missing)
 	}
 	s.palette = u.palette
+	s.ptUnion = u
 
 	first := s.cfg.FirstServer
 	if back := s.n.takeRejoin(s.id.XUID); back != "" {
@@ -487,6 +493,9 @@ func (s *switchSession) join() error {
 	sg.Experiments = u.exps
 	sg.PlayerMovementSettings.RewindHistorySize = u.rewind
 	sg.ExperimentsPreviouslyToggled = len(u.exps) > 0
+	if MultiPlayerOff {
+		sg.MultiPlayerGame = false
+	}
 	if len(l.pre) > 0 {
 		if err := s.writeClient(l.pre...); err != nil {
 			return err
@@ -677,7 +686,14 @@ func (s *switchSession) readBackend(l *link, first bool) {
 				l.err = err
 				return
 			}
-			s.debugPacket("server", id, payload)
+			sub := subClientOf(raw)
+			s.debugPacket("server", sub, id, payload)
+			if sub != 0 && s.host == nil { // a passed-through guest's packet
+				if rw := s.passGuestToClient(l, raw, id, payload); rw != nil {
+					out = append(out, rw)
+				}
+				continue
+			}
 			switch id {
 			case packet.IDItemRegistry, packet.IDAvailableActorIdentifiers, packet.IDBiomeDefinitionList:
 				// Only a server's first item list is its registry: Dragonfly sends a second, short
@@ -744,7 +760,7 @@ func (s *switchSession) forward(l *link, pks [][]byte) bool {
 				continue
 			}
 			if s.scrub {
-				pks[i] = out
+				pks[i] = withSub(raw, out)
 			}
 			s.noteScrubbed(raw)
 		}
@@ -761,6 +777,9 @@ func (s *switchSession) forward(l *link, pks [][]byte) bool {
 	}
 	moving := s.transfer
 	for _, raw := range pks {
+		if subClientOf(raw) != 0 {
+			continue // a guest's packets (passthrough) are not the host's
+		}
 		s.track(raw)
 		if moving != nil && moving.l == l && moving.inPhase2() {
 			moving.rememberChunk(raw)
@@ -858,7 +877,17 @@ func (s *switchSession) readClient() {
 				s.cancel(err)
 				return
 			}
-			s.debugPacket("client", id, payload)
+			sub := subClientOf(raw)
+			s.debugPacket("client", sub, id, payload)
+			if sub != 0 && s.host == nil { // only passed-through guests' packets are left here
+				if held || (t != nil && t.l != cur) {
+					continue
+				}
+				if rw := s.passGuestToServer(cur, raw, id); rw != nil {
+					out = append(out, rw)
+				}
+				continue
+			}
 			if id != packet.IDPlayerAuthInput {
 				s.logSettlingPacket(id)
 			}
@@ -1286,6 +1315,14 @@ func (s *switchSession) setItems(l *link) {
 	}
 	m := newItemMap(l.itemReg.Items, s.itemIDs)
 	l.rw.items.Store(m)
+	var shields [2]int32
+	for _, it := range l.itemReg.Items {
+		if it.Name == "minecraft:shield" {
+			shields[0] = int32(it.RuntimeID)
+		}
+	}
+	shields[1] = s.itemIDs["minecraft:shield"]
+	l.rw.shields.Store(&shields)
 	if m != nil {
 		s.log.Info("network: items renumbered for this server", "server", l.server.Name)
 	}

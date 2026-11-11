@@ -41,9 +41,9 @@ func TestDebugCommand(t *testing.T) {
 	s.cd.SkinImageWidth, s.cd.SkinImageHeight = 2, 1
 	s.cd.SkinData = base64.StdEncoding.EncodeToString(make([]byte, 8))
 	s.cd.DeviceModel = "TestPhone"
-	s.debugPacket("client", id, payload)
-	s.debugPacket("client", mid, mpayload)                       // not chosen
-	debugTestSession("Other").debugPacket("client", id, payload) // not this player
+	s.debugPacket("client", 0, id, payload)
+	s.debugPacket("client", 0, mid, mpayload)                       // not chosen
+	debugTestSession("Other").debugPacket("client", 0, id, payload) // not this player
 
 	path := d.path
 	if got := DebugCommand("off"); !strings.Contains(got[0], "1 packets") {
@@ -72,8 +72,8 @@ func TestDebugAllQuiet(t *testing.T) {
 	id, payload := debugTestPayload(t, &packet.Text{Message: "secret words"})
 	mid, mpayload := debugTestPayload(t, &packet.MovePlayer{})
 	s := debugTestSession("A")
-	s.debugPacket("client", id, payload)
-	s.debugPacket("client", mid, mpayload)
+	s.debugPacket("client", 0, id, payload)
+	s.debugPacket("client", 0, mid, mpayload)
 	path := d.path
 	DebugCommand("off")
 	data, _ := os.ReadFile(path)
@@ -88,7 +88,7 @@ func TestDebugAllLogsEverything(t *testing.T) {
 	DebugCommand("all")
 	d := debugActive.Load()
 	mid, mpayload := debugTestPayload(t, &packet.MovePlayer{})
-	debugTestSession("A").debugPacket("client", mid, mpayload)
+	debugTestSession("A").debugPacket("client", 0, mid, mpayload)
 	path := d.path
 	DebugCommand("off")
 	data, _ := os.ReadFile(path)
@@ -117,9 +117,9 @@ func TestDebugHasAndDirection(t *testing.T) {
 	id, yes := debugTestPayload(t, &packet.Text{Message: "a Diamond sword"})
 	_, no := debugTestPayload(t, &packet.Text{Message: "nothing here"})
 	s := debugTestSession("A")
-	s.debugPacket("client", id, yes)
-	s.debugPacket("client", id, no)
-	s.debugPacket("server", id, yes)
+	s.debugPacket("client", 0, id, yes)
+	s.debugPacket("client", 0, id, no)
+	s.debugPacket("server", 0, id, yes)
 	path := d.path
 	if got := DebugCommand("off"); !strings.Contains(got[0], "1 packets") {
 		t.Fatalf("%v", got)

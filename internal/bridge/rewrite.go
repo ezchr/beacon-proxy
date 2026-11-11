@@ -44,6 +44,13 @@ type rewriter struct {
 	// ores) sends its stacks without a block, which crashes the client drawing them.
 	blockItems map[int32]uint32
 
+	// shields holds the shield's item network id on the backend [0] and on the client [1]. A shield
+	// stack carries an extra field (its blocking tick) that is read and written only when the item
+	// id is the shield's, so a packet must be decoded with the shield id of the side it came from
+	// and encoded with the side it goes to. With 0 the field was dropped and Crossfly, which knows
+	// the shield, read past the end ("decode packet *packet.MobEquipment: EOF") and kicked the player.
+	shields atomic.Pointer[[2]int32]
+
 	fallingMu sync.Mutex
 	falling   map[uint64]bool // runtime ids (client side) of falling blocks, whose variant is a block
 }
@@ -196,8 +203,9 @@ func (r *rewriter) rewrite(raw []byte, toClient bool, pool packet.Pool) ([]byte,
 	if !ok {
 		return raw, nil
 	}
+	from, to := r.shieldIDs(toClient)
 	pk := f()
-	if err := decodeInto(pk, payload); err != nil {
+	if err := decodeIntoShield(pk, payload, from); err != nil {
 		return nil, err
 	}
 	changed := r.special(pk, toClient)
@@ -207,7 +215,19 @@ func (r *rewriter) rewrite(raw []byte, toClient bool, pool packet.Pool) ([]byte,
 	if !changed {
 		return raw, nil
 	}
-	return encodePacket(pk), nil
+	return encodePacketShield(pk, to), nil
+}
+
+// shieldIDs returns the shield's item id on the side a packet comes from and on the side it goes to.
+func (r *rewriter) shieldIDs(toClient bool) (from, to int32) {
+	s := r.shields.Load()
+	if s == nil {
+		return 0, 0
+	}
+	if toClient {
+		return s[0], s[1]
+	}
+	return s[1], s[0]
 }
 
 // special rewrites what the generic walk can't see from field names: block ids in event data and
