@@ -13,6 +13,7 @@ import (
 	"os"
 	"path/filepath"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -49,6 +50,10 @@ type Network struct {
 	// servers' block lists with their maps to a union palette. n.mu guards both.
 	seen     map[string]seenContent
 	palettes map[paletteKey]serverPalette
+	// paletteBuilds are the palettes being built, shared by every player who needs one (n.mu).
+	paletteBuilds map[paletteKey]*paletteBuild
+	// SendBatch is how many players a /send of several moves at once (default 4, BEACON_SEND_BATCH).
+	SendBatch int
 	// rejoinTo holds, by XUID, the server a player was moving to when sent to join again for new
 	// resource packs (switchSession.record): they land there when they are back, not on the default.
 	rejoinTo sync.Map // xuid -> rejoinTarget
@@ -569,10 +574,52 @@ type serverPalette struct {
 func (n *Network) serverPalette(blocks []protocol.BlockEntry, union *blockPalette, hashed bool) (*blockPalette, *blockMap, error) {
 	key := paletteKey{blocksKey(blocks), union, hashed}
 	n.mu.Lock()
-	p, ok := n.palettes[key]
-	n.mu.Unlock()
-	if ok {
+	if p, ok := n.palettes[key]; ok {
+		n.mu.Unlock()
 		return p.bp, p.bm, nil
+	}
+	if b := n.paletteBuilds[key]; b != nil {
+		n.mu.Unlock()
+		<-b.done
+		return b.bp, b.bm, b.err
+	}
+	b := &paletteBuild{done: make(chan struct{}), err: errors.New("palette build failed")}
+	if n.paletteBuilds == nil {
+		n.paletteBuilds = map[paletteKey]*paletteBuild{}
+	}
+	n.paletteBuilds[key] = b
+	n.mu.Unlock()
+	defer func() {
+		n.mu.Lock()
+		delete(n.paletteBuilds, key)
+		if b.err == nil {
+			if n.palettes == nil || len(n.palettes) >= 32 {
+				n.palettes = map[paletteKey]serverPalette{}
+			}
+			n.palettes[key] = serverPalette{b.bp, b.bm}
+		}
+		n.mu.Unlock()
+		close(b.done)
+	}()
+	b.bp, b.bm, b.err = buildServerPalette(blocks, union, hashed)
+	return b.bp, b.bm, b.err
+}
+
+// paletteBuild is a server palette being built; done closes when bp, bm and err are set.
+type paletteBuild struct {
+	done chan struct{}
+	bp   *blockPalette
+	bm   *blockMap
+	err  error
+}
+
+// paletteBuildHook, if set, runs at the start of each palette build (tests).
+var paletteBuildHook func()
+
+// buildServerPalette builds a server palette and its map to the union palette.
+func buildServerPalette(blocks []protocol.BlockEntry, union *blockPalette, hashed bool) (*blockPalette, *blockMap, error) {
+	if paletteBuildHook != nil {
+		paletteBuildHook()
 	}
 	newPalette := newBlockPalette
 	if hashed {
@@ -586,12 +633,6 @@ func (n *Network) serverPalette(blocks []protocol.BlockEntry, union *blockPalett
 	if hashed || !bp.sameAs(union) {
 		bm = newBlockMap(bp, union)
 	}
-	n.mu.Lock()
-	if n.palettes == nil || len(n.palettes) >= 32 {
-		n.palettes = map[paletteKey]serverPalette{}
-	}
-	n.palettes[key] = serverPalette{bp, bm}
-	n.mu.Unlock()
 	return bp, bm, nil
 }
 
@@ -1304,16 +1345,50 @@ func (n *Network) Send(who, server string) (int, error) {
 		}
 		targets = []Player{p}
 	}
-	moved := 0
+	to := *n.server(server)
+	var moves []func()
 	for _, p := range targets {
 		if strings.EqualFold(p.Server, server) {
 			continue
 		}
-		if err := n.Switch(p.XUID, server); err == nil {
-			moved++
+		v, ok := n.sessions.Load(p.XUID)
+		if !ok {
+			continue
+		}
+		s := v.(*switchSession)
+		if s.checkSwitch(to, "") == nil {
+			moves = append(moves, func() { s.switchTo(to, "") })
 		}
 	}
-	return moved, nil
+	go runBatched(moves, n.sendBatch())
+	return len(moves), nil
+}
+
+func (n *Network) sendBatch() int {
+	if n.SendBatch > 0 {
+		return n.SendBatch
+	}
+	if v, err := strconv.Atoi(env("SEND_BATCH")); err == nil && v > 0 {
+		return v
+	}
+	return 4
+}
+
+// runBatched runs the moves, at most batch at a time: moving everyone at once built every
+// player's palette and chunks together.
+func runBatched(moves []func(), batch int) {
+	sem := make(chan struct{}, max(batch, 1))
+	var wg sync.WaitGroup
+	for _, m := range moves {
+		sem <- struct{}{}
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			defer func() { <-sem }()
+			m()
+		}()
+	}
+	wg.Wait()
 }
 
 // Switch moves a player (by XUID) to a server.

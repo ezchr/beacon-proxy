@@ -1256,6 +1256,15 @@ func (s *switchSession) trackLink(lk protocol.EntityLink) {
 // requestSwitch moves the player to a server in the background. reason, when set, is why their
 // server sent them away (shown to them).
 func (s *switchSession) requestSwitch(server ServerConfig, reason string) error {
+	if err := s.checkSwitch(server, reason); err != nil {
+		return err
+	}
+	go s.switchTo(server, reason)
+	return nil
+}
+
+// checkSwitch reports why the player can't be moved to server now, if so.
+func (s *switchSession) checkSwitch(server ServerConfig, reason string) error {
 	if !server.Accepts(s.proto) {
 		return errors.New(server.versionMessage(s.proto))
 	}
@@ -1275,7 +1284,6 @@ func (s *switchSession) requestSwitch(server ServerConfig, reason string) error 
 		return fmt.Errorf("already on %s", server.Name)
 	}
 	s.mu.Unlock()
-	go s.switchTo(server, reason)
 	return nil
 }
 
