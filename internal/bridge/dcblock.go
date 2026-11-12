@@ -146,6 +146,20 @@ func dcVerdict(addr net.Addr) (blocked bool, verdict string, ip net.IP, kind str
 	return false, "allowed", ip, kind
 }
 
+// dcListed reports whether addr is on the datacenter block list, whatever let the join in
+// (an allowed XUID). The allow list (cloud gaming) does not count as datacenter.
+func dcListed(addr net.Addr) bool {
+	ip, _ := remoteIP(addr)
+	if ip == nil {
+		return false
+	}
+	dc.mu.Lock()
+	dc.refresh()
+	allow, block := dc.allow, dc.block
+	dc.mu.Unlock()
+	return firstMatch(allow, ip) == nil && firstMatch(block, ip) != nil
+}
+
 var joinsLogMu sync.Mutex
 
 // logJoin appends one join attempt to joins.log, next to Velocity's.
@@ -158,4 +172,26 @@ func logJoin(line string) {
 	}
 	defer f.Close()
 	fmt.Fprintln(f, line)
+}
+
+// dcAllowedXUID reports whether xuid is a line of allow_xuids.txt in dcBlockDir: players let in from
+// any hosting/datacenter network (for example staff testing through a cloud proxy). The file is read
+// at every check, so edits count at once; "#" starts a comment.
+func dcAllowedXUID(xuid string) bool {
+	if xuid == "" {
+		return false
+	}
+	b, err := os.ReadFile(filepath.Join(dcBlockDir, "allow_xuids.txt"))
+	if err != nil {
+		return false
+	}
+	for _, line := range strings.Split(string(b), "\n") {
+		if i := strings.IndexByte(line, '#'); i >= 0 {
+			line = line[:i]
+		}
+		if strings.TrimSpace(line) == xuid {
+			return true
+		}
+	}
+	return false
 }
