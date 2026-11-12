@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/ezchr/beacon-proxy/internal/anticheat"
 	"log/slog"
 	"slices"
 	"strings"
@@ -62,6 +63,11 @@ func reloadConfig() []string {
 	}
 	applyLive(next)
 	out = append(out, "admins, moderators, max-players, forced hosts, ping passthrough, rate limits and cross-server chat reloaded")
+	if err := anticheat.Load(); err != nil {
+		out = append(out, "anticheat.json not reloaded: "+err.Error())
+	} else {
+		out = append(out, fmt.Sprintf("anticheat.json reloaded (on: %v)", anticheat.Enabled()))
+	}
 
 	var restart []string
 	same := func(name string, equal bool) {

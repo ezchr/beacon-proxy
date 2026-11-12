@@ -24,6 +24,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/ezchr/beacon-proxy/internal/anticheat"
 	"github.com/ezchr/beacon-proxy/internal/bridge"
 	"github.com/ezchr/beacon-proxy/internal/invitequeue"
 	"github.com/ezchr/beacon-proxy/internal/proxy"
@@ -219,6 +220,13 @@ func main() {
 	if network, err = setupNetwork(cfg, authSession, log); err != nil {
 		log.Error("invalid [servers] in beacon.toml", "err", err)
 		exit(1)
+	}
+	anticheat.Logger = log
+	anticheat.Alert = network.AlertStaff
+	if err := anticheat.Load(); err != nil {
+		log.Error("anticheat.json not loaded, the anticheat is off", "err", err)
+	} else if anticheat.Enabled() {
+		log.Info("anticheat on (anticheat.json)", "checks", len(anticheat.Checks()))
 	}
 
 	var allowXUID func(string) bool

@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/df-mc/go-nethernet"
+	"github.com/ezchr/beacon-proxy/internal/anticheat"
 	"github.com/ezchr/beacon-proxy/internal/proxy"
 	"github.com/go-gl/mathgl/mgl32"
 	"github.com/google/uuid"
@@ -55,6 +56,8 @@ type switchSession struct {
 	mu sync.Mutex
 	// What the client was given at its join, fixed for the whole connection.
 	clientRID uint64
+	// ac is the player's anticheat state, nil while it is off (see package anticheat).
+	ac        *anticheat.Player
 	clientUID int64
 	palette   *blockPalette
 	itemIDs   map[string]int32 // the client's item numbering (the union's)
@@ -199,7 +202,7 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	log = log.With("player", id.DisplayName)
 	log.Info("player authenticated via xbox live", "xuid", id.XUID)
-	if msg, closed := Closed(); closed && !n.IsAdmin(id.XUID, id.DisplayName) {
+	if msg, closed := Closed(); closed && !n.isStaff(id.XUID, id.DisplayName) {
 		log.Info("join refused: the network is closed")
 		_ = client.WritePacket(&packet.Disconnect{Message: msg})
 		time.Sleep(time.Second)
@@ -221,6 +224,10 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		cd := client.ClientData()
 		logJoin(fmt.Sprintf("%s bedrock name=%s xuid=%s ip=%s route=%s device=%d version=%s title=%s %s",
 			time.Now().UTC().Format(time.RFC3339), id.DisplayName, id.XUID, ip, kind, int(cd.DeviceOS), cd.GameVersion, id.TitleID, verdict))
+		if blocked && dcAllowedXUID(id.XUID) {
+			log.Info("datacenter join let through: XUID on the allow list", "ip", ip, "verdict", verdict)
+			blocked = false
+		}
 		if blocked {
 			log.Warn("datacenter join turned away", "ip", ip, "verdict", verdict)
 			_ = client.WritePacket(&packet.Disconnect{Message: dcBlockMessage})
@@ -306,6 +313,19 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	if cfg.OnJoin != nil {
 		cfg.OnJoin(id.XUID, id.DisplayName)
+	}
+	if p := anticheat.New(acConn{s}, s.id, s.cd, s.log); p != nil {
+		p.SelfRID = s.clientRID
+		p.Datacenter = dcListed(s.conn.RemoteAddr())
+		s.mu.Lock()
+		if s.cur != nil && s.cur.startGame != nil {
+			p.GameMode = s.cur.startGame.PlayerGameMode // the StartGame went out before p existed
+		}
+		s.mu.Unlock()
+		p.Login(client.RawLoginPacket())
+		s.mu.Lock()
+		s.ac = p
+		s.mu.Unlock()
 	}
 	go s.readClient()
 	<-sctx.Done()
@@ -804,6 +824,11 @@ func (s *switchSession) forward(l *link, pks [][]byte) bool {
 	if len(pks) == 0 {
 		return true
 	}
+	if s.ac != nil {
+		for _, pk := range s.ac.ServerBatch(l.server.Name, pks) {
+			pks = append(pks, encodePacket(pk))
+		}
+	}
 	if err := s.writeClient(pks...); err != nil {
 		s.cancel(fmt.Errorf("write to client: %w", err))
 		return false
@@ -902,6 +927,9 @@ func (s *switchSession) readClient() {
 					out = append(out, rw)
 				}
 				continue
+			}
+			if s.ac != nil && !s.ac.ClientPacket(id, payload) {
+				continue // the anticheat's own acknowledgement, or an action it undid
 			}
 			if id != packet.IDPlayerAuthInput {
 				s.logSettlingPacket(id)
