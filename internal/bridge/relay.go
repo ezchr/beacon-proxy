@@ -315,7 +315,7 @@ func dialBackend(ctx context.Context, cfg Config, log *slog.Logger) (backendConn
 		if err != nil {
 			return nil, nil, fmt.Errorf("dial tcp backend %s: %w", cfg.ServerAddress, err)
 		}
-		return c.(backendConn), nil, nil
+		return watchTCPBackend(c.(backendConn), cfg.ServerAddress, log), nil, nil
 	case TransportNetherNetNoRelay:
 		// HandleConn is never reached in this mode: signalBroker hands the negotiation to the
 		// backend and no connection is ever accepted here to be relayed.
