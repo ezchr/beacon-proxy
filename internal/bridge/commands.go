@@ -14,7 +14,8 @@ import (
 //
 //	/server [name]                 list the servers, or move to one
 //	/ping [player|@a|@r|...]       your ping or other players' (anyone; see ping.go)
-//	/broadcast [on|off|status]     list the world in the Friends tab or take it off (admins only)
+//	/beacon broadcast [on|off|status] [world]  list worlds in the Friends tab or take them off (admins)
+//	/beacon open|close|status      let everyone join, or only staff (admins)
 //
 // They are added to the command list every server sends, so they autocomplete everywhere. A
 // /server name that isn't one of the relay's servers goes on to the server (Velocity has its own).
@@ -152,25 +153,28 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		})
 		added = true
 	}
-	if s.isAdmin() && !have["beacon"] && ReloadHook != nil {
-		actions := enum("BeaconAction", []string{"reload"})
-		pk.Commands = append(pk.Commands, protocol.Command{
-			Name: "beacon", Description: "Beacon Proxy: reload beacon.toml", AliasesOffset: math.MaxUint32,
-			Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-				{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | actions},
-			}}},
-		})
-		added = true
-	}
-	if !have["broadcast"] && s.n.Listing != nil && s.isAdmin() {
-		states := enum("BeaconBroadcast", []string{"on", "off", "status"})
-		worlds := enum("BeaconBroadcastWorld", s.n.Listing.Worlds())
-		pk.Commands = append(pk.Commands, protocol.Command{
-			Name: "broadcast", Description: "Show or hide worlds in the Friends tab", AliasesOffset: math.MaxUint32,
-			Overloads: []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+	if s.isAdmin() && !have["beacon"] {
+		names := []string{"open", "close", "status"}
+		if ReloadHook != nil {
+			names = append([]string{"reload"}, names...)
+		}
+		actions := enum("BeaconAction", names)
+		overloads := []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
+			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | actions, Optional: true},
+		}}}
+		if s.n.Listing != nil {
+			sub := enum("BeaconBroadcastAction", []string{"broadcast"})
+			states := enum("BeaconBroadcast", []string{"on", "off", "status"})
+			worlds := enum("BeaconBroadcastWorld", s.n.Listing.Worlds())
+			overloads = append(overloads, protocol.CommandOverload{Parameters: []protocol.CommandParameter{
+				{Name: "broadcast", Type: protocol.CommandArgValid | protocol.CommandArgEnum | sub},
 				{Name: "state", Type: protocol.CommandArgValid | protocol.CommandArgEnum | states, Optional: true},
 				{Name: "world", Type: protocol.CommandArgValid | protocol.CommandArgEnum | worlds, Optional: true},
-			}}},
+			}})
+		}
+		pk.Commands = append(pk.Commands, protocol.Command{
+			Name: "beacon", Description: "Beacon Proxy: open or close to players, the Friends-tab broadcast, reload", AliasesOffset: math.MaxUint32,
+			Overloads: overloads,
 		})
 		added = true
 	}
@@ -256,15 +260,55 @@ func (s *switchSession) handleCommand(line string) bool {
 		s.message("<green>Moving %d player(s) to %s.</green>", moved, fields[2])
 		return true
 	case "beacon":
-		if !s.isAdmin() || ReloadHook == nil {
+		if !s.isAdmin() {
 			return false
 		}
-		if len(fields) != 2 || !strings.EqualFold(fields[1], "reload") {
-			s.message("<red>Usage: /beacon reload</red>")
-			return true
+		sub := "status"
+		if len(fields) > 1 {
+			sub = strings.ToLower(fields[1])
 		}
-		for _, line := range ReloadHook() {
-			s.message("<yellow>%s</yellow>", line)
+		switch sub {
+		case "reload":
+			if ReloadHook == nil {
+				s.message("<red>Reload isn't available here.</red>")
+				return true
+			}
+			for _, line := range ReloadHook() {
+				s.message("<yellow>%s</yellow>", line)
+			}
+		case "broadcast":
+			if s.n.Listing == nil {
+				s.message("<red>There is no Friends-tab broadcast to switch.</red>")
+				return true
+			}
+			return s.handleCommand(strings.Join(fields[1:], " "))
+		case "open", "close":
+			s.n.Log.Info("network: opened or closed by a player", "player", s.id.DisplayName, "closed", sub == "close")
+			if sub == "close" {
+				kicked, err := s.n.Close("§cThe server is closed right now: only staff can join.")
+				if err != nil {
+					s.message("<red>Could not close: %s</red>", err)
+					return true
+				}
+				s.message("<yellow>Closed: only admins and moderators can join now. %d player(s) who aren't staff were sent off. /beacon open lets everyone in again.</yellow>", kicked)
+			} else {
+				if err := s.n.Open(); err != nil {
+					s.message("<red>Could not open: %s</red>", err)
+					return true
+				}
+				s.message("<green>Open: everyone can join again.</green>")
+			}
+		case "status":
+			if _, closed := Closed(); closed {
+				s.message("<yellow>Closed: only admins and moderators can join.</yellow>")
+			} else {
+				s.message("<green>Open: everyone can join.</green>")
+			}
+			if s.n.Listing != nil {
+				return s.handleCommand("broadcast status")
+			}
+		default:
+			s.message("<red>Usage: /beacon [open|close|status|reload], /beacon broadcast [on|off|status] [world]</red>")
 		}
 		return true
 	case "broadcast":
@@ -306,7 +350,7 @@ func (s *switchSession) handleCommand(line string) bool {
 				}
 			}
 		default:
-			s.message("<red>Usage: /broadcast [on|off|status] [world]</red>")
+			s.message("<red>Usage: /beacon broadcast [on|off|status] [world]</red>")
 		}
 		return true
 	}

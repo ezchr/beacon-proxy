@@ -28,7 +28,7 @@ func Closed() (string, bool) {
 	return "", false
 }
 
-// Close closes the network: everyone but the admins is disconnected with msg, and new joins
+// Close closes the network: everyone but staff (admins and moderators) is disconnected with msg, and new joins
 // (Friends tab or address) are turned away with it until Open. It returns how many were disconnected.
 func (n *Network) Close(msg string) (int, error) {
 	if err := os.WriteFile(ClosedFile, []byte(msg+"\n"), 0o644); err != nil {
@@ -38,7 +38,7 @@ func (n *Network) Close(msg string) (int, error) {
 	kicked := 0
 	n.sessions.Range(func(_, v any) bool {
 		s := v.(*switchSession)
-		if !n.IsAdmin(s.id.XUID, s.id.DisplayName) {
+		if !n.isStaff(s.id.XUID, s.id.DisplayName) {
 			s.disconnect(msg)
 			kicked++
 		}
