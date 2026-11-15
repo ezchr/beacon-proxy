@@ -158,16 +158,21 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		if ReloadHook != nil {
 			names = append([]string{"reload"}, names...)
 		}
-		actions := enum("BeaconAction", names)
-		overloads := []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
-			{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | actions, Optional: true},
-		}}}
+		// Every overload starts with the same enum of all the subcommands: a Bedrock client given
+		// overloads that start with different enums suggests from one of them only.
 		if s.n.Listing != nil {
-			sub := enum("BeaconBroadcastAction", []string{"broadcast"})
+			names = append(names, "broadcast")
+		}
+		actions := enum("BeaconAction", names)
+		first := func(optional bool) protocol.CommandParameter {
+			return protocol.CommandParameter{Name: "action", Type: protocol.CommandArgValid | protocol.CommandArgEnum | actions, Optional: optional}
+		}
+		overloads := []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{first(true)}}}
+		if s.n.Listing != nil {
 			states := enum("BeaconBroadcast", []string{"on", "off", "status"})
 			worlds := enum("BeaconBroadcastWorld", s.n.Listing.Worlds())
 			overloads = append(overloads, protocol.CommandOverload{Parameters: []protocol.CommandParameter{
-				{Name: "broadcast", Type: protocol.CommandArgValid | protocol.CommandArgEnum | sub},
+				first(false),
 				{Name: "state", Type: protocol.CommandArgValid | protocol.CommandArgEnum | states, Optional: true},
 				{Name: "world", Type: protocol.CommandArgValid | protocol.CommandArgEnum | worlds, Optional: true},
 			}})
