@@ -96,7 +96,7 @@ survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
 |---|---|
 | `address` | where Beacon reaches the server (`host:port`); the only one you must give |
 | `forwarding` | how the server learns who the player is: leave it out for Beacon's signature, or `"endstone"`. See [Forwarding](#forwarding-who-the-player-is). |
-| `resource-packs` | `false` leaves the server's resource packs out of what players get ([below](#leaving-out-a-servers-resource-packs)) |
+| `resource-packs` | `false` leaves the server's resource packs out of what players get, `"on-join"` gives them only to players going to that server ([below](#leaving-out-a-servers-resource-packs)) |
 | `transport` | `"nethernet"` (default), `"raknet"` for a server that only speaks RakNet, or `"tcp"` for a server on the same machine that listens on TCP ([below](#tcp-for-servers-on-the-same-machine)) |
 | `encryption`, `compression` | `false` asks a `"tcp"` server not to encrypt or compress the link ([below](#tcp-for-servers-on-the-same-machine)) |
 | `protocols` | the game versions (protocol numbers) the server takes, e.g. `[2193]`; leave it out for every version Beacon serves |
@@ -157,6 +157,18 @@ old = { address = "127.0.0.1:19134", resource-packs = false }
 ```
 
 Its blocks and items still work; they are drawn by the other servers' packs.
+
+To give a server's packs only to the players who go there, use `resource-packs = "on-join"`:
+
+```toml
+creative = { address = "127.0.0.1:19135", resource-packs = "on-join" }
+```
+
+Players joining the network do not download them. A player who moves to that server (`/server`,
+`/send`, a menu) joins again to download its packs: Beacon transfers them to `rejoin-address`
+(`[advanced]`, your network's own address; without one they are asked to join again) and puts them
+on the server once they are back. Players joining straight to it (its address as a forced
+host, or it first in `try`) get its packs at once.
 
 ### Forwarding: who the player is
 

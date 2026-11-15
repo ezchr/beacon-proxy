@@ -314,14 +314,35 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 			if err := parseHold(&s, v); err != nil {
 				return nil, nil, fmt.Errorf("server %s: %w", name, err)
 			}
-			if rp, ok := v["resource-packs"].(bool); ok && !rp {
-				s.NoPacks = true
+			switch rp := v["resource-packs"].(type) {
+			case nil:
+			case bool:
+				s.NoPacks = !rp
+			case string:
+				switch strings.ToLower(strings.TrimSpace(rp)) {
+				case "true", "":
+				case "false":
+					s.NoPacks = true
+				case "on-join":
+					s.PacksOnJoin = true // its packs only for players joining to go there
+				default:
+					return nil, nil, fmt.Errorf(`server %s: resource-packs %q: use true, false or "on-join"`, name, rp)
+				}
+			default:
+				return nil, nil, fmt.Errorf(`server %s: resource-packs: use true, false or "on-join"`, name)
 			}
 			if e, ok := v["encryption"].(bool); ok && !e {
 				s.NoEncryption = true
 			}
 			if c, ok := v["compression"].(bool); ok && !c {
 				s.NoCompression = true
+			}
+			if l, ok := v["allowed"].([]any); ok {
+				for _, x := range l {
+					if x, ok := x.(string); ok && x != "" {
+						s.Allowed = append(s.Allowed, x)
+					}
+				}
 			}
 			if f, ok := v["forwarding"].(string); ok {
 				switch strings.ToLower(f) {
@@ -337,6 +358,11 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 		}
 		if s.Address == "" {
 			return nil, nil, fmt.Errorf("server %s has no address", name)
+		}
+		for _, x := range s.Allowed {
+			if strings.TrimLeft(x, "0123456789") != "" {
+				return nil, nil, fmt.Errorf("server %s: allowed takes XUIDs, not %q", name, x)
+			}
 		}
 		switch strings.ToLower(s.Transport) {
 		case "", bridge.TransportNetherNet:

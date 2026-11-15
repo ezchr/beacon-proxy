@@ -40,8 +40,11 @@ type switchSession struct {
 
 	ctx    context.Context
 	cancel context.CancelCauseFunc
-	// packGen is Network.packGen when this client logged in.
-	packGen uint64
+	// packGen is Network.packGenFor(packsFor) when this client logged in. packsFor is the
+	// resource-packs = "on-join" server whose packs the client got at its join ("" for none):
+	// moving to another on-join server takes a join again (packRejoin).
+	packGen  uint64
+	packsFor string
 	// reply takes messages in place of a client: the console's stand-in session (moderation.go).
 	reply func(string)
 	// limited marks a stand-in session (reply) as a moderator's (ModerateAs).
@@ -382,24 +385,45 @@ func (s *switchSession) record(server string, id uint32, payload []byte) {
 	if id != packet.IDResourcePacksInfo && id != packet.IDResourcePackStack {
 		return
 	}
-	if s.n.packGen.Load() == s.packGen || !s.rejoining.CompareAndSwap(false, true) {
+	if s.n.packGenFor(s.packsFor) == s.packGen || !s.rejoining.CompareAndSwap(false, true) {
 		return
 	}
 	s.log.Info("network: server has new resource packs, the player joins again to download them", "server", server)
 	s.n.rememberRejoin(s.id.XUID, server)
-	go s.rejoin()
+	go s.rejoin("The server just updated.\nJoin again to play.", 3*time.Second)
 }
 
-// rejoin transfers the client to the network again (Network.RejoinAddress), or asks the player to
-// join again when there is no address or the client stays.
-func (s *switchSession) rejoin() {
+// packRejoin sends the player to join again to go to server, a resource-packs = "on-join" server
+// whose packs their client did not get: packs only download at a join. They land on server
+// (rememberRejoin), with its packs. A split-screen player can't join again alone: the host can.
+// wait is how long the client has to show the message (or finish loading) before its transfer.
+func (s *switchSession) packRejoin(server ServerConfig, wait time.Duration) {
+	name := server.Name
+	if name != "" {
+		name = strings.ToUpper(name[:1]) + name[1:]
+	}
+	if s.host != nil {
+		s.message("<red>%s needs its resource pack: the main player has to go there first.</red>", name)
+		return
+	}
+	if !s.rejoining.CompareAndSwap(false, true) {
+		return
+	}
+	s.log.Info("network: server's resource packs are given on joining it, the player joins again to download them", "server", server.Name, "has", s.packsFor)
+	s.n.rememberRejoin(s.id.XUID, server.Name)
+	s.message("<yellow>Downloading %s's resource pack...</yellow>", name)
+	go s.rejoin(fmt.Sprintf("Join again to download %s's resource pack.", name), wait)
+}
+
+// rejoin transfers the client to the network again (Network.RejoinAddress) after wait, or asks the
+// player to join again (msg) when there is no address or the client stays.
+func (s *switchSession) rejoin(msg string, wait time.Duration) {
 	defer s.recoverSession("rejoin")
 	select {
-	case <-time.After(3 * time.Second): // a transfer while the client still loads is lost
+	case <-time.After(wait): // a transfer while the client still loads is lost
 	case <-s.ctx.Done():
 		return
 	}
-	const msg = "The server just updated.\nJoin again to play."
 	host, port, err := net.SplitHostPort(s.n.RejoinAddress)
 	p, perr := strconv.ParseUint(port, 10, 16)
 	if err != nil || perr != nil {
@@ -435,16 +459,6 @@ func (s *switchSession) message(format string, a ...any) {
 // join does the client's pack screen with the union of the network's packs, logs the player into the
 // default server and hands its StartGame to the client with the union's blocks, items and entities.
 func (s *switchSession) join() error {
-	u, err := s.n.buildUnion()
-	if err != nil {
-		return err
-	}
-	if len(u.missing) > 0 {
-		s.log.Warn("network: some servers were never joined, their content is missing for this player", "servers", u.missing)
-	}
-	s.palette = u.palette
-	s.ptUnion = u
-
 	first := s.cfg.FirstServer
 	if s.startServer != "" {
 		first = s.startServer // a split-screen player joins its host's server
@@ -452,11 +466,33 @@ func (s *switchSession) join() error {
 	if back := s.n.takeRejoin(s.id.XUID); back != "" {
 		first = back // joining again for new packs: back to the server they were moving to
 	}
-	order := s.n.withFirstServer(s.n.joinOrder(s.proto, s.cd.ServerAddress), first, s.proto)
+	all := s.n.withFirstServer(s.n.joinOrder(s.proto, s.cd.ServerAddress), first, s.proto)
+	order := allowedServers(all, s.id.XUID) // a closed server (allowed) is left out for the others
 	s.log.Info("network: join order", "first", first, "order", serverNames(order))
 	if len(order) == 0 {
+		if len(all) > 0 {
+			return errors.New(closedServerMessage)
+		}
 		return fmt.Errorf("no server here supports %s yet", proxy.VersionName(s.proto))
 	}
+	// The client gets the packs of a resource-packs = "on-join" server only when it joins to go
+	// there; a split-screen player has what its host's client got.
+	if s.host != nil {
+		s.packsFor = s.host.packsFor
+	} else {
+		s.packsFor = s.n.unionVariant(order[0].Name)
+		s.packGen = s.n.packGenFor(s.packsFor)
+	}
+	u, err := s.n.buildUnion(s.packsFor)
+	if err != nil {
+		return err
+	}
+	if len(u.missing) > 0 {
+		s.log.Warn("network: some servers were never joined, their content is missing for this player", "servers", u.missing)
+	}
+	s.log.Info("network: resource packs for this join", "packs", len(u.packsInfo.TexturePacks), "onJoinPacksOf", s.packsFor)
+	s.palette = u.palette
+	s.ptUnion = u
 	// The player joins the first server in order that answers with a world; the others are tried in
 	// turn while the client loads the resource packs.
 	type dialed struct {
@@ -537,6 +573,11 @@ func (s *switchSession) join() error {
 	s.log.Info("network: joined", "server", server.Name, "blocksRenumbered", bm != nil)
 	s.setBackendPing(l) // the server leg counts in /ping only for a server on another machine
 	go s.readBackend(l, true)
+	if s.host == nil && s.n.packRejoinNeeded(server, s.packsFor) {
+		// The servers before it in order did not answer: the player landed on an on-join server
+		// without its packs, and joins again to get them once the client has loaded.
+		s.packRejoin(server, 3*time.Second)
+	}
 	return nil
 }
 
@@ -868,16 +909,45 @@ func (s *switchSession) backendGone(l *link) {
 // server list: the player goes to the first other server (the default one first), for example
 // while their server restarts. Only with none left are they disconnected.
 func (s *switchSession) moveAway(from, reason string) {
-	for _, other := range s.n.orderedServers() {
-		if strings.EqualFold(other.Name, from) {
-			continue
-		}
+	for _, other := range s.moveAwayOrder(from) {
 		s.log.Info("network: server ended the connection, moving the player to another server", "server", from, "to", other.Name, "reason", reason)
 		if err := s.requestSwitch(other, reason); err == nil {
 			return
 		}
 	}
 	s.disconnect(reason)
+}
+
+// moveAwayOrder is where moveAway tries to send a player whose server from let them go: the other
+// servers in order, the ones the client can play on as it is before those that would send it to
+// join again for their resource packs (resource-packs = "on-join").
+func (s *switchSession) moveAwayOrder(from string) []ServerConfig {
+	var now, later []ServerConfig
+	for _, other := range s.n.orderedServers() {
+		if strings.EqualFold(other.Name, from) {
+			continue
+		}
+		if s.n.packRejoinNeeded(other, s.packsFor) {
+			later = append(later, other)
+		} else {
+			now = append(now, other)
+		}
+	}
+	return append(now, later...)
+}
+
+// closedServerMessage is what a player not in a server's allowed list is told when trying to go there.
+const closedServerMessage = "That server is closed."
+
+// allowedServers is the servers of order the player of xuid may join.
+func allowedServers(order []ServerConfig, xuid string) []ServerConfig {
+	out := make([]ServerConfig, 0, len(order))
+	for _, s := range order {
+		if s.Allows(xuid) {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 func errText(err error) string {
@@ -1302,6 +1372,9 @@ func (s *switchSession) requestSwitch(server ServerConfig, reason string) error 
 
 // checkSwitch reports why the player can't be moved to server now, if so.
 func (s *switchSession) checkSwitch(server ServerConfig, reason string) error {
+	if !server.Allows(s.id.XUID) {
+		return errors.New(closedServerMessage)
+	}
 	if !server.Accepts(s.proto) {
 		return errors.New(server.versionMessage(s.proto))
 	}

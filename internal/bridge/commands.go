@@ -94,7 +94,7 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 	}
 	added := false
 	serverOverloads := func() []protocol.CommandOverload {
-		servers := enum("BeaconServer", s.n.ServerNames())
+		servers := enum("BeaconServer", s.n.serverNamesFor(s.id.XUID)) // closed servers only for their players
 		return []protocol.CommandOverload{{Parameters: []protocol.CommandParameter{
 			{Name: "server", Type: protocol.CommandArgValid | protocol.CommandArgEnum | servers, Optional: true},
 		}}}
@@ -217,6 +217,9 @@ func (s *switchSession) handleCommand(line string) bool {
 			var names []string
 			for _, sc := range s.n.conf().servers {
 				n := sc.Name
+				if !sc.Allows(s.id.XUID) && !strings.EqualFold(n, cur) {
+					continue // a closed server, listed only for its players
+				}
 				if strings.EqualFold(n, cur) {
 					n = "<green>" + n + "</green>"
 				} else if !sc.Accepts(s.proto) {

@@ -39,13 +39,15 @@ import (
 // resource packs are downloaded from each server once and served by the relay itself.
 type Network struct {
 	// packGen counts the changes to the servers' resource packs: a client logged in before the
-	// last one has old packs.
-	packGen atomic.Uint64
+	// last one has old packs. Changes to a resource-packs = "on-join" server's packs count in
+	// onJoinGen instead (lower-case name -> *atomic.Uint64): only its own players have them.
+	packGen   atomic.Uint64
+	onJoinGen sync.Map
 	// contentGen counts the changes to what the union is built from (servers' content, packs).
-	// With the live config it keys unionCache, the union every join shares. n.mu guards all three.
+	// With the live config it keys unions, the unions every join shares by variant (the on-join
+	// server whose packs it holds, lower case; "" for none). n.mu guards both.
 	contentGen uint64
-	unionCache *union
-	unionKey   unionKey
+	unions     map[string]cachedUnion
 	// seen is what record last stored or found per server packet, palettes the block palettes of
 	// servers' block lists with their maps to a union palette. n.mu guards both.
 	seen     map[string]seenContent
@@ -141,6 +143,11 @@ type ServerConfig struct {
 	// NoPacks keeps the server's resource packs out of what players get (resource-packs = false in
 	// beacon.toml): its blocks and items still join the union, drawn by the other servers' packs.
 	NoPacks bool `json:"no_packs,omitempty"`
+	// PacksOnJoin (resource-packs = "on-join" in beacon.toml) keeps the server's resource packs out
+	// of what players get at their join, unless they join to go to this server: a player moving
+	// there without them joins again (transferred to RejoinAddress) to download them. Its blocks and
+	// items are in the union for everyone, as with NoPacks.
+	PacksOnJoin bool `json:"packs_on_join,omitempty"`
 	// Forwarding "endstone" (ForwardingEndstone) signs logins to the server for Endstone 0.12's
 	// [proxies.endgate], which gives it the player's real XUID and address with no plugin.
 	Forwarding string `json:"forwarding,omitempty"`
@@ -149,6 +156,14 @@ type ServerConfig struct {
 	// both only cost CPU on each end. Only Dragonfly's TCP listener (through gophertunnel) grants them.
 	NoEncryption  bool `json:"no_encryption,omitempty"`
 	NoCompression bool `json:"no_compression,omitempty"`
+	// Allowed (allowed = ["xuid", ...] in beacon.toml) are the only players who may join the server;
+	// empty: anyone.
+	Allowed []string `json:"allowed,omitempty"`
+}
+
+// Allows reports whether the player of xuid may join the server.
+func (s ServerConfig) Allows(xuid string) bool {
+	return len(s.Allowed) == 0 || slices.Contains(s.Allowed, xuid)
 }
 
 // backendProtocol is the version a player of protocol id logs in to the server with.
@@ -477,16 +492,67 @@ func (n *Network) record(server string, id uint32, payload []byte) bool {
 	}
 	// A server whose packs players never get (resource-packs = false) changes nothing a client has:
 	// no rejoin to download them, and no download.
-	if sc := n.server(server); sc != nil && sc.NoPacks {
+	sc := n.server(server)
+	if sc != nil && sc.NoPacks {
 		return true
 	}
 	if id == packet.IDResourcePacksInfo || id == packet.IDResourcePackStack {
-		n.packGen.Add(1)
+		if sc != nil && sc.PacksOnJoin {
+			n.onJoinGenOf(server).Add(1) // only the clients that have its packs have old ones
+		} else {
+			n.packGen.Add(1)
+		}
 	}
 	if id == packet.IDResourcePacksInfo {
 		go n.fetchPacks(server)
 	}
 	return true
+}
+
+// onJoinGenOf is the counter of an on-join server's pack changes.
+func (n *Network) onJoinGenOf(server string) *atomic.Uint64 {
+	v, _ := n.onJoinGen.LoadOrStore(strings.ToLower(server), new(atomic.Uint64))
+	return v.(*atomic.Uint64)
+}
+
+// packGenFor is the pack generation of a client that has the packs of the on-join server packsFor
+// ("" for none) besides every other server's: it changes when any of those packs change.
+func (n *Network) packGenFor(packsFor string) uint64 {
+	g := n.packGen.Load()
+	if packsFor != "" {
+		g += n.onJoinGenOf(packsFor).Load()
+	}
+	return g
+}
+
+// unionVariant is the variant of the union a login headed to server gets: the server's name (lower
+// case) when it is a resource-packs = "on-join" server, "" (no on-join server's packs) otherwise.
+func (n *Network) unionVariant(server string) string {
+	if sc := n.server(server); sc != nil && sc.PacksOnJoin && !sc.NoPacks {
+		return strings.ToLower(sc.Name)
+	}
+	return ""
+}
+
+// packRejoinNeeded reports whether a client with the packs of the on-join server have ("" for none)
+// has to join again before it can play on server: server keeps its packs for the players joining to
+// go there, this client does not have them, and the relay has them to give.
+func (n *Network) packRejoinNeeded(server ServerConfig, have string) bool {
+	if !server.PacksOnJoin || server.NoPacks || strings.EqualFold(server.Name, have) {
+		return false
+	}
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	c := n.content[server.Name]
+	if c == nil || c.PacksInfo == nil {
+		return false // nothing known of its packs yet: joining again would give the client nothing
+	}
+	for _, t := range c.PacksInfo.TexturePacks {
+		if n.packs[t.UUID.String()+"_"+t.Version] != nil {
+			return true
+		}
+	}
+	return false
 }
 
 // union is the content a joining client gets: every server's, the default server's first.
@@ -651,24 +717,41 @@ type unionKey struct {
 	conf *liveConfig
 }
 
-// buildUnion returns the union, built again only when the servers' content, the packs or the
-// server list changed: every player shares one (it is only read).
-func (n *Network) buildUnion() (*union, error) {
+// cachedUnion is a built union with what it was built from.
+type cachedUnion struct {
+	key unionKey
+	u   *union
+}
+
+// buildUnion returns the union of variant (unionVariant: the on-join server whose packs it holds,
+// "" for none), built again only when the servers' content, the packs or the server list changed:
+// every player of a variant shares one (it is only read).
+func (n *Network) buildUnion(variant string) (*union, error) {
+	variant = n.unionVariant(variant)
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	key := unionKey{n.contentGen, n.conf()}
-	if n.unionCache != nil && n.unionKey == key {
-		return n.unionCache, nil
+	if c, ok := n.unions[variant]; ok && c.key == key {
+		return c.u, nil
 	}
-	u, err := n.makeUnion()
+	u, err := n.makeUnion(variant)
 	if err == nil {
-		n.unionCache, n.unionKey = u, key
+		if n.unions == nil {
+			n.unions = map[string]cachedUnion{}
+		}
+		for v, c := range n.unions {
+			if c.key != key {
+				delete(n.unions, v) // built from old content: never used again
+			}
+		}
+		n.unions[variant] = cachedUnion{key, u}
 	}
 	return u, err
 }
 
-// makeUnion builds the union. n.mu held.
-func (n *Network) makeUnion() (*union, error) {
+// makeUnion builds the union of variant: every server's packs but those of resource-packs = false
+// servers and of on-join servers other than variant. n.mu held.
+func (n *Network) makeUnion(variant string) (*union, error) {
 	u := &union{
 		packsInfo: &packet.ResourcePacksInfo{},
 		packStack: &packet.ResourcePackStack{BaseGameVersion: "*"},
@@ -706,7 +789,7 @@ func (n *Network) makeUnion() (*union, error) {
 		if r := c.StartGame.PlayerMovementSettings.RewindHistorySize; r > u.rewind {
 			u.rewind = r
 		}
-		packs := !s.NoPacks
+		packs := !s.NoPacks && (!s.PacksOnJoin || strings.EqualFold(s.Name, variant))
 		if p := c.PacksInfo; p != nil && packs {
 			u.packsInfo.TexturePackRequired = u.packsInfo.TexturePackRequired || p.TexturePackRequired
 			u.packsInfo.HasScripts = u.packsInfo.HasScripts || p.HasScripts
@@ -1414,6 +1497,17 @@ func (n *Network) ServerNames() []string {
 	out := make([]string, 0, len(servers))
 	for _, s := range servers {
 		out = append(out, s.Name)
+	}
+	return out
+}
+
+// serverNamesFor lists the servers the player of xuid may join (allowed), for their /server.
+func (n *Network) serverNamesFor(xuid string) []string {
+	var out []string
+	for _, s := range n.conf().servers {
+		if s.Allows(xuid) {
+			out = append(out, s.Name)
+		}
 	}
 	return out
 }

@@ -96,9 +96,19 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	if busy || already {
 		return // a second /server while the first move runs, or one to where the player already is
 	}
+	if !server.Allows(s.id.XUID) {
+		s.message("<red>%s</red>", closedServerMessage)
+		return
+	}
 	start := time.Now()
 	if reason != "" {
 		s.kickReason(reason)
+	}
+	if s.n.packRejoinNeeded(server, s.packsFor) {
+		// Its resource packs are given only to players joining to go there: the client joins
+		// again for them (every move comes here: /server, /send, menus, moves away).
+		s.packRejoin(server, time.Second)
+		return
 	}
 	s.message("<grey>Connecting you to %s...</grey>", server.Name)
 	l, err := s.openLink(server)
