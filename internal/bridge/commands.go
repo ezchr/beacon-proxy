@@ -153,7 +153,9 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 		})
 		added = true
 	}
-	if s.isAdmin() && !have["beacon"] {
+	// A server may have a /beacon of its own: the relay answers /beacon, so its full form replaces the
+	// server's.
+	if s.isAdmin() {
 		names := []string{"open", "close", "status"}
 		if ReloadHook != nil {
 			names = append([]string{"reload"}, names...)
@@ -177,10 +179,21 @@ func (s *switchSession) injectCommands(raw, payload []byte) []byte {
 				{Name: "world", Type: protocol.CommandArgValid | protocol.CommandArgEnum | worlds, Optional: true},
 			}})
 		}
-		pk.Commands = append(pk.Commands, protocol.Command{
+		beaconCmd := protocol.Command{
 			Name: "beacon", Description: "Beacon Proxy: open or close to players, the Friends-tab broadcast, reload", AliasesOffset: math.MaxUint32,
 			Overloads: overloads,
-		})
+		}
+		replaced := false
+		for k, c := range pk.Commands {
+			if c.Name == "beacon" {
+				beaconCmd.AliasesOffset = c.AliasesOffset
+				pk.Commands[k] = beaconCmd
+				replaced = true
+			}
+		}
+		if !replaced {
+			pk.Commands = append(pk.Commands, beaconCmd)
+		}
 		added = true
 	}
 	if s.isAdmin() || s.moderator() {
