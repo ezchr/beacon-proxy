@@ -104,6 +104,13 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 	if reason != "" {
 		s.kickReason(reason)
 	}
+	if s.host == nil && s.packsOutdated(server) {
+		// The client has this server's packs, but an older version (the server restarted with
+		// new ones since this login): it joins again first and downloads them on the way, instead
+		// of landing and being sent to join again from there.
+		s.packRejoin(server, time.Second)
+		return
+	}
 	if s.n.packRejoinNeeded(server, s.packsFor) {
 		// Its resource packs are given only to players joining to go there: the client joins
 		// again for them (every move comes here: /server, /send, menus, moves away).

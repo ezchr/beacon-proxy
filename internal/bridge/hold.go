@@ -515,6 +515,18 @@ func (s *switchSession) reattach(h *holdState) holdResult {
 		go s.holdExpired(h)
 		return holdDone
 	}
+	if s.host == nil && s.packsOutdated(*server) {
+		// Back with new resource packs: the player joins again straight away and downloads them,
+		// landing on the server, rather than being put back and then sent to join again.
+		s.hold = nil
+		s.lastHold = endedHold{server: h.server, deadline: h.deadline, ended: time.Now()}
+		s.mu.Unlock()
+		l.close()
+		s.sendClient(holdTitleClear()...)
+		s.log.Info("network: the held player's server is back with new resource packs, the player joins again to get them first", "server", h.server)
+		s.packRejoin(*server, time.Second)
+		return holdDone
+	}
 	if sg.Dimension != s.dimension {
 		// Back in another dimension than the client is in (the player's saved position is in the
 		// nether, say): only a dimension change gets them there, as at a move.

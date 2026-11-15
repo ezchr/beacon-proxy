@@ -1500,3 +1500,12 @@ func serverNames(servers []ServerConfig) []string {
 	}
 	return out
 }
+
+// packsOutdated reports whether moving to server needs new resource packs first: the client got
+// server's on-join packs at its login, and the server has changed them since.
+func (s *switchSession) packsOutdated(server ServerConfig) bool {
+	if s.packsFor == "" || !strings.EqualFold(server.Name, s.packsFor) {
+		return false
+	}
+	return s.n.packGenFor(s.packsFor) != s.packGen
+}
