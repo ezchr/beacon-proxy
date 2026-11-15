@@ -45,6 +45,9 @@ type switchSession struct {
 	// moving to another on-join server takes a join again (packRejoin).
 	packGen  uint64
 	packsFor string
+	// loginServer is the server whose StartGame the client got (set by join, before any move): the
+	// only one that may leave chunks to the client to build (clientgen.go).
+	loginServer string
 	// reply takes messages in place of a client: the console's stand-in session (moderation.go).
 	reply func(string)
 	// limited marks a stand-in session (reply) as a moderator's (ModerateAs).
@@ -505,7 +508,7 @@ func (s *switchSession) join() error {
 		defer s.recoverSession("join dial")
 		var last error
 		for _, server := range order {
-			l, err := s.openLink(server)
+			l, err := s.openLink(server, true)
 			if err == nil {
 				select {
 				case <-l.started:
@@ -535,6 +538,10 @@ func (s *switchSession) join() error {
 		return d.err
 	}
 	l, server := d.l, d.server
+	s.loginServer = server.Name
+	if l.startGame.ClientSideGeneration {
+		s.log.Info("network: the client builds the far chunks of this server itself (client-side generation)", "server", server.Name)
+	}
 
 	sg := *l.startGame
 	_, bm, err := s.n.serverPalette(sg.Blocks, s.palette, sg.UseBlockNetworkIDHashes)
@@ -646,10 +653,11 @@ func (s *switchSession) packScreen(u *union) error {
 
 // openLink dials a server and logs the player in; the link's reader handles its pack screen and
 // reports StartGame by closing l.started.
-func (s *switchSession) openLink(server ServerConfig) (*link, error) {
+// joining: a first join (join), whose StartGame the client gets.
+func (s *switchSession) openLink(server ServerConfig, joining bool) (*link, error) {
 	ctx, cancel := context.WithTimeout(s.ctx, backendDialTimeout)
 	defer cancel()
-	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.cd, s.conn.RemoteAddr().String(), s.backendLoginToken())
+	c, conn, err := s.n.dialServer(ctx, server, server.backendProtocol(s.proto), s.id, s.backendClientData(server, joining), s.conn.RemoteAddr().String(), s.backendLoginToken())
 	if err != nil {
 		return nil, err
 	}

@@ -80,6 +80,10 @@ func main() {
 	c := proxy.NewProxyConn(conn, false)
 	cd := bridge.ProbeClientData("netbot")
 	cd.ServerAddress = *typedAddress
+	if *clientGen {
+		// As a PC client: BDS only leaves chunks to a client whose hardware can show far ones.
+		cd.CompatibleWithClientSideChunkGen, cd.MaxViewDistance, cd.MemoryTier = true, 96, 4
+	}
 	cd.GameVersion = proxy.VersionName(int32(*proto))
 	if err := c.Login(cd, sess, int32(*proto)); err != nil {
 		fail("login: %v", err)
@@ -192,6 +196,10 @@ func (b *bot) terrainArrived(x, z int32) {
 var typedAddress = flag.String("address", "127.0.0.1:19190", "the address the client says the player typed (its ServerAddress), for forced hosts")
 
 var runCmds = flag.String("cmds", "", "comma-separated commands to run (without /) on the last server, logging the replies")
+
+var chunkRadius = flag.Int("radius", 8, "chunk radius the client asks for (BDS leaves chunks to a client-side generating client only above 8)")
+
+var clientGen = flag.Bool("clientgen", false, "log in as a client that can build chunks itself (CompatibleWithClientSideChunkGen, view distance 96, memory tier 4), as a PC client does")
 
 var doneDelay = flag.Duration("donedelay", 0, "wait this long before confirming a dimension change")
 
@@ -417,8 +425,8 @@ func (b *bot) handle(pk packet.Packet) {
 		b.runtimeID = pk.EntityRuntimeID
 		b.palette, b.paletteErr = names, err
 		b.mu.Unlock()
-		b.log.Info("start game", "runtimeID", pk.EntityRuntimeID, "customBlocks", len(pk.Blocks), "paletteSize", len(names), "experiments", len(pk.Experiments))
-		_ = b.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: 8, MaxChunkRadius: 8})
+		b.log.Info("start game", "runtimeID", pk.EntityRuntimeID, "customBlocks", len(pk.Blocks), "paletteSize", len(names), "experiments", len(pk.Experiments), "clientSideGeneration", pk.ClientSideGeneration, "generator", pk.Generator, "seed", pk.WorldSeed)
+		_ = b.c.WritePacket(&packet.RequestChunkRadius{ChunkRadius: int32(*chunkRadius), MaxChunkRadius: uint8(*chunkRadius)})
 	case *packet.PlayStatus:
 		if pk.Status == packet.PlayStatusPlayerSpawn {
 			b.mu.Lock()

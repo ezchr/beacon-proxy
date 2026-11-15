@@ -331,6 +331,13 @@ func (t tomlConfig) parseServers() ([]bridge.ServerConfig, []string, error) {
 			default:
 				return nil, nil, fmt.Errorf(`server %s: resource-packs: use true, false or "on-join"`, name)
 			}
+			switch g := v["client-side-generation"].(type) {
+			case nil:
+			case bool:
+				s.ClientSideGeneration = g
+			default:
+				return nil, nil, fmt.Errorf("server %s: client-side-generation: use true or false", name)
+			}
 			if e, ok := v["encryption"].(bool); ok && !e {
 				s.NoEncryption = true
 			}

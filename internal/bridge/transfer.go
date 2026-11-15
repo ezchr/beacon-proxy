@@ -118,7 +118,7 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 		return
 	}
 	s.message("<grey>Connecting you to %s...</grey>", server.Name)
-	l, err := s.openLink(server)
+	l, err := s.openLink(server, false)
 	if err == nil {
 		select {
 		case <-l.started:
@@ -154,6 +154,9 @@ func (s *switchSession) switchTo(server ServerConfig, reason string) {
 // s.switchMu held.
 func (s *switchSession) moveWithLink(l *link, server ServerConfig, start time.Time, answered time.Duration) bool {
 	sg := l.startGame
+	if sg.ClientSideGeneration && !strings.EqualFold(server.Name, s.loginServer) {
+		s.log.Warn("network: the server leaves its far chunks to the client, which has another server's world: they stay empty", "server", server.Name, "joinedOn", s.loginServer)
+	}
 	bp, bm, perr := s.n.serverPalette(sg.Blocks, s.palette, sg.UseBlockNetworkIDHashes)
 	s.mu.Lock()
 	old := s.cur

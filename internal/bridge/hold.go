@@ -475,7 +475,7 @@ func (s *switchSession) reattach(h *holdState) holdResult {
 	}
 	h.tries.Add(1)
 	start := time.Now()
-	l, err := s.openLink(*server)
+	l, err := s.openLink(*server, false)
 	if err == nil {
 		select {
 		case <-l.started:

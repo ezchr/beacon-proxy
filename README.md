@@ -102,6 +102,7 @@ survival = { address = "127.0.0.1:19134", forwarding = "endstone" }
 | `protocols` | the game versions (protocol numbers) the server takes, e.g. `[2193]`; leave it out for every version Beacon serves |
 | `native` | newer versions the server speaks itself; players on the other versions it takes are translated by Beacon |
 | `hold` | how long to keep the server's players on Beacon while it restarts, e.g. `"90s"` ([below](#holding-players-while-a-server-restarts)); leave it out to move them to another server at once |
+| `client-side-generation` | `true` lets players who join to go to this BDS server build its far chunks themselves (`client-side-chunk-generation-enabled`); left out, Beacon tells it no player can, and it sends every chunk, so players moving there from another server see its world |
 | `hold-message`, `hold-reasons` | the title held players see, and more kick messages that mean the server is restarting ([below](#holding-players-while-a-server-restarts)) |
 
 ### TCP for servers on the same machine

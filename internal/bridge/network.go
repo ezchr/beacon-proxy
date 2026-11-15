@@ -159,6 +159,11 @@ type ServerConfig struct {
 	// Allowed (allowed = ["xuid", ...] in beacon.toml) are the only players who may join the server;
 	// empty: anyone.
 	Allowed []string `json:"allowed,omitempty"`
+	// ClientSideGeneration (client-side-generation = true in beacon.toml) lets the players who join
+	// Beacon to go to this server build its far chunks themselves, for a BDS server with
+	// client-side-chunk-generation-enabled. Every other login to it (a move from another server)
+	// says the client can't, and gets all its chunks. See clientgen.go.
+	ClientSideGeneration bool `json:"client_side_generation,omitempty"`
 }
 
 // Allows reports whether the player of xuid may join the server.
