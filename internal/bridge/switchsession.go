@@ -800,7 +800,8 @@ func (s *switchSession) readBackend(l *link, first bool) {
 			case packet.IDDisconnect:
 				var pk packet.Disconnect
 				_ = decodeInto(&pk, payload)
-				l.err = &kickError{msg: pk.Message}
+				l.err = &kickError{msg: pk.Message, code: pk.Reason}
+				s.log.Info("network: server sent a disconnect", "server", l.server.Name, "reasonCode", pk.Reason, "message", text.Clean(pk.Message))
 				return
 			case packet.IDPlayStatus:
 				var pk packet.PlayStatus
@@ -829,7 +830,10 @@ func (s *switchSession) readBackend(l *link, first bool) {
 	}
 }
 
-type kickError struct{ msg string }
+type kickError struct {
+	msg  string
+	code int32 // the Disconnect packet's reason (packet.DisconnectReasonXxx)
+}
 
 func (k *kickError) Error() string { return "kicked: " + text.Clean(k.msg) }
 
