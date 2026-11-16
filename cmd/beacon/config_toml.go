@@ -65,7 +65,7 @@ type tomlConfig struct {
 		Moderators     []string `toml:"moderators"`
 		Protected      []string `toml:"protected"`
 		AcceptFriends  *bool    `toml:"accept-friends"`
-		ListingToggle  bool     `toml:"listing-toggle"`
+		ListingToggle  *bool    `toml:"listing-toggle"`
 		AllowedXUIDs   []string `toml:"allowed-xuids"`
 		UpdateInterval int      `toml:"update-interval-seconds"`
 		Server         string   `toml:"server"`
@@ -166,7 +166,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.Moderators = t.Broadcast.Moderators
 	cfg.Protected = t.Broadcast.Protected
 	cfg.NoFriendAccept = t.Broadcast.AcceptFriends != nil && !*t.Broadcast.AcceptFriends
-	cfg.ListingToggle = t.Broadcast.ListingToggle
+	cfg.ListingToggle = t.Broadcast.ListingToggle == nil || *t.Broadcast.ListingToggle // on unless turned off
 	cfg.AllowedXUIDs = t.Broadcast.AllowedXUIDs
 	cfg.FirstServer = t.Broadcast.Server
 	pc, err := playerCountMode(t.Broadcast.PlayerCount)

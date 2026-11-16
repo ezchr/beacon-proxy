@@ -30,11 +30,13 @@ show-max-players = {{.ShowMaxPlayers}}
 ping-passthrough = "off"
 
 [servers]
-# Your servers, as name = "host:port".
-# survival = { address = "127.0.0.1:19134", forwarding = "endstone", resource-packs = false }
-# Add hold = "90s" to keep a server's players on Beacon while it restarts, instead of moving them.
-# resource-packs = "on-join" gives a server's resource packs only to players going there: they join
-# again to download them when they move to it.
+# Your servers, as name = "host:port", or a table with options:
+# survival = { address = "127.0.0.1:19134", forwarding = "endstone", resource-packs = "on-join", hold = "90s" }
+#   forwarding      how it learns the player's XUID: left out (Beacon signs it) | "endstone" (Endstone 0.12+)
+#   resource-packs  true: downloaded on joining the network | false: never sent | "on-join": downloaded on joining that server
+#   hold            "90s"
+#   transport       "nethernet" | "raknet" | "tcp"
+#   allowed         ["xuid", ...]
 {{- range .Servers}}
 {{- if or .Transport .Forwarding .NoPacks .PacksOnJoin}}
 {{.Name}} = { address = {{q .Address}}{{if .Transport}}, transport = {{q .Transport}}{{end}}{{if .Forwarding}}, forwarding = {{q .Forwarding}}{{end}}{{if .NoPacks}}, resource-packs = false{{else if .PacksOnJoin}}, resource-packs = "on-join"{{end}} }
@@ -66,10 +68,8 @@ moderators = []
 # Accept friend requests automatically.
 accept-friends = {{.AcceptFriends}}
 
-# Let admins hide the world with /broadcast off.
-listing-toggle = {{.ListingToggle}}
-
-# Player count shown: "world", "server" or "network".
+# Player count the Friends-tab world shows: "world" (players who joined through this world),
+# "server" (players on its server) or "network" (everyone on all your servers).
 player-count = {{q (or .PlayerCount "world")}}
 
 # Server this world's players join first. Empty: try.
@@ -121,10 +121,11 @@ packet-window = 7
 packet-burst = 4
 sessions-per-ip = 0
 
-# Show this player count instead of the real one. 0: off.
+# Show this player count on the Friends tab instead of the real one. 0: off.
 fake-player-count = {{.FakePlayerCount}}
 
-# Or a count that wanders between min and max. max = 0: off.
+# Or a Friends-tab count that wanders between min and max, moving by at most max-step at each
+# update (every 30 s). Example: { min = 16, max = 26, max-step = 2 }. max = 0: off.
 fake-player-drift = {{with .FakePlayerDrift}}{ min = {{.Min}}, max = {{.Max}}, max-step = {{.MaxStep}} }{{else}}{ min = 0, max = 0, max-step = 1 }{{end}}
 {{- if .DisableClientEncryption}}
 disable-client-encryption = true
