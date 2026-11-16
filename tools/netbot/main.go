@@ -153,7 +153,8 @@ type bot struct {
 	counts     map[string]int
 	spawned    bool
 	runtimeID  uint64
-	palette    []string // runtime id -> block name, from the client's StartGame
+	palette    []string         // runtime id -> block name, from the client's StartGame
+	blockIDs   map[string]int64 // StartGame's custom blocks: name -> vanilla_block_data block_id
 	itemNames  map[int32]string
 	mismatch   map[string]int // item -> block its stacks point at, when the block isn't the item's own
 	paletteErr error
@@ -260,6 +261,14 @@ func (b *bot) report(stage string) {
 	if len(top) > 8 {
 		top = top[:8]
 	}
+	var custom []kv
+	for k, v := range b.chunkNames {
+		if !strings.HasPrefix(k, "minecraft:") {
+			custom = append(custom, kv{k, v})
+		}
+	}
+	sort.Slice(custom, func(i, j int) bool { return custom[i].k < custom[j].k })
+	fmt.Printf("CUSTOMCHUNK %s: %d custom block kinds in chunk palettes: %v\n", stage, len(custom), custom)
 	fmt.Printf("== %s\n packets:%s\n dimension changes: %v\n chunk blocks (top): %v\n palette ids outside the client palette: %d\n messages: %q\n",
 		stage, sb.String(), b.dims, top, b.badIDs, b.messages)
 }
@@ -319,6 +328,22 @@ func (b *bot) handle(pk packet.Packet) {
 			f.Close()
 		}
 		b.mu.Lock()
+		// A block item numbered below 256 is the block with legacy id 255-id to the client: it
+		// must be the block of the item's own name, or the item draws as another block.
+		legacyOK, legacyBad := 0, 0
+		for _, it := range pk.Items {
+			id, ok := b.blockIDs[it.Name]
+			if !ok || it.RuntimeID >= 0 || id < 10000 {
+				continue
+			}
+			if int64(255-int64(it.RuntimeID)) == id {
+				legacyOK++
+			} else {
+				legacyBad++
+				fmt.Printf("LEGACYID item %s id=%d -> block_id %d, but the block has %d\n", it.Name, it.RuntimeID, 255-int64(it.RuntimeID), id)
+			}
+		}
+		fmt.Printf("LEGACYCHECK custom block items: %d match their block, %d do not\n", legacyOK, legacyBad)
 		b.itemNames = map[int32]string{}
 		for _, it := range pk.Items {
 			b.itemNames[int32(it.RuntimeID)] = it.Name
@@ -416,6 +441,21 @@ func (b *bot) handle(pk packet.Packet) {
 		fmt.Println("PACK STACK", st)
 		_ = b.c.WritePacket(&packet.ResourcePackClientResponse{Response: packet.PackResponseCompleted})
 	case *packet.StartGame:
+		b.mu.Lock()
+		b.blockIDs = map[string]int64{}
+		for _, blk := range pk.Blocks {
+			if v, ok := blk.Properties["vanilla_block_data"].(map[string]any); ok {
+				switch n := v["block_id"].(type) {
+				case int32:
+					b.blockIDs[blk.Name] = int64(n)
+				case int64:
+					b.blockIDs[blk.Name] = n
+				case int16:
+					b.blockIDs[blk.Name] = int64(n)
+				}
+			}
+		}
+		b.mu.Unlock()
 		if f, err := os.Create("/tmp/netbot_startgame_blocks.json"); err == nil {
 			_ = json.NewEncoder(f).Encode(pk.Blocks)
 			f.Close()
@@ -557,7 +597,7 @@ func (b *bot) handle(pk packet.Packet) {
 			_ = b.c.WritePacket(&packet.SubChunkRequest{
 				Dimension: pk.Dimension,
 				Position:  protocol.SubChunkPos{pk.Position[0], 0, pk.Position[1]},
-				Offsets:   []protocol.SubChunkOffset{{0, -4, 0}, {0, 0, 0}, {0, 4, 0}},
+				Offsets:   allSubChunks,
 			})
 			return
 		}
@@ -611,6 +651,15 @@ func (b *bot) handle(pk packet.Packet) {
 }
 
 var _ = nethernet.Identity{}
+
+// allSubChunks asks for every sub-chunk of an overworld column (-64 to 319), as a client does.
+var allSubChunks = func() []protocol.SubChunkOffset {
+	var o []protocol.SubChunkOffset
+	for y := int8(-4); y < 20; y++ {
+		o = append(o, protocol.SubChunkOffset{0, y, 0})
+	}
+	return o
+}()
 
 // checkItem records custom items whose stacks point at a block other than their own, and items
 // the client's item list doesn't have.
