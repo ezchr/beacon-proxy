@@ -95,3 +95,44 @@ func TestCustomBlockTraitsAddStates(t *testing.T) {
 		t.Fatalf("a placement_position block_face trait gives 6 states, got %d", len(states))
 	}
 }
+
+// A server numbering by network hashes (BDS with block-network-ids-are-hashes) hashes its add-on
+// blocks' states too: they map to the union's ids and back, instead of to air.
+func TestHashedPaletteNumbersCustomBlocks(t *testing.T) {
+	blocks := []protocol.BlockEntry{
+		{Name: "oresplus:viocrite_bricks", Properties: map[string]any{}},
+		{Name: "oresplus:rose_quartz_pillar", Properties: map[string]any{
+			"traits": []any{map[string]any{"name": "minecraft:placement_position",
+				"enabled_states": map[string]any{"block_face": uint8(1), "vertical_half": uint8(0)}}},
+		}},
+	}
+	server, err := newHashedBlockPalette(blocks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	union, err := newBlockPalette(blocks)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := newBlockMap(server, union)
+	for _, c := range []struct {
+		name  string
+		props map[string]any
+	}{
+		{"oresplus:viocrite_bricks", map[string]any{}},
+		{"oresplus:rose_quartz_pillar", map[string]any{"minecraft:block_face": "east"}},
+		{"minecraft:stone", map[string]any{}},
+	} {
+		h := networkBlockHash(c.name, c.props)
+		want, ok := union.index[blockState{Name: c.name, Properties: encodeProperties(c.props)}]
+		if !ok {
+			t.Fatalf("%s %v not in the union palette", c.name, c.props)
+		}
+		if got := m.forward(h); got != want {
+			t.Errorf("%s %v: hash %#x maps to %v, want %v", c.name, c.props, h, union.states[got], union.states[want])
+		}
+		if back := m.reverse(want); back != h {
+			t.Errorf("%s %v: maps back to %#x, want %#x", c.name, c.props, back, h)
+		}
+	}
+}

@@ -768,6 +768,11 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 	seenExp := map[string]bool{}
 	itemByName := map[string]bool{}
 	itemByID := map[int16]string{}
+	// blockServer is the place in the server order of the server each of u.blocks came from, and
+	// legacyItem the items numbered below 0 on their server (BDS's add-on block items: 255 - the
+	// block's id), which follow their block's union number (blockids.go).
+	var blockServer []int
+	legacyItem := map[string]bool{}
 	// blocklessItem is where an item sits in u.items that its server sent without a block of the
 	// same name (pvp's geyser_custom:player_skull_* heads).
 	blocklessItem := map[string]int{}
@@ -840,6 +845,7 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 			if !seenBlock[b.Name] {
 				seenBlock[b.Name] = true
 				u.blocks = append(u.blocks, b)
+				blockServer = append(blockServer, i)
 			}
 		}
 		for _, e := range c.StartGame.Experiments {
@@ -861,6 +867,7 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 					}
 					continue
 				}
+				legacyItem[it.Name] = it.RuntimeID < 0
 				if other, ok := itemByID[it.RuntimeID]; ok {
 					n.Log.Info("network: two servers number different items the same, this one gets a free number",
 						"server", s.Name, "item", it.Name, "id", it.RuntimeID, "other", other, "now", nextItemID)
@@ -906,7 +913,8 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 		return nil, err
 	}
 	u.actors = &packet.AvailableActorIdentifiers{SerialisedEntityIdentifiers: b}
-	u.blocks = uniqueBlockIDs(u.blocks) // see blockids.go
+	ids := uniqueBlockIDs(u.blocks, blockServer) // see blockids.go
+	blockItemIDs(u.items.Items, ids, legacyItem, nextItemID)
 	if u.palette, err = newBlockPalette(u.blocks); err != nil {
 		return nil, err
 	}

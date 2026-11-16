@@ -101,7 +101,7 @@ type blockPalette struct {
 	// vanilla is the number of vanilla states, which differs between protocol versions.
 	vanilla int
 	// hashes, for a server with block network id hashes on, is the network hash of each state: its
-	// id on that server. Custom states have none (0xffffffff) and come out as air.
+	// id on that server. A state without one (0xffffffff) comes out as air.
 	hashes []uint32
 
 	namesOnce sync.Once
@@ -144,16 +144,35 @@ func newBlockPaletteFor(blocks []protocol.BlockEntry, proto int32) (*blockPalett
 	return p, nil
 }
 
-// newHashedBlockPalette is newBlockPalette for a server with block network id hashes on: the same
-// states, numbered by their network hashes.
+// newHashedBlockPalette is newBlockPalette for a server with block network id hashes on (BDS with
+// block-network-ids-are-hashes, a world a Bedrock client hosts): the same states, numbered by their
+// network hashes. The server hashes its add-on blocks' states the same way as vanilla ones: without
+// them every add-on block came out as air (invisible, and gone again right after placing one).
 func newHashedBlockPalette(blocks []protocol.BlockEntry) (*blockPalette, error) {
 	p, err := newBlockPalette(blocks)
 	if err != nil {
 		return nil, err
 	}
+	custom := map[blockState]uint32{}
+	_, names := vanillaFor(0)
+	for _, b := range blocks {
+		if names[b.Name] {
+			continue
+		}
+		perms, err := customBlockStateProps(b)
+		if err != nil {
+			return nil, fmt.Errorf("custom block %s: %w", b.Name, err)
+		}
+		for _, props := range perms {
+			custom[blockState{Name: b.Name, Properties: encodeProperties(props)}] = networkBlockHash(b.Name, props)
+		}
+	}
 	p.hashes = make([]uint32, len(p.states))
 	for i, s := range p.states {
 		h, ok := vanillaHashes[s]
+		if !ok {
+			h, ok = custom[s]
+		}
 		if !ok {
 			h = 0xffffffff
 		}
@@ -237,6 +256,20 @@ func networkBlockHash(name string, properties map[string]any) uint32 {
 // them, matching the client). Property values come as whatever NBT list type the server used
 // (strings, ints, bytes for booleans).
 func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
+	perms, err := customBlockStateProps(b)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]blockState, len(perms))
+	for i, props := range perms {
+		out[i] = blockState{Name: b.Name, Properties: encodeProperties(props)}
+	}
+	return out, nil
+}
+
+// customBlockStateProps is customBlockStates with each state's properties as their NBT values (what
+// the network hash of a state is made of).
+func customBlockStateProps(b protocol.BlockEntry) ([]map[string]any, error) {
 	props, _ := b.Properties["properties"].([]any)
 	type prop = blockProp
 	var ps []prop
@@ -256,13 +289,13 @@ func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
 	// numbers like declared properties: without them every block sorted after is off.
 	ps = append(ps, traitProps(b)...)
 	if len(ps) == 0 {
-		return []blockState{{Name: b.Name, Properties: encodeProperties(nil)}}, nil
+		return []map[string]any{{}}, nil
 	}
 	total := 1
 	for _, p := range ps {
 		total *= len(p.values)
 	}
-	out := make([]blockState, 0, total)
+	out := make([]map[string]any, 0, total)
 	for i := 0; i < total; i++ {
 		cur := make(map[string]any, len(ps))
 		idx := i
@@ -270,7 +303,7 @@ func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
 			cur[p.name] = p.values[idx%len(p.values)]
 			idx /= len(p.values)
 		}
-		out = append(out, blockState{Name: b.Name, Properties: encodeProperties(cur)})
+		out = append(out, cur)
 	}
 	return out, nil
 }
