@@ -326,18 +326,78 @@ var traitStates = map[string][]blockProp{
 	},
 }
 
+// multiBlockTrait is the trait of a block made of several parts (a curtain two blocks high): its
+// state minecraft:multi_block_part numbers the parts from 0, as many as the trait's part_count.
+const multiBlockTrait = "minecraft:multi_block"
+
+func traitOn(v any) bool { return v != nil && fmt.Sprint(v) != "0" && fmt.Sprint(v) != "false" }
+
 // traitProps lists the states a custom block's traits enable ("traits" in its StartGame entry).
 func traitProps(b protocol.BlockEntry) []blockProp {
-	var out []blockProp
+	out, _ := traitPropsKnown(b)
+	return out
+}
+
+// traitPropsKnown is traitProps and the enabled trait states the relay has no values for
+// ("trait/state"). Each of those is a state the client counts and the relay does not: the block
+// has too few states here, and every block numbered after it is off.
+func traitPropsKnown(b protocol.BlockEntry) (out []blockProp, unknown []string) {
 	for _, t := range anySlice(b.Properties["traits"]) {
 		m, _ := t.(map[string]any)
 		name, _ := m["name"].(string)
 		enabled, _ := m["enabled_states"].(map[string]any)
+		known := map[string]bool{}
+		if name == multiBlockTrait {
+			known["multi_block"], known["multi_block_part"] = true, true
+			if traitOn(enabled["multi_block"]) || traitOn(enabled["multi_block_part"]) {
+				n := 0
+				switch c := m["part_count"].(type) {
+				case int32:
+					n = int(c)
+				case int64:
+					n = int(c)
+				case uint8:
+					n = int(c)
+				case int16:
+					n = int(c)
+				}
+				if n < 1 || n > 64 {
+					unknown = append(unknown, name+"/part_count")
+					continue
+				}
+				parts := make([]any, n)
+				for i := range parts {
+					parts[i] = int32(i)
+				}
+				out = append(out, blockProp{"minecraft:multi_block_part", parts})
+			}
+		}
 		for _, st := range traitStates[name] {
 			short := st.name[len("minecraft:"):]
-			if on, ok := enabled[short]; ok && fmt.Sprint(on) != "0" && fmt.Sprint(on) != "false" {
+			known[short] = true
+			if traitOn(enabled[short]) {
 				out = append(out, st)
 			}
+		}
+		for short, on := range enabled {
+			if traitOn(on) && !known[short] {
+				unknown = append(unknown, name+"/"+short)
+			}
+		}
+	}
+	sort.Strings(unknown)
+	return out, unknown
+}
+
+// UnknownBlockTraits lists, for a server's custom blocks, the enabled trait states the relay cannot
+// number ("trait/state" -> how many blocks use it). Not empty means blocks will look wrong on
+// that server, and on every server when players have its blocks too.
+func UnknownBlockTraits(blocks []protocol.BlockEntry) map[string]int {
+	out := map[string]int{}
+	for _, b := range blocks {
+		_, unknown := traitPropsKnown(b)
+		for _, u := range unknown {
+			out[u]++
 		}
 	}
 	return out

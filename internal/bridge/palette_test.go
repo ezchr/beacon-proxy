@@ -136,3 +136,31 @@ func TestHashedPaletteNumbersCustomBlocks(t *testing.T) {
 		}
 	}
 }
+
+// TestMultiBlockTrait: a multi_block trait adds a part state, one value per part, and a trait
+// state the relay does not know is reported instead of being left out silently.
+func TestMultiBlockTrait(t *testing.T) {
+	curtain := protocol.BlockEntry{Name: "x:curtain", Properties: map[string]any{
+		"properties": []any{map[string]any{"name": "x:open", "enum": []any{uint8(0), uint8(1)}}},
+		"traits": []any{
+			map[string]any{"name": "minecraft:placement_direction", "enabled_states": map[string]any{"cardinal_direction": uint8(1), "facing_direction": uint8(0)}},
+			map[string]any{"name": "minecraft:multi_block", "enabled_states": map[string]any{"multi_block": uint8(1)}, "part_count": int32(2), "direction": int32(1)},
+		},
+	}}
+	states, err := customBlockStates(curtain)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(states) != 2*4*2 {
+		t.Fatalf("open x 4 directions x 2 parts = 16 states, got %d", len(states))
+	}
+	if u := UnknownBlockTraits([]protocol.BlockEntry{curtain}); len(u) != 0 {
+		t.Fatalf("unknown traits %v", u)
+	}
+	odd := protocol.BlockEntry{Name: "x:odd", Properties: map[string]any{
+		"traits": []any{map[string]any{"name": "minecraft:placement_direction", "enabled_states": map[string]any{"sixteen_way_rotation": uint8(1)}}},
+	}}
+	if u := UnknownBlockTraits([]protocol.BlockEntry{odd, curtain}); u["minecraft:placement_direction/sixteen_way_rotation"] != 1 {
+		t.Fatalf("the unknown trait state is not reported: %v", u)
+	}
+}

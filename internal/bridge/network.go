@@ -488,7 +488,15 @@ func (n *Network) record(server string, id uint32, payload []byte) bool {
 	}
 	c.set(id, payload)
 	n.contentGen++
+	var badTraits map[string]int
+	if id == packet.IDStartGame && c.StartGame != nil {
+		badTraits = UnknownBlockTraits(c.StartGame.Blocks)
+	}
 	n.mu.Unlock()
+	for trait, blocks := range badTraits {
+		n.Log.Warn("network: this server has custom blocks with a trait state the relay cannot number: blocks will look wrong, on every server for players who have its blocks. Update Beacon, or take the blocks or the server out",
+			"server", server, "trait", trait, "blocks", blocks)
+	}
 	_ = os.MkdirAll(filepath.Dir(path), 0o755)
 	if err := os.WriteFile(path, payload, 0o644); err != nil {
 		n.Log.Warn("network: could not cache server content", "server", server, "file", file, "err", err)
