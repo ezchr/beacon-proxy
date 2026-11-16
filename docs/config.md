@@ -32,7 +32,7 @@ player whose server stops is moved to the next one. Default: the first server.
 | `address` | `"host:port"` | required | where Beacon reaches the server |
 | `transport` | `"nethernet"` \| `"raknet"` \| `"tcp"` | `"nethernet"` | raknet: a server that only speaks RakNet. tcp: a Dragonfly server on the same machine listening on TCP |
 | `forwarding` | left out \| `"endstone"` | left out | how the server learns the player's XUID. Left out: Beacon signs it into the login (Dragonfly, Geyser, xuidforward). `"endstone"`: Endstone 0.12+ ([setup](../README.md#endstone-012-and-newer)) |
-| `resource-packs` | `true` \| `false` \| `"on-join"` | `true` | true: downloaded on joining the network. false: never sent (its custom blocks show without textures unless another server sends the same pack). `"on-join"`: downloaded on joining this server; players rejoin once (set `rejoin-address`) |
+| `resource-packs` | `true` \| `false` \| `"on-join"` | `true` | true: downloaded on joining the network. false: never sent (its custom blocks show without textures unless another server sends the same pack). `"on-join"`: downloaded on joining this server, together with its custom blocks and items, which other players then never get; players rejoin once (set `rejoin-address`) |
 | `hold` | `"90s"` (5s to 10m) | off | keep the server's players on Beacon while it restarts, instead of moving them |
 | `hold-message` | text | `"Server restarting, hold on..."` | title held players see |
 | `hold-reasons` | `["text", ...]` | built in | more kick messages that mean the server is restarting |

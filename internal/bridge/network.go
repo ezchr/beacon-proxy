@@ -145,8 +145,9 @@ type ServerConfig struct {
 	NoPacks bool `json:"no_packs,omitempty"`
 	// PacksOnJoin (resource-packs = "on-join" in beacon.toml) keeps the server's resource packs out
 	// of what players get at their join, unless they join to go to this server: a player moving
-	// there without them joins again (transferred to RejoinAddress) to download them. Its blocks and
-	// items are in the union for everyone, as with NoPacks.
+	// there without them joins again (transferred to RejoinAddress) to download them. Its custom
+	// blocks, items and entities stay out with the packs: a player gets them at the join that is
+	// for this server, so what one such server has (or gets wrong) changes nothing on the others.
 	PacksOnJoin bool `json:"packs_on_join,omitempty"`
 	// Forwarding "endstone" (ForwardingEndstone) signs logins to the server for Endstone 0.12's
 	// [proxies.endgate], which gives it the player's real XUID and address with no plugin.
@@ -557,8 +558,14 @@ func (n *Network) packRejoinNeeded(server ServerConfig, have string) bool {
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	c := n.content[server.Name]
-	if c == nil || c.PacksInfo == nil {
-		return false // nothing known of its packs yet: joining again would give the client nothing
+	if c == nil {
+		return false // nothing known of it yet: joining again would give the client nothing
+	}
+	if c.StartGame != nil && len(c.StartGame.Blocks) > 0 {
+		return true // its custom blocks come with the join for it, like its packs
+	}
+	if c.PacksInfo == nil {
+		return false
 	}
 	for _, t := range c.PacksInfo.TexturePacks {
 		if n.packs[t.UUID.String()+"_"+t.Version] != nil {
@@ -848,6 +855,12 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 					u.packStack.TexturePacks = append(u.packStack.TexturePacks, t)
 				}
 			}
+		}
+		// An on-join server's own content goes only to the players who joined for it (they
+		// rejoin to get there, packRejoinNeeded): everyone else's block and item lists stay as
+		// they are without it.
+		if s.PacksOnJoin && !s.NoPacks && !strings.EqualFold(s.Name, variant) {
+			continue
 		}
 		for _, b := range c.StartGame.Blocks {
 			if !seenBlock[b.Name] {

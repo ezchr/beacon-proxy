@@ -73,8 +73,9 @@ func packIDs(u *union) []string {
 	return out
 }
 
-// The base union leaves the on-join servers' packs out; a login headed to one gets its packs, and
-// only its. Blocks are the same in every variant (the client's palette does not depend on it).
+// The base union leaves the on-join servers' packs out, and their custom blocks with them; a login
+// headed to one gets its packs and blocks, and only its. So a block list of one on-join server
+// cannot change how the others' blocks are numbered.
 func TestUnionVariants(t *testing.T) {
 	n := packsNetwork(t)
 	base := unionPacks(t, n, "")
@@ -89,12 +90,22 @@ func TestUnionVariants(t *testing.T) {
 	if got, want := packIDs(sky), []string{kitsPack.String(), skygenPack.String()}; !slices.Equal(got, want) {
 		t.Errorf("skygen union packs %v, want %v", got, want)
 	}
-	if len(base.blocks) != len(lulu.blocks) || len(base.blocks) != len(sky.blocks) || len(base.palette.states) != len(lulu.palette.states) {
-		t.Errorf("variants differ in blocks: %d %d %d", len(base.blocks), len(lulu.blocks), len(sky.blocks))
+	has := func(u *union, name string) bool {
+		return slices.ContainsFunc(u.blocks, func(b protocol.BlockEntry) bool { return b.Name == name+":block" })
 	}
-	for _, name := range []string{"kits", "lulu", "skygen", "old"} {
-		if !slices.ContainsFunc(base.blocks, func(b protocol.BlockEntry) bool { return b.Name == name+":block" }) {
-			t.Errorf("base union lacks %s's block", name)
+	for _, c := range []struct {
+		u     *union
+		which string
+		want  map[string]bool
+	}{
+		{base, "base", map[string]bool{"kits": true, "old": true, "lulu": false, "skygen": false}},
+		{lulu, "lulu", map[string]bool{"kits": true, "old": true, "lulu": true, "skygen": false}},
+		{sky, "skygen", map[string]bool{"kits": true, "old": true, "lulu": false, "skygen": true}},
+	} {
+		for name, want := range c.want {
+			if has(c.u, name) != want {
+				t.Errorf("%s union has %s's block: %v, want %v", c.which, name, !want, want)
+			}
 		}
 	}
 	// A server that is not on-join (or unknown) is the base variant, and shares its cache.
@@ -119,8 +130,8 @@ func TestUnionVariants(t *testing.T) {
 	}
 }
 
-// A move to an on-join server takes a join again only for a client without its packs, and only when
-// the relay has packs of it to give.
+// A move to an on-join server takes a join again only for a client that did not join for it: its
+// packs and its custom blocks come with that join.
 func TestPackRejoinNeeded(t *testing.T) {
 	n := packsNetwork(t)
 	lulu, sky, kits, old := *n.server("lulu"), *n.server("skygen"), *n.server("kits"), *n.server("old")
@@ -141,9 +152,17 @@ func TestPackRejoinNeeded(t *testing.T) {
 			t.Errorf("to %s with %q: %v, want %v", c.to.Name, c.have, got, c.want)
 		}
 	}
+	// Without its packs downloaded the join again still brings its custom blocks.
 	delete(n.packs, luluPack.String()+"_1.0.0")
+	if !n.packRejoinNeeded(lulu, "") {
+		t.Error("no join again for a server whose custom blocks the client lacks")
+	}
+	// A server with neither packs to give nor custom blocks needs none.
+	n.mu.Lock()
+	n.content["lulu"].StartGame.Blocks = nil
+	n.mu.Unlock()
 	if n.packRejoinNeeded(lulu, "") {
-		t.Error("a join again for packs the relay does not have")
+		t.Error("a join again for a server with nothing to give")
 	}
 }
 
