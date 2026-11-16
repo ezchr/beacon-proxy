@@ -74,7 +74,8 @@ of a broken join.
   comment), in `dcblock/block.txt` to turn away joins
   from hosting providers, such as scanners on rented servers; `dcblock/allow.txt` lets ranges
   through anyway (Microsoft's, for example, which Xbox relays use). Every join attempt is logged in
-  `dcblock/joins.log`. With no lists, nobody is blocked. `BEACON_DCBLOCK_DIR` moves the folder.
+  `dcblock/joins.log`. With no lists, nobody is blocked. `dcblock/allow_xuids.txt` lets the players
+  listed in it (XUIDs, one a line) join from any network. `BEACON_DCBLOCK_DIR` moves the folder.
 - **Allow list.** `allowed-xuids` under `[broadcast]` lets only those Xbox accounts join.
 - **Rate limits** (under `[advanced]`, off by default): `login-ratelimit` is the least time in
   milliseconds between two joins from one IP address, `packets-per-second` the most packets a
