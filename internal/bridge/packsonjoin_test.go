@@ -262,3 +262,17 @@ func TestMoveAwayPrefersServersWithoutRejoin(t *testing.T) {
 		t.Errorf("with lulu's packs: %v", got)
 	}
 }
+
+// TestUnionPackSizeIsDownload checks that the pack list shows the size of what Beacon sends (the
+// zip), not the unpacked folder size BDS lists, which the client shows in its download prompt.
+func TestUnionPackSizeIsDownload(t *testing.T) {
+	n := packsNetwork(t)
+	key := kitsPack.String() + "_1.0.0"
+	n.packs[key] = &cachedPack{data: make([]byte, 1234)}
+	n.content["kits"].PacksInfo.TexturePacks[0].Size = 999999
+	for _, p := range unionPacks(t, n, "").packsInfo.TexturePacks {
+		if p.UUID == kitsPack && p.Size != 1234 {
+			t.Errorf("pack shown with %d bytes, want the 1234 downloaded", p.Size)
+		}
+	}
+}

@@ -830,6 +830,9 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 				}
 				seenPack[t.UUID.String()] = true
 				t.DownloadURL = ""
+				// BDS lists a pack with the size of its unpacked folder; the client shows that
+				// in the download prompt. Beacon sends the zip, so show what is downloaded.
+				t.Size = uint64(len(n.packs[key].data))
 				u.packsInfo.TexturePacks = append(u.packsInfo.TexturePacks, t)
 			}
 		}
