@@ -37,6 +37,9 @@ ping-passthrough = "off"
 #   hold            "90s"
 #   transport       "nethernet" | "raknet" | "tcp"
 #   allowed         ["xuid", ...]
+#   hold-message    "Restarting, hold on..."   hold-reasons ["maintenance"]
+#   encryption      false (tcp only)            compression false (tcp only)
+#   protocols       [2193]   native [2225]   client-side-generation true
 {{- range .Servers}}
 {{- if or .Transport .Forwarding .NoPacks .PacksOnJoin}}
 {{.Name}} = { address = {{q .Address}}{{if .Transport}}, transport = {{q .Transport}}{{end}}{{if .Forwarding}}, forwarding = {{q .Forwarding}}{{end}}{{if .NoPacks}}, resource-packs = false{{else if .PacksOnJoin}}, resource-packs = "on-join"{{end}} }
@@ -74,6 +77,11 @@ player-count = {{q (or .PlayerCount "world")}}
 
 # Server this world's players join first. Empty: try.
 server = {{q .Server}}
+
+# protected = ["Bot*"]            # names staff can't ban, mute or kick
+# allowed-xuids = ["xuid"]        # only these players may join the network
+# update-interval-seconds = 30    # how often the Friends-tab world is refreshed
+# Another world on another Xbox account: beacon accounts add <name>
 {{- range .Extra}}
 
 # Another world, hosted by another account. Add one with: beacon accounts add <name>
@@ -127,13 +135,14 @@ fake-player-count = {{.FakePlayerCount}}
 # Or a Friends-tab count that wanders between min and max, moving by at most max-step at each
 # update (every 30 s). Example: { min = 16, max = 26, max-step = 2 }. max = 0: off.
 fake-player-drift = {{with .FakePlayerDrift}}{ min = {{.Min}}, max = {{.Max}}, max-step = {{.MaxStep}} }{{else}}{ min = 0, max = 0, max-step = 1 }{{end}}
-{{- if .DisableClientEncryption}}
-disable-client-encryption = true
-{{- end}}
-{{- if .NetworkDir}}
-network-dir = {{q .NetworkDir}}
-{{- end}}
-{{- if .RejoinAddress}}
-# Where players rejoin when a server's packs changed during their join.
-rejoin-address = {{q .RejoinAddress}}
-{{- end}}
+
+# Where players are sent to rejoin, for "on-join" packs. Empty: they're asked to rejoin.
+{{if .RejoinAddress}}rejoin-address = {{q .RejoinAddress}}{{else}}# rejoin-address = "play.example.com:19132"{{end}}
+
+# Rarely needed (docs/config.md):
+# compression = "snappy"           # with players: "snappy" | "flate" | "none"
+# compression-threshold = 256      # bytes; smaller packets aren't compressed
+# protocol = 0                     # with version = "1.26.60": advertise another game version
+# acme-http-address = ":80"        # where Let's Encrypt checks your domain
+{{if .NetworkDir}}network-dir = {{q .NetworkDir}}{{else}}# network-dir = "network"         # cache of your servers' content and packs{{end}}
+{{if .DisableClientEncryption}}disable-client-encryption = true{{else}}# disable-client-encryption = false   # only if a client version can't log in{{end}}
