@@ -244,6 +244,14 @@ func (r *rewriter) special(pk packet.Packet, toClient bool) bool {
 			packet.LevelEventParticlesCrackBlockUp, packet.LevelEventParticlesCrackBlockNorth,
 			packet.LevelEventParticlesCrackBlockSouth, packet.LevelEventParticlesCrackBlockWest,
 			packet.LevelEventParticlesCrackBlockEast:
+			if toClient && r.blocks.hashTo != nil {
+				// A server numbering by network hashes puts the whole 32-bit hash here: cut to 24 bits
+				// it names no block and the client shows no particles.
+				if to, ok := r.blocks.hashTo[uint32(pk.EventData)]; ok {
+					pk.EventData = int32(to)
+					return true
+				}
+			}
 			low := uint32(pk.EventData) & 0xffffff
 			pk.EventData = int32(uint32(pk.EventData)&^0xffffff | r.block(low, toClient)&0xffffff)
 			return true
@@ -256,7 +264,9 @@ func (r *rewriter) special(pk packet.Packet, toClient bool) bool {
 		case packet.SoundEventItemUseOn, packet.SoundEventHit, packet.SoundEventStep, packet.SoundEventBreak,
 			packet.SoundEventPlace, packet.SoundEventHeavyStep, packet.SoundEventFall, packet.SoundEventLand,
 			packet.SoundEventBreakBlock:
-			if pk.ExtraData >= 0 {
+			// -1 is no block. A network hash read as int32 is negative half the time: it is still a
+			// block, and left as it is the client plays a default sound for it.
+			if pk.ExtraData != -1 {
 				pk.ExtraData = int32(r.block(uint32(pk.ExtraData), toClient))
 				return true
 			}
