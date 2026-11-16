@@ -1254,9 +1254,12 @@ func (n *Network) downloadPacks(server string) (changed bool, err error) {
 	defer conn.Close()
 	_ = conn.SetReadDeadline(time.Now().Add(2 * time.Minute))
 
+	// A pack arrives in chunks, each with its place in the file. A server may answer the requests
+	// out of order (BDS does for a big pack), so a chunk goes where it says, not after the last.
 	type pending struct {
 		info   *packet.ResourcePackDataInfo
 		data   []byte
+		have   map[uint32]bool
 		chunks uint32
 	}
 	downloads := map[string]*pending{}
@@ -1306,7 +1309,7 @@ func (n *Network) downloadPacks(server string) (changed bool, err error) {
 				if err := decodeInto(pk, payload); err != nil {
 					return changed, err
 				}
-				downloads[pk.UUID] = &pending{info: pk, data: make([]byte, 0, pk.Size)}
+				downloads[pk.UUID] = &pending{info: pk, data: make([]byte, pk.Size), have: map[uint32]bool{}}
 				for i := uint32(0); i < pk.ChunkCount; i++ {
 					if err := c.WritePacket(&packet.ResourcePackChunkRequest{UUID: pk.UUID, ChunkIndex: int32(i)}); err != nil {
 						return changed, err
@@ -1321,14 +1324,21 @@ func (n *Network) downloadPacks(server string) (changed bool, err error) {
 				if d == nil {
 					continue
 				}
-				d.data = append(d.data, pk.Data...)
+				if d.have[pk.ChunkIndex] {
+					continue
+				}
+				if end := pk.DataOffset + uint64(len(pk.Data)); end > uint64(len(d.data)) {
+					return changed, fmt.Errorf("pack %s: chunk %d ends at %d, past the pack's %d bytes", pk.UUID, pk.ChunkIndex, end, len(d.data))
+				}
+				copy(d.data[pk.DataOffset:], pk.Data)
+				d.have[pk.ChunkIndex] = true
 				d.chunks++
 				if d.chunks < d.info.ChunkCount {
 					continue
 				}
 				sum := sha256.Sum256(d.data)
 				if len(d.info.Hash) > 0 && !bytes.Equal(sum[:], d.info.Hash) {
-					return changed, fmt.Errorf("pack %s: hash mismatch", pk.UUID)
+					return changed, fmt.Errorf("pack %s: hash mismatch (%d bytes in %d chunks)", pk.UUID, len(d.data), d.chunks)
 				}
 				key := pk.UUID
 				if !strings.Contains(key, "_") {
