@@ -75,8 +75,11 @@ func holdable(err error, extra []string) bool {
 	if !errors.As(err, &kick) {
 		return true // no reason given: the connection closed or broke, the server or its process went away
 	}
-	if kick.code == packet.DisconnectReasonShutdown || kick.code == packet.DisconnectReasonRequestServerShutdown {
-		return true // BDS stopping: it kicks everyone with no message, only this reason
+	switch {
+	case kick.code == packet.DisconnectReasonShutdown, kick.code == packet.DisconnectReasonRequestServerShutdown:
+		return true
+	case kick.code == packet.DisconnectReasonHostDisconnected && strings.TrimSpace(kick.msg) == "":
+		return true // BDS 1.26.60 stopping: everyone kicked with no message and this reason
 	}
 	msg := strings.ToLower(text.Clean(kick.msg))
 	for _, w := range holdRestartWords {
