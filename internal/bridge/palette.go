@@ -272,7 +272,12 @@ func customBlockStates(b protocol.BlockEntry) ([]blockState, error) {
 func customBlockStateProps(b protocol.BlockEntry) ([]map[string]any, error) {
 	props, _ := b.Properties["properties"].([]any)
 	type prop = blockProp
-	var ps []prop
+	// The order the game numbers a block's states in, the first changing fastest: the states its
+	// traits add, in the order the entry lists the traits, then its own properties in the order
+	// the entry lists them. Checked against a BDS numbering blocks itself (hashes off): with the
+	// two groups the other way round a block still has the right number of states, but shows as
+	// another of them (a different facing, a different fill level).
+	ps := append([]prop(nil), traitProps(b)...)
 	for _, p := range props {
 		m, ok := p.(map[string]any)
 		if !ok {
@@ -285,9 +290,8 @@ func customBlockStateProps(b protocol.BlockEntry) ([]map[string]any, error) {
 		}
 		ps = append(ps, prop{name, values})
 	}
-	// Traits add states of their own (a BDS add-on's pillar: 6 block faces), which the client
-	// numbers like declared properties: without them every block sorted after is off.
-	ps = append(ps, traitProps(b)...)
+	// (Traits add states of their own, a BDS add-on's pillar: 6 block faces. Without them every
+	// block sorted after is off.)
 	if len(ps) == 0 {
 		return []map[string]any{{}}, nil
 	}
