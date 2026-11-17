@@ -226,7 +226,10 @@ func (j *Conn) handleCallback(ctx context.Context, req *jrpc2.Request) (result a
 			b, _ := json.Marshal(map[string]any{
 				"jsonrpc": "2.0",
 				"method":  "Signaling_DeliveryNotification_V1_0",
+				// messageId names the message this acknowledges: a client that waits for its offer to
+				// be delivered (Cinnabar) matches on it; netherNetId is kept for the ones reading that.
 				"params": map[string]any{
+					"messageId":   msg.ID,
 					"netherNetId": j.outboundNetherNetID(),
 				},
 			})
