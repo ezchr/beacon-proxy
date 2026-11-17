@@ -105,4 +105,5 @@ Another world on another Xbox account. `beacon accounts add <name>` signs it in 
 | `network-dir` | path | `"network"` | cache of your servers' content and packs |
 | `acme-http-address` | `"host:port"` | `":80"` | where Let's Encrypt checks your domain |
 | `disable-client-encryption` | `true` \| `false` | `false` | skip the encryption handshake with players. Only if a client version can't log in |
+| `library-logins` | `"refuse"` \| `"log"` \| `"off"` | `"refuse"` | logins whose client data is a library's default rather than the game's: gophertunnel's (no device model, its blank skin) are refused, PrismarineJS's and Cinnabar's are logged as that client. Connections from Beacon's own machine are never refused |
 | `world-join-nonce` | `true` \| `false` | `true` | a player joining a world from the Friends tab or an invite must have joined the world's Xbox session, as a Minecraft host requires: logins that connect with a world's connection ID read elsewhere (bots with accounts nobody added) are refused. Direct-IP joins aren't affected |

@@ -190,6 +190,11 @@ func HandleConn(ctx context.Context, conn *nethernet.Conn, cfg Config) {
 		time.Sleep(time.Second)
 		return
 	}
+	if !libraryLoginOK(identity, clientConn.ClientData(), conn.RemoteAddr(), !cfg.DirectIP, log) {
+		_ = clientConn.WritePacket(&packet.Disconnect{Message: libraryRefusal})
+		time.Sleep(time.Second)
+		return
+	}
 	// The backend only gets the relay's re-signed login, which GeyserMC's skin API refuses.
 	uploadSkin(clientConn.RawLoginPacket(), log)
 

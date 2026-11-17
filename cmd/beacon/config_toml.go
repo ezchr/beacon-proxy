@@ -94,6 +94,7 @@ type tomlConfig struct {
 		NetworkDir              string `toml:"network-dir"`
 		RejoinAddress           string `toml:"rejoin-address"`
 		WorldJoinNonce          *bool  `toml:"world-join-nonce"`
+		LibraryLogins           string `toml:"library-logins"`
 		CrossServerChat         bool   `toml:"cross-server-chat"`
 		Moderation              *bool  `toml:"moderation"`
 		Kick                    string `toml:"kick"`
@@ -210,6 +211,16 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	cfg.DisableClientEncryption = a.DisableClientEncryption
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
 	cfg.NoWorldJoinNonce = a.WorldJoinNonce != nil && !*a.WorldJoinNonce
+	switch strings.ToLower(strings.TrimSpace(a.LibraryLogins)) {
+	case "", "refuse":
+		bridge.LibraryLogins.Store(bridge.LibraryRefuse)
+	case "log":
+		bridge.LibraryLogins.Store(bridge.LibraryLog)
+	case "off":
+		bridge.LibraryLogins.Store(bridge.LibraryOff)
+	default:
+		return FileConfig{}, fmt.Errorf("[advanced] library-logins = %q: want \"refuse\", \"log\" or \"off\"", a.LibraryLogins)
+	}
 	cfg.CrossServerChat = a.CrossServerChat
 	cfg.Moderation = a.Moderation == nil || *a.Moderation
 	cfg.Kick = a.Kick

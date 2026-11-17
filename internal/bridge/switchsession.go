@@ -218,6 +218,11 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		time.Sleep(time.Second)
 		return
 	}
+	if !libraryLoginOK(id, client.ClientData(), conn.RemoteAddr(), !cfg.DirectIP, log) {
+		_ = client.WritePacket(&packet.Disconnect{Message: libraryRefusal})
+		time.Sleep(time.Second)
+		return
+	}
 	if msg, closed := Closed(); closed && !n.isStaff(id.XUID, id.DisplayName) {
 		log.Info("join refused: the network is closed")
 		_ = client.WritePacket(&packet.Disconnect{Message: msg})
