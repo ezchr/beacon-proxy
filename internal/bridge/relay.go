@@ -67,6 +67,9 @@ type Config struct {
 	// WorldPlayers, when set, counts the players on the relay who joined through this Friends-tab
 	// world (one counter per world): it is the player count the world shows.
 	WorldPlayers *atomic.Int64
+	// DirectIP marks the direct-IP door's connections: players who typed the address, not ones joining
+	// a world from the Friends tab or an invite.
+	DirectIP bool
 
 	// ServerAddress is host:port of the backend's RakNet listener, e.g. "127.0.0.1:19132".
 	// Used only when BackendTransport is RakNet. That listener MUST have encryption disabled -

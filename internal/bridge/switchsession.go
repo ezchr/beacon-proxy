@@ -277,7 +277,7 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	unchecked := true
 	if Checks != nil {
 		var kick string
-		unchecked, kick = Checks.Login(id, client.ClientData(), conn.RemoteAddr(), log)
+		unchecked, kick = Checks.Login(id, client.ClientData(), conn.RemoteAddr(), !cfg.DirectIP, log)
 		if kick != "" {
 			_ = client.WritePacket(&packet.Disconnect{Message: kick})
 			time.Sleep(time.Second)

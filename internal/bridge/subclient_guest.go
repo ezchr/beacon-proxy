@@ -264,7 +264,7 @@ func (s *switchSession) newGuest(sub byte, request []byte) (*switchSession, func
 	unchecked := true
 	if Checks != nil {
 		var kick string
-		unchecked, kick = Checks.Login(gid, cd, s.conn.RemoteAddr(), log)
+		unchecked, kick = Checks.Login(gid, cd, s.conn.RemoteAddr(), !s.cfg.DirectIP, log)
 		if kick != "" {
 			return fail(kick)
 		}

@@ -335,7 +335,7 @@ func main() {
 			MaxPlayers:    cfg.MaxPlayers,
 			Protocol:      cfg.Protocol,
 			Version:       cfg.Version,
-			Relay:         relayConfig(withoutFirstServer(cfg), authSession, allowXUID, friendActivity, log),
+			Relay:         directIPRelay(relayConfig(withoutFirstServer(cfg), authSession, allowXUID, friendActivity, log)),
 			Extra:         directIPExtra(cfg, control),
 			Log:           log,
 		}); err != nil {
@@ -844,6 +844,13 @@ func identityCacheFor(s *session.Session, log *slog.Logger) *bridge.IdentityCach
 
 // withoutFirstServer is cfg for the direct-IP door: a Friends-tab world's own first server does not
 // apply to players who join by address.
+// directIPRelay marks the direct-IP door's config: its players typed the address, they did not join
+// a world.
+func directIPRelay(c bridge.Config) bridge.Config {
+	c.DirectIP = true
+	return c
+}
+
 func withoutFirstServer(cfg FileConfig) FileConfig {
 	cfg.FirstServer = ""
 	return cfg
