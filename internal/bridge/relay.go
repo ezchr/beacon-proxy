@@ -70,6 +70,12 @@ type Config struct {
 	// DirectIP marks the direct-IP door's connections: players who typed the address, not ones joining
 	// a world from the Friends tab or an invite.
 	DirectIP bool
+	// CheckNonce, when set, is asked about every login that joins a world from the Friends tab or an
+	// invite: whether one of the world's sessions issued the login's nonce to that account. A game
+	// gets its nonce by joining the session, which Xbox allows only to accounts a member follows; a
+	// login without one connected with a world's connection ID it read some other way, and is refused,
+	// as a Minecraft host refuses it. nil: no check (the direct-IP door, or world-join-nonce = false).
+	CheckNonce func(xuid, nonce string) bool
 
 	// ServerAddress is host:port of the backend's RakNet listener, e.g. "127.0.0.1:19132".
 	// Used only when BackendTransport is RakNet. That listener MUST have encryption disabled -
@@ -178,6 +184,11 @@ func HandleConn(ctx context.Context, conn *nethernet.Conn, cfg Config) {
 		return
 	}
 	log.Info("player authenticated via xbox live", "displayName", identity.DisplayName, "xuid", identity.XUID, "serverAddress", clientConn.ClientData().ServerAddress)
+	if !worldNonceOK(cfg, identity.XUID, identity.DisplayName, clientConn.ClientData(), conn.RemoteAddr().String(), log) {
+		_ = clientConn.WritePacket(&packet.Disconnect{Message: nonceRefusal})
+		time.Sleep(time.Second)
+		return
+	}
 	// The backend only gets the relay's re-signed login, which GeyserMC's skin API refuses.
 	uploadSkin(clientConn.RawLoginPacket(), log)
 

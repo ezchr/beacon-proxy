@@ -241,6 +241,9 @@ type FileConfig struct {
 	// RejoinAddress (host:port, network mode) is where players are transferred to join again when
 	// a server's content changed during their join; empty asks them to join again.
 	RejoinAddress string `json:"rejoin_address,omitempty"`
+	// NoWorldJoinNonce ([advanced] world-join-nonce = false) lets Friends-tab and invite logins in
+	// without a nonce from the world's sessions (bridge.Config.CheckNonce).
+	NoWorldJoinNonce bool `json:"-"`
 
 	// BroadcastName and InvitesEnabled describe the one broadcast a copy of the config is being
 	// run for (see runBroadcast and BroadcastConfig.forBroadcast). Never read from the file.

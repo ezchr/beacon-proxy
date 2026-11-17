@@ -93,6 +93,7 @@ type tomlConfig struct {
 		Version                 string `toml:"version"`
 		NetworkDir              string `toml:"network-dir"`
 		RejoinAddress           string `toml:"rejoin-address"`
+		WorldJoinNonce          *bool  `toml:"world-join-nonce"`
 		CrossServerChat         bool   `toml:"cross-server-chat"`
 		Moderation              *bool  `toml:"moderation"`
 		Kick                    string `toml:"kick"`
@@ -208,6 +209,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	}
 	cfg.DisableClientEncryption = a.DisableClientEncryption
 	cfg.NetworkDir, cfg.RejoinAddress = a.NetworkDir, a.RejoinAddress
+	cfg.NoWorldJoinNonce = a.WorldJoinNonce != nil && !*a.WorldJoinNonce
 	cfg.CrossServerChat = a.CrossServerChat
 	cfg.Moderation = a.Moderation == nil || *a.Moderation
 	cfg.Kick = a.Kick

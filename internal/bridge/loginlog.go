@@ -4,6 +4,8 @@ import (
 	"log/slog"
 	"strings"
 
+	"github.com/sandertv/gophertunnel/minecraft/protocol/login"
+
 	"github.com/ezchr/beacon-proxy/internal/proxy"
 )
 
@@ -31,4 +33,18 @@ func refusedLoginAttrs(c *proxy.ProxyConn, remote string, err error) []any {
 // logRefusedLogin logs a login Beacon refused, with refusedLoginAttrs.
 func logRefusedLogin(log *slog.Logger, c *proxy.ProxyConn, remote string, err error) {
 	log.Warn("client failed to log in", append([]any{"err", err}, refusedLoginAttrs(c, remote, err)...)...)
+}
+
+// nonceRefusal is what a world join is told when its login has no nonce from the world's sessions.
+const nonceRefusal = "Could not join the world. Join it again from the Friends tab."
+
+// worldNonceOK reports whether a login may go on under cfg's nonce check, logging a refusal.
+func worldNonceOK(cfg Config, xuid, name string, cd login.ClientData, remote string, log *slog.Logger) bool {
+	if cfg.CheckNonce == nil || cfg.DirectIP || cfg.CheckNonce(xuid, cd.Nonce) {
+		return true
+	}
+	log.Warn("world join refused: the login carries no nonce from this world's sessions (the account never joined the world's Xbox session)",
+		"name", name, "xuid", xuid, "nonceSent", cd.Nonce != "", "serverAddress", cd.ServerAddress,
+		"deviceOS", cd.DeviceOS, "deviceModel", cd.DeviceModel, "remote", remote)
+	return false
 }

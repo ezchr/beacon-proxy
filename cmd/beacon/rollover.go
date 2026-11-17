@@ -113,6 +113,16 @@ func (s *sessionSet) restore(ctx context.Context, connectionID string) {
 	s.mu.Unlock()
 }
 
+// hasNonce reports whether one of the sessions issued nonce to xuid (bridge.Config.CheckNonce).
+func (s *sessionSet) hasNonce(xuid, nonce string) bool {
+	for _, x := range s.all() {
+		if x.HasNonce(xuid, nonce) {
+			return true
+		}
+	}
+	return false
+}
+
 // needsNew reports whether a session with members members (the host included) is full enough that
 // a new one should open: one free place left.
 func needsNew(members, cap int) bool { return members >= cap-1 }

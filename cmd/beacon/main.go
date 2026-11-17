@@ -683,6 +683,9 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	// torn down and rebuilt when sessionCtx ends; a healthy in-progress WebRTC transport for a
 	// connected player has nothing to do with whether the signaling websocket that originally
 	// negotiated it is still open.
+	if !cfg.NoWorldJoinNonce {
+		relayCfg.CheckNonce = sessions.hasNonce // a world join must have joined one of its sessions
+	}
 	err = ln.Serve(sessionCtx, ctx, relayCfg)
 	if errors.Is(context.Cause(sessionCtx), errTokenRenewal) {
 		return sessionID, netherNetID, errTokenRenewal

@@ -92,6 +92,17 @@ type Session struct {
 	members atomic.Int32
 }
 
+// HasNonce reports whether this session issued nonce to xuid: the game sends the nonce its host
+// gave it, which it only gets by joining the session.
+func (s *Session) HasNonce(xuid, nonce string) bool {
+	if xuid == "" || nonce == "" {
+		return false
+	}
+	s.noncesMu.Lock()
+	defer s.noncesMu.Unlock()
+	return s.nonces[xuid] == nonce
+}
+
 // Members is the session's member count when last read, the host included.
 func (s *Session) Members() int { return int(s.members.Load()) }
 

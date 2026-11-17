@@ -212,6 +212,11 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	log = log.With("player", id.DisplayName)
 	log.Info("player authenticated via xbox live", "xuid", id.XUID, "serverAddress", client.ClientData().ServerAddress)
+	if !worldNonceOK(cfg, id.XUID, id.DisplayName, client.ClientData(), conn.RemoteAddr().String(), log) {
+		_ = client.WritePacket(&packet.Disconnect{Message: nonceRefusal})
+		time.Sleep(time.Second)
+		return
+	}
 	if msg, closed := Closed(); closed && !n.isStaff(id.XUID, id.DisplayName) {
 		log.Info("join refused: the network is closed")
 		_ = client.WritePacket(&packet.Disconnect{Message: msg})

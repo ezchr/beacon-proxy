@@ -146,3 +146,4 @@ fake-player-drift = {{with .FakePlayerDrift}}{ min = {{.Min}}, max = {{.Max}}, m
 # acme-http-address = ":80"        # where Let's Encrypt checks your domain
 {{if .NetworkDir}}network-dir = {{q .NetworkDir}}{{else}}# network-dir = "network"         # cache of your servers' content and packs{{end}}
 {{if .DisableClientEncryption}}disable-client-encryption = true{{else}}# disable-client-encryption = false   # only if a client version can't log in{{end}}
+# world-join-nonce = true          # Friends-tab and invite joins must have joined the world's session, as in Minecraft
