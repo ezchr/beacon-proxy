@@ -212,6 +212,7 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	}
 	log = log.With("player", id.DisplayName)
 	log.Info("player authenticated via xbox live", "xuid", id.XUID, "serverAddress", client.ClientData().ServerAddress)
+	logLoginSize(log, client.RawLoginPacket(), client.ClientData())
 	if !worldNonceOK(cfg, id.XUID, id.DisplayName, client.ClientData(), conn.RemoteAddr().String(), log) {
 		_ = client.WritePacket(&packet.Disconnect{Message: nonceRefusal})
 		time.Sleep(time.Second)

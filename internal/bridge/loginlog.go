@@ -1,6 +1,7 @@
 package bridge
 
 import (
+	"fmt"
 	"log/slog"
 	"strings"
 
@@ -47,4 +48,20 @@ func worldNonceOK(cfg Config, xuid, name string, cd login.ClientData, remote str
 		"name", name, "xuid", xuid, "nonceSent", cd.Nonce != "", "serverAddress", cd.ServerAddress,
 		"deviceOS", cd.DeviceOS, "deviceModel", cd.DeviceModel, "remote", remote)
 	return false
+}
+
+// logLoginSize logs how big a player's login was and what made it up. The skin travels inside the
+// login (image, geometry, animation frames, cape, persona pieces), and some servers and proxies
+// refuse a login above a size of their own ("login packet too long"): this tells which part of a
+// skin makes a login big.
+func logLoginSize(log *slog.Logger, raw []byte, cd login.ClientData) {
+	anim := 0
+	for _, a := range cd.AnimatedImageData {
+		anim += len(a.Image)
+	}
+	log.Info("login size", "loginBytes", len(raw), "skinId", cd.SkinID,
+		"skin", fmt.Sprintf("%dx%d", cd.SkinImageWidth, cd.SkinImageHeight), "skinDataBytes", len(cd.SkinData),
+		"geometryBytes", len(cd.SkinGeometry), "resourcePatchBytes", len(cd.SkinResourcePatch),
+		"animations", len(cd.AnimatedImageData), "animationBytes", anim, "capeBytes", len(cd.CapeData),
+		"personaPieces", len(cd.PersonaPieces), "persona", cd.PersonaSkin, "premium", cd.PremiumSkin)
 }
