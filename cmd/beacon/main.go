@@ -419,6 +419,20 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	xblSession := xbl.New(authSession, xuid, sessionID, connectionID, pmsgID, netherNetID, log)
 	sessionID = xblSession.SessionID()
 	xblSession.SetWorldInfo(worldInfo())
+	// The world's sessions: more open as each fills up (rollover.go).
+	sessions := &sessionSet{auth: authSession, xuid: xuid, pmsgID: pmsgID, netherNetID: netherNetID,
+		broadcast: cfg.BroadcastName, cap: sessionCap(), worldInfo: worldInfo, log: log,
+		list: []*xbl.Session{xblSession}}
+	updateAll := func(ctx context.Context) error {
+		var first error
+		for _, xs := range sessions.all() {
+			xs.SetWorldInfo(worldInfo())
+			if err := xs.Update(ctx); err != nil && first == nil {
+				first = err
+			}
+		}
+		return first
+	}
 
 	sessionCtx, cancelSession := context.WithCancelCause(ctx)
 	defer cancelSession(nil)
@@ -478,11 +492,16 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	// be re-armed every time runSession builds a new xblSession; a prior refactor moved session
 	// setup into this function but dropped this registration, which was the actual regression.
 	rta.OnSessionChanged = func() {
-		if err := xblSession.RefreshNonces(sessionCtx); err != nil {
-			if sessionCtx.Err() != nil {
-				return // the session ended (left on /broadcast off, or rebuilt): nothing to refresh
+		for _, xs := range sessions.all() {
+			if err := xs.RefreshNonces(sessionCtx); err != nil {
+				if sessionCtx.Err() != nil {
+					return // the session ended (left on /broadcast off, or rebuilt): nothing to refresh
+				}
+				log.Error("failed to refresh session nonces", "session", xs.SessionID(), "err", err)
 			}
-			log.Error("failed to refresh session nonces", "err", err)
+		}
+		if cid, err := rta.ConnectionID(sessionCtx); err == nil {
+			sessions.check(sessionCtx, cid)
 		}
 	}
 
@@ -503,8 +522,10 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 		if newConnectionID == initialConnectionID {
 			return
 		}
-		xblSession.SetConnectionID(newConnectionID)
-		if err := xblSession.Update(sessionCtx); err != nil {
+		for _, xs := range sessions.all() {
+			xs.SetConnectionID(newConnectionID)
+		}
+		if err := updateAll(sessionCtx); err != nil {
 			// go-xsapi's own reconcileSessionConnection (mpsd/subscription.go's
 			// HandleSubscribe) treats a failed reconciliation PUT as fatal and closes the
 			// session outright rather than leaving it in a half-reconciled state - do the
@@ -556,6 +577,7 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 		return sessionID, netherNetID, fmt.Errorf("create xbox live session: %w", err)
 	}
 	log.Info("session is live - should now be visible on the friends tab", "sessionID", xblSession.SessionID())
+	sessions.restore(sessionCtx, connectionID)
 
 	// Invite-everyone-from-another-server feature (see invitewatcher.go for the full design and
 	// the scraper (scraper/) for the other half). OFF BY DEFAULT - the controller starts stopped, and only
@@ -567,8 +589,8 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	// The primary broadcast's controls are always there; an extra broadcast's only with
 	// "invites": true. None in a process without a control port (a -login broadcaster).
 	if controlSrv != nil && cfg.InvitesEnabled {
-		inviteCtl := newInviteController(xblSession, cfg.BroadcastName, log)
-		friendsInviteCtl := newFriendsInviteController(authSession, xblSession, log)
+		inviteCtl := newInviteController(sessions, cfg.BroadcastName, log)
+		friendsInviteCtl := newFriendsInviteController(authSession, sessions, log)
 		adder := friendAdderFor(cfg.BroadcastName, authSession, xuid, log)
 		controlSrv.setInvites(sessionCtx, cfg.BroadcastName, inviteRoutes(sessionCtx, ctx, inviteCtl, friendsInviteCtl, adder))
 		// If invites were running when the previous session (or relay process) ended, carry on
@@ -611,8 +633,7 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 					}
 					shown = n
 					log.Info("players in this world changed, updating the Friends tab", "players", n, "advertised", advertisedPlayers(cfg))
-					xblSession.SetWorldInfo(worldInfo())
-					if err := xblSession.Update(sessionCtx); err != nil {
+					if err := updateAll(sessionCtx); err != nil {
 						log.Error("failed to update session with the new player count", "err", err)
 					}
 					continue
@@ -635,13 +656,12 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 				}
 				log.Info("backend player count changed, updating the Friends tab",
 					"players", readPlayers(cfg).Load(), "advertised", advertisedPlayers(cfg))
-				xblSession.SetWorldInfo(worldInfo())
-				if err := xblSession.Update(sessionCtx); err != nil {
+				if err := updateAll(sessionCtx); err != nil {
 					log.Error("failed to update session with the new player count", "err", err)
 				}
 			case <-ticker.C:
-				xblSession.SetWorldInfo(worldInfo()) // picks up fake_player_drift's next value
-				if err := xblSession.Update(sessionCtx); err != nil {
+				// worldInfo picks up fake_player_drift's next value
+				if err := updateAll(sessionCtx); err != nil {
 					log.Error("failed to update session", "err", err)
 				}
 				// Active health check, not just reacting to an explicit disconnect - mirrors
@@ -669,11 +689,14 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	}
 	if errors.Is(context.Cause(sessionCtx), errListingOff) {
 		leaveCtx, cancelLeave := context.WithTimeout(ctx, 15*time.Second)
-		if err := xblSession.Leave(leaveCtx); err != nil {
-			log.Warn("could not leave the xbox live session - the world stays in the Friends tab until it times out", "err", err)
-		} else {
-			log.Info("left the xbox live session: the world is off the Friends tab")
+		for _, xs := range sessions.all() {
+			if err := xs.Leave(leaveCtx); err != nil {
+				log.Warn("could not leave the xbox live session - the world stays in the Friends tab until it times out", "session", xs.SessionID(), "err", err)
+			} else {
+				log.Info("left the xbox live session: the world is off the Friends tab", "session", xs.SessionID())
+			}
 		}
+		rolloverIDs.Delete(cfg.BroadcastName) // off the Friends tab: the next listing starts with one session
 		cancelLeave()
 		return sessionID, netherNetID, errListingOff
 	}

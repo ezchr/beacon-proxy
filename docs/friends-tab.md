@@ -12,16 +12,22 @@ this, not your own. Its token is kept in `token.json`: keep that file private, i
 Players add the account as a friend in Minecraft or the Xbox app. Beacon accepts friend requests on
 its own (`accept-friends = true` under `[broadcast]`), and once they are friends the world shows up.
 
-## 30 players per world, and more accounts
+## More than 30 players, and more accounts
 
-A world on the Friends tab holds at most **30 players** at once. That limit is built into Minecraft
-and Xbox Live: no server, proxy or setting can raise it. Once 30 players have joined a world,
-nobody else can connect to it, even if its max shows more (`show-max-players` can be set higher,
-as in Minecraft itself, but it only changes the number shown). Players who join by IP address
-don't count.
+A world on the Friends tab is an Xbox Live session, and a session holds at most **30 players**
+(the host's account included). Beacon opens a new session for the same account when the current
+one has one place left:
 
-To let more players in from the Friends tab, list more worlds: each extra Xbox account broadcasts
-your servers as one more world with its own 30 places. Players still end up on the same servers
+- The host's Friends-tab entry moves to the new session: new players join there.
+- Players already in an older session keep showing it to their own friends, who can still join it
+  while it has room. A session everyone has left closes.
+- Invites always invite into the newest session, and a running invite loop carries on into a new
+  one by itself.
+
+Players who join by IP address don't count. `show-max-players` only changes the number shown.
+
+To reach more players from the Friends tab, list more worlds: each extra Xbox account broadcasts
+your servers as one more world. Players still end up on the same servers
 together, whichever world they joined from. Extra accounts also help with the other limit: an
 account can have at most **1000 friends**.
 

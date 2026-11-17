@@ -15,7 +15,6 @@ import (
 
 	"github.com/ezchr/beacon-proxy/internal/bridge"
 	"github.com/ezchr/beacon-proxy/internal/invitequeue"
-	"github.com/ezchr/beacon-proxy/internal/xbl"
 )
 
 // This file is the host-account half of the "invite everyone from another server into ours"
@@ -121,7 +120,7 @@ func parseInviteInterval(s string) (time.Duration, error) {
 // to flip it. There is exactly one of these per process (one xblSession, one world to invite
 // people into), constructed once in runSession and torn down with it.
 type inviteController struct {
-	xblSession *xbl.Session
+	xblSession sessionInviter // the newest of the world's sessions (rollover.go)
 	log        *slog.Logger
 
 	mu      sync.Mutex
@@ -143,7 +142,7 @@ type inviteController struct {
 
 // newInviteController constructs a controller in the stopped state - see this file's package doc
 // for why starting stopped is load-bearing, not just a default.
-func newInviteController(xblSession *xbl.Session, broadcast string, log *slog.Logger) *inviteController {
+func newInviteController(xblSession sessionInviter, broadcast string, log *slog.Logger) *inviteController {
 	l := log.With("src", "invite-watcher")
 	// Prune once here, at construction, rather than only as part of the invite loop's own read
 	// path - the loop only runs between "start" and "stop" (off by default, see this file's

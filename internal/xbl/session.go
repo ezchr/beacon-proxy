@@ -14,6 +14,7 @@ import (
 	"log/slog"
 	"net/http"
 	"sync"
+	"sync/atomic"
 
 	"github.com/ezchr/beacon-proxy/internal/session"
 	"github.com/google/uuid"
@@ -85,7 +86,14 @@ type Session struct {
 	noncesMu         sync.Mutex
 
 	httpClient *http.Client
+
+	// members is how many members the session had when last read (RefreshNonces), the host
+	// included: 1 until then.
+	members atomic.Int32
 }
+
+// Members is the session's member count when last read, the host included.
+func (s *Session) Members() int { return int(s.members.Load()) }
 
 // New creates a Session. connectionID must be the RTA connection ID (see RTA.ConnectionID())
 // obtained from an active RTA subscription - Xbox Live requires this to correlate the
@@ -120,7 +128,7 @@ func New(authSession *session.Session, xuid, sessionID, connectionID, pmsgID str
 	// must NOT do is change identity out from under a client mid-session. MCXboxBroadcast sends
 	// the constant "level" here.
 	levelSum := sha256.Sum256([]byte(sessionID))
-	return &Session{
+	s := &Session{
 		auth:             authSession,
 		xuid:             xuid,
 		log:              log,
@@ -134,6 +142,8 @@ func New(authSession *session.Session, xuid, sessionID, connectionID, pmsgID str
 		nonceConnections: make(map[string]string),
 		httpClient:       &http.Client{},
 	}
+	s.members.Store(1)
+	return s
 }
 
 func (s *Session) SessionID() string { return s.sessionID }
@@ -434,6 +444,7 @@ func (s *Session) RefreshNonces(ctx context.Context) error {
 	if err := json.Unmarshal(respBody, &parsed); err != nil {
 		return fmt.Errorf("parse session response: %w", err)
 	}
+	s.members.Store(int32(len(parsed.Members)))
 
 	// activeConn maps xuid -> the "connection" value of their current member-slot. A member
 	// system entry with no matching properties/connection (shouldn't normally happen, but the

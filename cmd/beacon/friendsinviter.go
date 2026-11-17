@@ -43,7 +43,7 @@ const friendsInviteRateLimit = 10 * time.Second
 // SendInvite" - everything about where the XUID list comes from differs.
 type friendsInviteController struct {
 	authSession *session.Session
-	xblSession  *xbl.Session
+	xblSession  sessionInviter // the newest of the world's sessions (rollover.go)
 	log         *slog.Logger
 
 	mu      sync.Mutex
@@ -51,7 +51,7 @@ type friendsInviteController struct {
 	stop    context.CancelFunc
 }
 
-func newFriendsInviteController(authSession *session.Session, xblSession *xbl.Session, log *slog.Logger) *friendsInviteController {
+func newFriendsInviteController(authSession *session.Session, xblSession sessionInviter, log *slog.Logger) *friendsInviteController {
 	return &friendsInviteController{
 		authSession: authSession,
 		xblSession:  xblSession,
