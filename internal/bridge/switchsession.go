@@ -194,7 +194,7 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 	client.SetAuthEnabled(true)
 	client.SetClientEncryption(!cfg.DisableClientEncryption)
 	if err := client.ReadLoop(); err != nil {
-		log.Warn("client failed to log in", "err", err)
+		logRefusedLogin(log, client, conn.RemoteAddr().String(), err)
 		_ = client.WritePacket(&packet.Disconnect{Message: "Error: " + err.Error()})
 		time.Sleep(time.Second)
 		return
@@ -211,7 +211,7 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		return
 	}
 	log = log.With("player", id.DisplayName)
-	log.Info("player authenticated via xbox live", "xuid", id.XUID)
+	log.Info("player authenticated via xbox live", "xuid", id.XUID, "serverAddress", client.ClientData().ServerAddress)
 	if msg, closed := Closed(); closed && !n.isStaff(id.XUID, id.DisplayName) {
 		log.Info("join refused: the network is closed")
 		_ = client.WritePacket(&packet.Disconnect{Message: msg})

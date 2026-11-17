@@ -155,7 +155,7 @@ func HandleConn(ctx context.Context, conn *nethernet.Conn, cfg Config) {
 	clientConn.SetClientEncryption(!cfg.DisableClientEncryption)
 
 	if err := clientConn.ReadLoop(); err != nil {
-		log.Warn("client failed to log in", "err", err)
+		logRefusedLogin(log, clientConn, conn.RemoteAddr().String(), err)
 		_ = clientConn.WritePacket(&packet.Disconnect{Message: "Error: " + err.Error()})
 		time.Sleep(time.Second)
 		return
@@ -174,7 +174,7 @@ func HandleConn(ctx context.Context, conn *nethernet.Conn, cfg Config) {
 		time.Sleep(time.Second)
 		return
 	}
-	log.Info("player authenticated via xbox live", "displayName", identity.DisplayName, "xuid", identity.XUID)
+	log.Info("player authenticated via xbox live", "displayName", identity.DisplayName, "xuid", identity.XUID, "serverAddress", clientConn.ClientData().ServerAddress)
 	// The backend only gets the relay's re-signed login, which GeyserMC's skin API refuses.
 	uploadSkin(clientConn.RawLoginPacket(), log)
 
