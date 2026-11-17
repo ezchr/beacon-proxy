@@ -194,6 +194,8 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 	}
 
 	a := t.Advanced
+	// The primary broadcast's invite controls are always on the control port, as with config.json.
+	cfg.BroadcastName, cfg.InvitesEnabled = primaryBroadcast, true
 	cfg.ControlPort = 7777
 	if a.ControlPort > 0 {
 		cfg.ControlPort = a.ControlPort
