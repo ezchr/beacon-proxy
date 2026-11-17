@@ -43,6 +43,8 @@ type Network struct {
 	// onJoinGen instead (lower-case name -> *atomic.Uint64): only its own players have them.
 	packGen   atomic.Uint64
 	onJoinGen sync.Map
+	// packMem is which on-join servers' packs each player's client took (packmemory.go).
+	packMem packMemory
 	// contentGen counts the changes to what the union is built from (servers' content, packs).
 	// With the live config it keys unions, the unions every join shares by variant (the on-join
 	// server whose packs it holds, lower case; "" for none). n.mu guards both.
@@ -533,8 +535,8 @@ func (n *Network) onJoinGenOf(server string) *atomic.Uint64 {
 // ("" for none) besides every other server's: it changes when any of those packs change.
 func (n *Network) packGenFor(packsFor string) uint64 {
 	g := n.packGen.Load()
-	if packsFor != "" {
-		g += n.onJoinGenOf(packsFor).Load()
+	for _, v := range variantNames(packsFor) {
+		g += n.onJoinGenOf(v).Load()
 	}
 	return g
 }
@@ -552,7 +554,7 @@ func (n *Network) unionVariant(server string) string {
 // has to join again before it can play on server: server keeps its packs for the players joining to
 // go there, this client does not have them, and the relay has them to give.
 func (n *Network) packRejoinNeeded(server ServerConfig, have string) bool {
-	if !server.PacksOnJoin || server.NoPacks || strings.EqualFold(server.Name, have) {
+	if !server.PacksOnJoin || server.NoPacks || variantHas(have, server.Name) {
 		return false
 	}
 	n.mu.Lock()
@@ -747,7 +749,7 @@ type cachedUnion struct {
 // "" for none), built again only when the servers' content, the packs or the server list changed:
 // every player of a variant shares one (it is only read).
 func (n *Network) buildUnion(variant string) (*union, error) {
-	variant = n.unionVariant(variant)
+	variant = n.normVariant(variant)
 	n.mu.Lock()
 	defer n.mu.Unlock()
 	key := unionKey{n.contentGen, n.conf()}
@@ -814,7 +816,7 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 		if r := c.StartGame.PlayerMovementSettings.RewindHistorySize; r > u.rewind {
 			u.rewind = r
 		}
-		packs := !s.NoPacks && (!s.PacksOnJoin || strings.EqualFold(s.Name, variant))
+		packs := !s.NoPacks && (!s.PacksOnJoin || variantHas(variant, s.Name))
 		if p := c.PacksInfo; p != nil && packs {
 			u.packsInfo.TexturePackRequired = u.packsInfo.TexturePackRequired || p.TexturePackRequired
 			u.packsInfo.HasScripts = u.packsInfo.HasScripts || p.HasScripts
@@ -862,7 +864,7 @@ func (n *Network) makeUnion(variant string) (*union, error) {
 		// An on-join server's own content goes only to the players who joined for it (they
 		// rejoin to get there, packRejoinNeeded): everyone else's block and item lists stay as
 		// they are without it.
-		if s.PacksOnJoin && !s.NoPacks && !strings.EqualFold(s.Name, variant) {
+		if s.PacksOnJoin && !s.NoPacks && !variantHas(variant, s.Name) {
 			continue
 		}
 		for _, b := range c.StartGame.Blocks {

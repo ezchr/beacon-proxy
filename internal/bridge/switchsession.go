@@ -45,6 +45,10 @@ type switchSession struct {
 	// moving to another on-join server takes a join again (packRejoin).
 	packGen  uint64
 	packsFor string
+	// baseGen and onJoinGens are the network's shared pack generation and each on-join server's
+	// (in packsFor) at this login: a change to one only matters on its own server (packsChanged).
+	baseGen    uint64
+	onJoinGens map[string]uint64
 	// loginServer is the server whose StartGame the client got (set by join, before any move): the
 	// only one that may leave chunks to the client to build (clientgen.go).
 	loginServer string
@@ -388,7 +392,7 @@ func (s *switchSession) record(server string, id uint32, payload []byte) {
 	if id != packet.IDResourcePacksInfo && id != packet.IDResourcePackStack {
 		return
 	}
-	if s.n.packGenFor(s.packsFor) == s.packGen || !s.rejoining.CompareAndSwap(false, true) {
+	if !s.packsChanged(server) || !s.rejoining.CompareAndSwap(false, true) {
 		return
 	}
 	s.log.Info("network: server has new resource packs, the player joins again to download them", "server", server)
@@ -480,11 +484,18 @@ func (s *switchSession) join() error {
 	}
 	// The client gets the packs of a resource-packs = "on-join" server only when it joins to go
 	// there; a split-screen player has what its host's client got.
+	var prints map[string]string
 	if s.host != nil {
 		s.packsFor = s.host.packsFor
 	} else {
-		s.packsFor = s.n.unionVariant(order[0].Name)
+		// Packs of other on-join servers the client took before come too: it has them cached.
+		s.packsFor, prints = s.n.withKnownPacks(s.id.XUID, s.n.unionVariant(order[0].Name))
 		s.packGen = s.n.packGenFor(s.packsFor)
+		s.baseGen = s.n.packGen.Load()
+		s.onJoinGens = map[string]uint64{}
+		for _, v := range variantNames(s.packsFor) {
+			s.onJoinGens[v] = s.n.onJoinGenOf(v).Load()
+		}
 	}
 	u, err := s.n.buildUnion(s.packsFor)
 	if err != nil {
@@ -532,6 +543,8 @@ func (s *switchSession) join() error {
 		s.sendClient(&packet.PlayStatus{Status: packet.PlayStatusLoginSuccess})
 	} else if err := s.packScreen(u); err != nil {
 		return fmt.Errorf("resource packs: %w", err)
+	} else {
+		s.n.rememberPacks(s.id.XUID, prints)
 	}
 	d := <-dialCh
 	if d.err != nil {
@@ -1516,8 +1529,8 @@ func serverNames(servers []ServerConfig) []string {
 // packsOutdated reports whether moving to server needs new resource packs first: the client got
 // server's on-join packs at its login, and the server has changed them since.
 func (s *switchSession) packsOutdated(server ServerConfig) bool {
-	if s.packsFor == "" || !strings.EqualFold(server.Name, s.packsFor) {
+	if !variantHas(s.packsFor, server.Name) {
 		return false
 	}
-	return s.n.packGenFor(s.packsFor) != s.packGen
+	return s.packsChanged(server.Name)
 }

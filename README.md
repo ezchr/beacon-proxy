@@ -172,6 +172,11 @@ Players joining the network do not download them. A player who moves to that ser
 on the server once they are back. Players joining straight to it (its address as a forced
 host, or it first in `try`) get its packs at once.
 
+Beacon remembers, by XUID, which of these servers' packs each player has downloaded (in
+`network/onjoin-packs.json`). Their later joins include those packs again; the client has them
+cached, so nothing downloads, and going to those servers needs no rejoin. When a server changes its
+packs, its players rejoin once more the next time they go there, to download the new ones.
+
 ### Forwarding: who the player is
 
 Your server only sees Beacon's login, so Beacon also tells it who the player really is. How depends
