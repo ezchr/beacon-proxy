@@ -190,10 +190,20 @@ func handleNetwork(ctx context.Context, conn backendConn, isNetherNet bool, cfg 
 		log = slog.Default()
 	}
 	defer conn.Close()
+	// One address's connections that have not logged in yet are capped (sessions-per-ip) before
+	// anything is read from them.
+	releasePending, ok := holdPending(conn.RemoteAddr())
+	if !ok {
+		refusePending(log, conn)
+		return
+	}
+	defer releasePending()
 	client := proxy.NewProxyConn(conn, isNetherNet)
 	client.SetAuthEnabled(true)
 	client.SetClientEncryption(!cfg.DisableClientEncryption)
-	if err := client.ReadLoop(); err != nil {
+	loginErr := client.ReadLoop()
+	releasePending()
+	if err := loginErr; err != nil {
 		logRefusedLogin(log, client, conn.RemoteAddr().String(), err)
 		_ = client.WritePacket(&packet.Disconnect{Message: "Error: " + err.Error()})
 		time.Sleep(time.Second)

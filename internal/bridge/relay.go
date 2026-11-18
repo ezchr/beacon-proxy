@@ -158,12 +158,22 @@ func HandleConn(ctx context.Context, conn *nethernet.Conn, cfg Config) {
 		log = slog.Default()
 	}
 	defer conn.Close()
+	// One address's connections that have not logged in yet are capped (sessions-per-ip) before
+	// anything is read from them.
+	releasePending, ok := holdPending(conn.RemoteAddr())
+	if !ok {
+		refusePending(log, conn)
+		return
+	}
+	defer releasePending()
 
 	clientConn := proxy.NewProxyConn(conn, true)
 	clientConn.SetAuthEnabled(true) // reject anyone not genuinely Xbox Live authenticated
 	clientConn.SetClientEncryption(!cfg.DisableClientEncryption)
 
-	if err := clientConn.ReadLoop(); err != nil {
+	loginErr := clientConn.ReadLoop()
+	releasePending()
+	if err := loginErr; err != nil {
 		logRefusedLogin(log, clientConn, conn.RemoteAddr().String(), err)
 		_ = clientConn.WritePacket(&packet.Disconnect{Message: "Error: " + err.Error()})
 		time.Sleep(time.Second)

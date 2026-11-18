@@ -127,6 +127,7 @@ packets-per-second = 0
 # over packet-burst times it is too many anyway (-1: no burst check).
 packet-window = 7
 packet-burst = 4
+# Most players online from one IP, and most connections from it not logged in yet (0: off).
 sessions-per-ip = 0
 
 # Show this player count on the Friends tab instead of the real one. 0: off.

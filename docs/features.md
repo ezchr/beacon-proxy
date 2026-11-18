@@ -81,7 +81,10 @@ of a broken join.
   milliseconds between two joins from one IP address, `packets-per-second` the most packets a
   player may send in a second, on average over `packet-window` seconds (7), so short bursts such as
   fast mining pass; a single second over `packet-burst` (4) times it is too many anyway; a player past either is sent away. `sessions-per-ip` is the most
-  players online at once from one IP address; a player joining again from it still gets in. A
+  players online at once from one IP address; a player joining again from it still gets in. It also
+  caps the connections from one address that have not logged in yet: one past it is closed as it
+  connects, before anything is read, so a client opening connection after connection can't pile them
+  up. A
   good start:
 
   ```toml

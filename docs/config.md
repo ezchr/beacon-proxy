@@ -96,7 +96,7 @@ Another world on another Xbox account. `beacon accounts add <name>` signs it in 
 | `packets-per-second` | number | `0` | most packets per player per second, averaged over `packet-window`. `0`: off |
 | `packet-window` | seconds | `7` | the window `packets-per-second` is averaged over |
 | `packet-burst` | number | `4` | one second over this many times `packets-per-second` is too many. `-1`: no burst check |
-| `sessions-per-ip` | number | `0` | most players online from one IP. `0`: off |
+| `sessions-per-ip` | number | `0` | most players online from one IP, and most connections from it that have not logged in yet (closed as they connect; a relayed connection counts against the player's own address). Loopback is never capped. `0`: off |
 | `fake-player-count` | number | `0` | Friends-tab count shown instead of the real one. `0`: off |
 | `fake-player-drift` | `{ min, max, max-step }` | off | Friends-tab count that wanders between min and max, by at most max-step per update. `max = 0`: off |
 | `compression` | `"snappy"` \| `"flate"` \| `"none"` | `"snappy"` | compression with players |
