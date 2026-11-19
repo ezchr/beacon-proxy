@@ -324,6 +324,11 @@ func recordPlayerList(ctx context.Context, conn *minecraft.Conn, source string, 
 		if err != nil {
 			return fmt.Errorf("read packet: %w", err)
 		}
+		if t, ok := pk.(*packet.Text); ok {
+			// Chat as the server sends it: shows who posts what (adverts, bots).
+			log.Info("chat", "type", t.TextType, "source", t.SourceName, "xuid", t.XUID, "message", t.Message)
+			continue
+		}
 		list, ok := pk.(*packet.PlayerList)
 		if !ok {
 			continue
@@ -344,6 +349,10 @@ func recordPlayerList(ctx context.Context, conn *minecraft.Conn, source string, 
 			// v1.62.0, so add/remove is now filtered per entry rather than per packet.
 			if entry.ActionType != protocol.PlayerListActionAdd {
 				continue
+			}
+			if entry.XUID != "" && entry.XUID != self {
+				// Everyone on the server, known or new: who is online right now.
+				log.Info("online player", "xuid", entry.XUID, "username", entry.Username, "subClient", entry.SubClient, "host", entry.Host, "platform", entry.BuildPlatform)
 			}
 			if entry.XUID == "" || entry.XUID == self || seen[entry.XUID] {
 				continue

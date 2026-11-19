@@ -190,7 +190,7 @@ func scrapeWorld(ctx context.Context, tokSrc oauth2.TokenSource, authSession *se
 	}
 	netherNet := minecraft.NetherNet{
 		Signaling: sig,
-		Dialer:    nethernet.Dialer{API: api, Log: log},
+		Dialer:    nethernet.Dialer{API: api, Log: log, AllowIdentitylessServer: true},
 		Log:       log,
 	}
 	// Join in the host's own version: a host on a newer one turns an older client away.
