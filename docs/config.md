@@ -79,6 +79,9 @@ Another world on another Xbox account. `beacon accounts add <name>` signs it in 
 | `host-name` | text | `[broadcast]`'s | host name |
 | `server` | server name | `try`'s first | where its players join first |
 | `player-count` | as in `[broadcast]` | `[broadcast]`'s | count it shows |
+| `inviters` | list of other broadcasts' `name`s | `[]` | as `inviter`, for several accounts: each joins this world's newest session (not the world) and they send this world's invites in turn, one each at a time |
+| `members` | list of other broadcasts' `name`s | `[]` | each of these accounts joins this world's newest session (not the world) and makes it its activity, so its friends see this world on their Friends tab, through it. Keep their own worlds off (`/broadcast off <name>`): an account has one activity |
+| `inviter` | another broadcast's `name` | `""` | that broadcast's account joins this world's newest session as a member (not the world), moves to each new session as it rolls over, and sends this world's invites from there. It sends the host a friend request first, since joining needs friendship |
 | `accept-friends` | `true` \| `false` | `true` | accept friend requests |
 | `invites` | `true` \| `false` | `false` | invite routes for this world on the control port ([control API](control-api.md)) |
 | `protocol`, `version` | `2193`, `"1.26.30"` | the main world's | serve another game version from this world |

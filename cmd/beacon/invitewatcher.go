@@ -97,8 +97,8 @@ func readXUIDLists(paths []string, log *slog.Logger) []string {
 // parseInviteInterval), at the operator's discretion - the reasons above still apply.
 const inviteRateLimit = 10 * time.Second
 
-// minInviteInterval is the fastest /invites/start?interval= accepts.
-const minInviteInterval = time.Second
+// minInviteInterval is the fastest /invites/start?interval= accepts (0.25 s: what ZID ran at with no 429s, 2026-11-10).
+const minInviteInterval = 250 * time.Millisecond
 
 // parseInviteInterval reads /invites/start's optional interval (a Go duration such as "1s" or
 // "5s"); empty means inviteRateLimit.
@@ -374,26 +374,44 @@ func (c *inviteController) run(ctx context.Context, interval time.Duration, list
 			}
 			resumeAfter = ""
 			c.log.Info("starting invite lap", "list", list, "count", len(xuids), "from", from)
-			for _, xuid := range xuids[from:] {
+			// Several inviting accounts (inviterPool) send one invite each at a time.
+			batch := 1
+			if p, ok := c.xblSession.(interface{ Parallel() int }); ok && p.Parallel() > 1 {
+				batch = p.Parallel()
+			}
+			rest := xuids[from:]
+			for len(rest) > 0 {
+				group := rest[:min(batch, len(rest))]
+				rest = rest[len(group):]
 				select {
 				case <-ctx.Done():
 					return
 				case <-time.After(interval):
 				}
-				// Checked fresh right before each send, not once per lap - a rate-limited lap
-				// over a long list can take a while, and someone can join partway through it.
-				// Anyone already in our world gets a pointless invite otherwise.
-				if bridge.ConnectedXUIDs()[xuid] {
-					c.log.Debug("skipping invite - already connected", "xuid", xuid)
-				} else if err := c.xblSession.SendInvite(ctx, xuid); err != nil {
-					c.log.Error("failed to send invite", "xuid", xuid, "err", err)
-				} else {
-					invitequeue.RecordSent(xuid)
-					// Keep going with the rest of the lap rather than aborting the whole cycle
-					// over one failed invite (a stale/invalid XUID, a momentary API hiccup) -
-					// this same XUID gets tried again on the next lap regardless.
+				var wg sync.WaitGroup
+				for _, xuid := range group {
+					// Checked fresh right before each send, not once per lap - a rate-limited lap
+					// over a long list can take a while, and someone can join partway through it.
+					// Anyone already in our world gets a pointless invite otherwise.
+					if bridge.ConnectedXUIDs()[xuid] {
+						c.log.Debug("skipping invite - already connected", "xuid", xuid)
+						continue
+					}
+					wg.Add(1)
+					go func(xuid string) {
+						defer wg.Done()
+						if err := c.xblSession.SendInvite(ctx, xuid); err != nil {
+							c.log.Error("failed to send invite", "xuid", xuid, "err", err)
+						} else {
+							invitequeue.RecordSent(xuid)
+							// Keep going with the rest of the lap rather than aborting the whole
+							// cycle over one failed invite (a stale/invalid XUID, a momentary API
+							// hiccup) - this same XUID gets tried again on the next lap regardless.
+						}
+					}(xuid)
 				}
-				c.recordProgress(ctx, interval, list, xuid)
+				wg.Wait()
+				c.recordProgress(ctx, interval, list, group[len(group)-1])
 			}
 			c.log.Info("invite lap complete", "list", list, "count", len(xuids))
 			c.recordProgress(ctx, interval, list, "")

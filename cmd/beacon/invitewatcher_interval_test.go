@@ -10,16 +10,17 @@ import (
 
 func TestParseInviteInterval(t *testing.T) {
 	for in, want := range map[string]time.Duration{
-		"":     inviteRateLimit,
-		"1s":   time.Second,
-		"2.5s": 2500 * time.Millisecond,
-		"1m":   time.Minute,
+		"":      inviteRateLimit,
+		"1s":    time.Second,
+		"2.5s":  2500 * time.Millisecond,
+		"1m":    time.Minute,
+		"250ms": 250 * time.Millisecond,
 	} {
 		if got, err := parseInviteInterval(in); err != nil || got != want {
 			t.Errorf("parseInviteInterval(%q) = %v, %v; want %v", in, got, err, want)
 		}
 	}
-	for _, in := range []string{"500ms", "0s", "-1s", "fast", "1"} {
+	for _, in := range []string{"100ms", "0s", "-1s", "fast", "1"} {
 		if _, err := parseInviteInterval(in); err == nil {
 			t.Errorf("parseInviteInterval(%q) accepted", in)
 		}

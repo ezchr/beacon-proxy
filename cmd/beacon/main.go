@@ -588,9 +588,13 @@ func runSession(ctx context.Context, authSession *session.Session, rta *xbl.RTA,
 	//
 	// The primary broadcast's controls are always there; an extra broadcast's only with
 	// "invites": true. None in a process without a control port (a -login broadcaster).
+	var inviter sessionInviter = sessions
+	if pool := startSessionMembers(sessionCtx, cfg, xuid, sessions, log); pool != nil {
+		inviter = pool
+	}
 	if controlSrv != nil && cfg.InvitesEnabled {
-		inviteCtl := newInviteController(sessions, cfg.BroadcastName, log)
-		friendsInviteCtl := newFriendsInviteController(authSession, sessions, log)
+		inviteCtl := newInviteController(inviter, cfg.BroadcastName, log)
+		friendsInviteCtl := newFriendsInviteController(authSession, inviter, log)
 		adder := friendAdderFor(cfg.BroadcastName, authSession, xuid, log)
 		controlSrv.setInvites(sessionCtx, cfg.BroadcastName, inviteRoutes(sessionCtx, ctx, inviteCtl, friendsInviteCtl, adder))
 		// If invites were running when the previous session (or relay process) ended, carry on

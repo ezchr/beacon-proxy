@@ -71,16 +71,19 @@ type tomlConfig struct {
 		Server         string   `toml:"server"`
 		PlayerCount    string   `toml:"player-count"`
 		Extra          []struct {
-			Name          string `toml:"name"`
-			TokenFile     string `toml:"token-file"`
-			HostName      string `toml:"host-name"`
-			WorldName     string `toml:"world-name"`
-			Invites       bool   `toml:"invites"`
-			AcceptFriends *bool  `toml:"accept-friends"`
-			Protocol      int32  `toml:"protocol"`
-			Version       string `toml:"version"`
-			Server        string `toml:"server"`
-			PlayerCount   string `toml:"player-count"`
+			Name          string   `toml:"name"`
+			TokenFile     string   `toml:"token-file"`
+			HostName      string   `toml:"host-name"`
+			WorldName     string   `toml:"world-name"`
+			Invites       bool     `toml:"invites"`
+			AcceptFriends *bool    `toml:"accept-friends"`
+			Protocol      int32    `toml:"protocol"`
+			Version       string   `toml:"version"`
+			Server        string   `toml:"server"`
+			PlayerCount   string   `toml:"player-count"`
+			Inviter       string   `toml:"inviter"`
+			Inviters      []string `toml:"inviters"`
+			Members       []string `toml:"members"`
 		} `toml:"extra"`
 	} `toml:"broadcast"`
 
@@ -192,6 +195,7 @@ func (t tomlConfig) fileConfig() (FileConfig, error) {
 			Name: name, TokenFile: e.TokenFile, HostName: e.HostName, WorldName: e.WorldName,
 			Invites: e.Invites, NoFriendAccept: e.AcceptFriends != nil && !*e.AcceptFriends,
 			Protocol: e.Protocol, Version: e.Version, Server: e.Server, PlayerCount: pc,
+			Inviter: e.Inviter, Inviters: e.Inviters, Members: e.Members,
 		})
 	}
 

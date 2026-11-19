@@ -82,6 +82,8 @@ server = {{q .Server}}
 # allowed-xuids = ["xuid"]        # only these players may join the network
 # update-interval-seconds = 30    # how often the Friends-tab world is refreshed
 # Another world on another Xbox account: beacon accounts add <name>
+# In an extra world: inviters = ["a", "b"] sends its invites from those accounts in turn;
+# members = ["a", "b"] has those accounts join it and show it to their friends.
 {{- range .Extra}}
 
 # Another world, hosted by another account. Add one with: beacon accounts add <name>
@@ -106,6 +108,9 @@ version = {{q .Version}}
 {{- end}}
 server = {{q .Server}}
 player-count = {{q .PlayerCount}}
+{{- if .Inviter}}
+inviter = {{q .Inviter}}
+{{- end}}
 {{- end}}
 
 [advanced]

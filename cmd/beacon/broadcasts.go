@@ -91,6 +91,8 @@ func (b BroadcastConfig) forBroadcast(cfg FileConfig) FileConfig {
 	cfg.HostName, cfg.WorldName = b.HostName, b.WorldName
 	cfg.BroadcastName, cfg.InvitesEnabled = b.Name, b.Invites
 	cfg.NoFriendAccept = b.NoFriendAccept
+	cfg.Inviter = b.Inviter
+	cfg.Inviters, cfg.Members = b.Inviters, b.Members
 	cfg.FirstServer = b.Server
 	cfg.FriendsWorldName = "" // an extra world has its own world-name
 	if b.PlayerCount != "" {
@@ -200,6 +202,7 @@ func runBroadcast(ctx context.Context, name string, authSession *session.Session
 	if _, err := rta.ConnectionID(ctx); err != nil {
 		return fmt.Errorf("obtain rta connection id: %w", err)
 	}
+	memberAccounts.Store(name, &memberAccount{auth: authSession, xuid: xuid, gamertag: gamertag, rta: rta})
 
 	// --- Friend request handling.
 	//

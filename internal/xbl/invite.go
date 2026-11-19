@@ -6,8 +6,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"strconv"
+
+	"github.com/ezchr/beacon-proxy/internal/session"
 )
 
 // InviteRequest is POSTed to https://sessiondirectory.xboxlive.com/handles to send a real Xbox
@@ -80,6 +83,21 @@ func (s *Session) SendInvite(ctx context.Context, invitedXUID string) error {
 	if err != nil {
 		return fmt.Errorf("invite %s: %w", invitedXUID, err)
 	}
+	return sendInvite(ctx, s.httpClient, auth, s.sessionID, invitedXUID, s.log)
+}
+
+// SendInviteAs sends a game invite into the session sessionID (this package's Minecraft template)
+// from authSession's account, which must be a member of it (JoinSessionRef): a member of a world's
+// session may invite into it, as a player in someone's world can.
+func SendInviteAs(ctx context.Context, authSession *session.Session, sessionID, invitedXUID string, log *slog.Logger) error {
+	auth, err := activityAuthHeader(ctx, authSession)
+	if err != nil {
+		return fmt.Errorf("invite %s: %w", invitedXUID, err)
+	}
+	return sendInvite(ctx, http.DefaultClient, auth, sessionID, invitedXUID, log)
+}
+
+func sendInvite(ctx context.Context, client *http.Client, auth, sessionID, invitedXUID string, log *slog.Logger) error {
 
 	body := InviteRequest{
 		Version: 1,
@@ -87,7 +105,7 @@ func (s *Session) SendInvite(ctx context.Context, invitedXUID string) error {
 		SessionRef: SessionRef{
 			Scid:         ServiceConfigID,
 			TemplateName: TemplateName,
-			Name:         s.sessionID,
+			Name:         sessionID,
 		},
 		InviteAttrs: InviteAttrs{TitleId: strconv.Itoa(InviteTitleId)},
 		InvitedXuid: invitedXUID,
@@ -105,7 +123,7 @@ func (s *Session) SendInvite(ctx context.Context, invitedXUID string) error {
 	req.Header.Set("Authorization", auth)
 	req.Header.Set("x-xbl-contract-version", xblContractVersion)
 
-	resp, err := s.httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return fmt.Errorf("send invite to %s: %w", invitedXUID, err)
 	}
@@ -118,6 +136,6 @@ func (s *Session) SendInvite(ctx context.Context, invitedXUID string) error {
 	// is proof Xbox Live actually created something, not just accepted the request, which
 	// matters for diagnosing "the invite never arrived" (a real handle can still fail to notify
 	// the recipient's device for other reasons this comment doesn't yet know about).
-	s.log.Info("sent xbox live game invite", "invitedXuid", invitedXUID, "handleResponse", string(respBody))
+	log.Info("sent xbox live game invite", "invitedXuid", invitedXUID, "session", sessionID, "handleResponse", string(respBody))
 	return nil
 }

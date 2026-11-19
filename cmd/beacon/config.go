@@ -247,8 +247,13 @@ type FileConfig struct {
 
 	// BroadcastName and InvitesEnabled describe the one broadcast a copy of the config is being
 	// run for (see runBroadcast and BroadcastConfig.forBroadcast). Never read from the file.
-	BroadcastName  string `json:"-"`
-	InvitesEnabled bool   `json:"-"`
+	BroadcastName string `json:"-"`
+	// Inviter: BroadcastConfig.Inviter of the broadcast this copy is for.
+	Inviter string `json:"-"`
+	// Inviters and Members: BroadcastConfig.Inviters and Members of the broadcast this copy is for.
+	Inviters       []string `json:"-"`
+	Members        []string `json:"-"`
+	InvitesEnabled bool     `json:"-"`
 }
 
 // BroadcastConfig is one extra Friends-tab broadcast. Only TokenFile is required.
@@ -277,6 +282,16 @@ type BroadcastConfig struct {
 	// NoFriendAccept: as FileConfig.NoFriendAccept, for this broadcast's account. Not inherited
 	// from the primary - each account's friends list is its own.
 	NoFriendAccept bool `json:"no_friend_accept"`
+	// Inviter names another broadcast whose account joins this world's newest session as a member
+	// (not the world itself) and sends this world's invites from there (sessionmember.go).
+	Inviter string `json:"inviter,omitempty"`
+	// Inviters names several broadcasts whose accounts send this world's invites in turn, one each
+	// at a time, from this world's newest session (sessionmember.go). Inviter is one more.
+	Inviters []string `json:"inviters,omitempty"`
+	// Members names broadcasts whose accounts join this world's newest session as members and make
+	// it their activity, so their friends see this world on their Friends tab, through them. Their
+	// own world stays off (their listing off), or they would leave this one for it.
+	Members []string `json:"members,omitempty"`
 	// Protocol / Version this broadcast's session advertises. Default: the primary's. A client
 	// only joins a Friends-tab world of its own protocol ("the host is using an older version"
 	// otherwise), so serving two game versions from the Friends tab takes one broadcast per
